@@ -10,7 +10,7 @@ clean-room rule.
 
 from __future__ import annotations
 
-from rcopula import credit, derivatives, risk
+from rcopula import credit, derivatives, portfolio, risk
 from rcopula.core.archimedean import (
     AMHCopula,
     ArchimedeanCopula,
@@ -48,6 +48,7 @@ from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, fit, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test
 from rcopula.htest import TestResult, ev_test, exch_test, indep_test, rad_sym_test
+from rcopula.transforms import conditional_cdf, conditional_ppf, rosenblatt
 
 __version__ = "0.1.0.dev0"
 
@@ -83,6 +84,8 @@ __all__ = [
     "TestResult",
     "__version__",
     "beta_n",
+    "conditional_cdf",
+    "conditional_ppf",
     "cor_kendall",
     "cor_spearman",
     "credit",
@@ -95,7 +98,9 @@ __all__ = [
     "indep_test",
     "loglik_copula",
     "p2P",
+    "portfolio",
     "pseudo_obs",
     "rad_sym_test",
     "risk",
+    "rosenblatt",
 ]
