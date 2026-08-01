@@ -10,6 +10,7 @@ clean-room rule.
 
 from __future__ import annotations
 
+from rcopula import credit, risk
 from rcopula.core.archimedean import (
     AMHCopula,
     ArchimedeanCopula,
@@ -84,6 +85,7 @@ __all__ = [
     "beta_n",
     "cor_kendall",
     "cor_spearman",
+    "credit",
     "ev_test",
     "exch_test",
     "fit",
@@ -94,4 +96,5 @@ __all__ = [
     "p2P",
     "pseudo_obs",
     "rad_sym_test",
+    "risk",
 ]
