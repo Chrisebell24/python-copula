@@ -96,7 +96,10 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
         ),
         ("api/inference", ["fit", "CopulaFitResult", "select_copula", "cross_validate"]),
         ("api/gof", ["gof_test", "exch_test", "rad_sym_test"]),
-        ("api/transforms", ["rosenblatt", "kendall_cdf", "kendall_return_period"]),
+        (
+            "api/transforms",
+            ["rosenblatt", "kendall_cdf", "kendall_return_period", "htrafo", "radial_simplex"],
+        ),
         ("api/plots", ["tail_concentration", "kendall_plot", "pickands_plot"]),
         (
             "api/applications",

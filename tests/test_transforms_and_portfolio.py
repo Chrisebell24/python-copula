@@ -335,3 +335,142 @@ class TestPortfolioOptimisation:
         assert np.all(np.diff(mu) >= -1e-9)
         assert np.all(np.diff(cvar) >= -1e-9)
         assert weights.shape[1] == 2
+
+
+class TestRadialSimplex:
+    """McNeil and Neslehova's decomposition.
+
+    The angular part is uniform on the simplex for *every* Archimedean copula in
+    *every* dimension at *every* parameter -- all the family-specific
+    information is in the radial part. That universality is the property worth
+    testing, because it is what makes a nonparametric test of Archimedeanity
+    possible at all.
+    """
+
+    @pytest.mark.parametrize(
+        "copula",
+        [
+            rc.ClaytonCopula(0.5, dim=3),
+            rc.ClaytonCopula(6.0, dim=3),
+            rc.GumbelCopula(1.5, dim=4),
+            rc.GumbelCopula(4.0, dim=4),
+            rc.FrankCopula(8.0, dim=3),
+            rc.JoeCopula(2.5, dim=3),
+        ],
+        ids=lambda c: f"{type(c).__name__}{c.params[0]:g}d{c.dim}",
+    )
+    def test_angular_part_is_uniform_on_the_simplex(self, copula: rc.Copula) -> None:
+        from rcopula.transforms import radial_simplex
+
+        _, angular = radial_simplex(copula, copula.rvs(20_000, random_state=0))
+        np.testing.assert_allclose(angular.sum(axis=1), 1.0, atol=1e-12)
+        # A uniform point on the d-simplex has mean 1/d and variance
+        # (d-1)/(d^2 (d+1)) in every coordinate.
+        d = copula.dim
+        np.testing.assert_allclose(angular.mean(axis=0), 1 / d, atol=0.01)
+        expected_variance = (d - 1) / (d**2 * (d + 1))
+        np.testing.assert_allclose(angular.var(axis=0), expected_variance, rtol=0.06)
+
+    def test_radial_and_angular_parts_are_independent(self) -> None:
+        from rcopula.transforms import radial_simplex
+
+        copula = rc.ClaytonCopula(2.0, dim=3)
+        radial, angular = radial_simplex(copula, copula.rvs(50_000, random_state=0))
+        for j in range(3):
+            assert abs(float(np.corrcoef(radial, angular[:, j])[0, 1])) < 0.02
+
+    def test_radial_part_is_the_sum_of_the_inverse_generator(self) -> None:
+        from rcopula.transforms import radial_simplex
+
+        copula = rc.GumbelCopula(2.0, dim=3)
+        u = copula.rvs(200, random_state=0)
+        radial, _ = radial_simplex(copula, u)
+        expected = sum(copula.generator.ipsi(u[:, j], 2.0) for j in range(3))
+        np.testing.assert_allclose(radial, expected, rtol=1e-12)
+
+    def test_refuses_a_non_archimedean_copula(self) -> None:
+        from rcopula.transforms import radial_simplex
+
+        with pytest.raises(TypeError, match="Archimedean"):
+            radial_simplex(rc.GaussianCopula(0.5), np.full((4, 2), 0.5))
+
+    def test_rejects_a_dimension_mismatch(self) -> None:
+        from rcopula.transforms import radial_simplex
+
+        with pytest.raises(ValueError, match="columns"):
+            radial_simplex(rc.ClaytonCopula(2.0, dim=3), np.full((4, 2), 0.5))
+
+
+class TestHtrafo:
+    """The Hering-Hofert transform.
+
+    Under the null it produces independent uniforms, so both properties are
+    checked -- uniformity alone would pass for a transform that got the
+    dependence wrong.
+    """
+
+    @pytest.mark.parametrize(
+        "copula",
+        [
+            rc.ClaytonCopula(2.0, dim=3),
+            rc.ClaytonCopula(0.5, dim=5),
+            rc.GumbelCopula(2.5, dim=4),
+            rc.FrankCopula(6.0, dim=4),
+            rc.JoeCopula(3.0, dim=3),
+        ],
+        ids=lambda c: f"{type(c).__name__}d{c.dim}",
+    )
+    def test_each_component_is_uniform(self, copula: rc.Copula) -> None:
+        from rcopula.transforms import htrafo
+
+        y = htrafo(copula, copula.rvs(20_000, random_state=0))
+        assert y.shape == (20_000, copula.dim)
+        for j in range(copula.dim):
+            assert stats.kstest(y[:, j], "uniform").pvalue > 0.001
+
+    @pytest.mark.parametrize(
+        "copula",
+        [rc.ClaytonCopula(2.0, dim=4), rc.GumbelCopula(2.5, dim=4), rc.FrankCopula(6.0, dim=4)],
+        ids=lambda c: type(c).__name__,
+    )
+    def test_the_components_are_independent(self, copula: rc.Copula) -> None:
+        from rcopula.transforms import htrafo
+
+        y = htrafo(copula, copula.rvs(20_000, random_state=0))
+        off_diagonal = np.abs(rc.cor_kendall(y) - np.eye(copula.dim))
+        # At n = 20000 the sampling standard deviation of a Kendall tau is about
+        # 0.0047, so 0.02 is four of them.
+        assert off_diagonal.max() < 0.02
+
+    def test_the_wrong_copula_is_detected(self) -> None:
+        from rcopula.transforms import htrafo
+
+        clayton = rc.ClaytonCopula(2.0, dim=5)
+        y = htrafo(clayton, rc.GumbelCopula(3.0, dim=5).rvs(4000, random_state=0))
+        assert stats.kstest(y.ravel(), "uniform").pvalue < 1e-6
+
+    def test_the_wrong_parameter_is_detected(self) -> None:
+        from rcopula.transforms import htrafo
+
+        wrong = rc.ClaytonCopula(6.0, dim=5).rvs(4000, random_state=0)
+        y = htrafo(rc.ClaytonCopula(0.5, dim=5), wrong)
+        assert stats.kstest(y.ravel(), "uniform").pvalue < 1e-6
+
+    def test_survives_a_dimension_the_rosenblatt_transform_would_not(self) -> None:
+        # The point of the transform: no high-order generator derivatives, so
+        # d = 100 is no harder than d = 3.
+        from rcopula.transforms import htrafo
+
+        copula = rc.GumbelCopula(2.0, dim=100)
+        y = htrafo(copula, copula.rvs(400, random_state=0))
+        assert y.shape == (400, 100)
+        assert np.all(np.isfinite(y))
+        assert np.all((y >= 0) & (y <= 1))
+        assert stats.kstest(y.ravel(), "uniform").pvalue > 0.001
+
+    def test_output_stays_in_the_unit_cube(self) -> None:
+        from rcopula.transforms import htrafo
+
+        copula = rc.ClaytonCopula(8.0, dim=6)
+        y = htrafo(copula, copula.rvs(2000, random_state=0))
+        assert np.all((y >= 0.0) & (y <= 1.0))

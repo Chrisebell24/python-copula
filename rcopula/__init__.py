@@ -77,7 +77,13 @@ from rcopula.structural import (
     fit_nested,
     survival,
 )
-from rcopula.transforms import conditional_cdf, conditional_ppf, rosenblatt
+from rcopula.transforms import (
+    conditional_cdf,
+    conditional_ppf,
+    htrafo,
+    radial_simplex,
+    rosenblatt,
+)
 from rcopula.vine import VineCopula, fit_vine
 
 __version__ = "0.1.0.dev0"
@@ -138,6 +144,7 @@ __all__ = [
     "garch",
     "gof_statistic",
     "gof_test",
+    "htrafo",
     "indep_test",
     "insurance",
     "kendall_cdf",
@@ -152,6 +159,7 @@ __all__ = [
     "portfolio",
     "pseudo_obs",
     "rad_sym_test",
+    "radial_simplex",
     "return_period_level",
     "risk",
     "rosenblatt",

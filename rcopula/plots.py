@@ -510,8 +510,9 @@ def vine_trees(
     for k in range(depth):
         ax = axes[k]
         # Lay the tree's nodes on a circle: readable for a star and for a path.
-        nodes = sorted({idx for i in range(len(vine.pair_copulas[k]))
-                        for idx in vine._edge_indices(k, i)[:2]})
+        nodes = sorted(
+            {idx for i in range(len(vine.pair_copulas[k])) for idx in vine._edge_indices(k, i)[:2]}
+        )
         angle = {node: 2 * np.pi * j / len(nodes) for j, node in enumerate(nodes)}
         position = {node: (np.cos(a), np.sin(a)) for node, a in angle.items()}
 
@@ -520,9 +521,12 @@ def vine_trees(
             (x0, y0), (x1, y1) = position[a], position[b]
             ax.plot([x0, x1], [y0, y1], color="0.6", linewidth=1.0, zorder=1, **kwargs)
             ax.text(
-                0.5 * (x0 + x1), 0.5 * (y0 + y1),
+                0.5 * (x0 + x1),
+                0.5 * (y0 + y1),
                 f"{copula.name}\n{_short_params(copula)}",
-                ha="center", va="center", fontsize=7,
+                ha="center",
+                va="center",
+                fontsize=7,
                 bbox={"facecolor": "white", "edgecolor": "0.8", "boxstyle": "round,pad=0.2"},
                 zorder=3,
             )
@@ -595,9 +599,13 @@ def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
             ax.plot([centre, x], [-depth, -depth - 1.0], color="0.6", linewidth=1.0, zorder=1)
         ax.scatter([centre], [-depth], s=520, color="0.92", edgecolor="0.35", zorder=3, **kwargs)
         ax.text(
-            centre, -depth,
+            centre,
+            -depth,
             f"{current.theta:.2f}\ntau {current.generator_copula.tau():.2f}",
-            ha="center", va="center", fontsize=7, zorder=4,
+            ha="center",
+            va="center",
+            fontsize=7,
+            zorder=4,
         )
         return centre
 

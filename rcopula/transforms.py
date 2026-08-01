@@ -39,7 +39,7 @@ from rcopula.core.archimedean import ArchimedeanCopula
 from rcopula.core.base import Copula
 from rcopula.core.elliptical import GaussianCopula, StudentCopula
 
-__all__ = ["conditional_cdf", "conditional_ppf", "rosenblatt"]
+__all__ = ["conditional_cdf", "conditional_ppf", "htrafo", "radial_simplex", "rosenblatt"]
 
 #: Step for the numerical fallback. Copula CDFs are smooth in the conditioning
 #: argument, so a modest step is both accurate and safe near the boundary.
@@ -279,3 +279,164 @@ def rosenblatt(copula: Copula, u: ArrayLike) -> NDArray[np.float64]:
         f"the Rosenblatt transform for {copula.name} copulas is implemented for "
         "dim=2 only; Archimedean and elliptical families support any dimension"
     )
+
+
+# --------------------------------------------------------------------------
+# the Archimedean simplex decomposition
+# --------------------------------------------------------------------------
+#
+# References for this section:
+#
+# McNeil, A. J. and Neslehova, J. (2009). Multivariate Archimedean copulas,
+#     d-monotone functions and l1-norm symmetric distributions.
+#     *Annals of Statistics* 37(5B), 3059-3097.
+#     The decomposition itself: an Archimedean copula sample is a radial
+#     variable times a point drawn uniformly from the unit simplex.
+# Hering, C. and Hofert, M. (2015). Goodness-of-fit tests for Archimedean
+#     copulas in high dimensions. In *Innovations in Quantitative Risk
+#     Management*, 357-373. Springer.
+#     The transformation to independent uniforms, ``htrafo`` in R.
+
+
+def radial_simplex(copula: ArchimedeanCopula, u: ArrayLike) -> tuple[NDArray, NDArray]:
+    r"""Split an Archimedean sample into its radial and angular parts.
+
+    McNeil and Neslehova showed that :math:`U \sim C` for an Archimedean copula
+    with generator :math:`\psi` if and only if
+
+    .. math::  \bigl(\psi^{-1}(U_1), \dots, \psi^{-1}(U_d)\bigr) = R\,S,
+
+    with :math:`S` **uniform on the unit simplex** and independent of the radial
+    variable :math:`R = \sum_k \psi^{-1}(U_k)`. All the family-specific
+    information sits in the distribution of :math:`R`; the angular part is the
+    same for every Archimedean copula in every dimension.
+
+    That is the whole basis for testing *Archimedeanity* rather than testing one
+    particular family: if the angular part is not uniform on the simplex, no
+    Archimedean copula fits, whatever generator is tried.
+
+    Parameters
+    ----------
+    copula : ArchimedeanCopula
+        Supplies the generator. Its parameter must be set.
+    u : array_like, shape (n, d)
+
+    Returns
+    -------
+    radial : ndarray, shape (n,)
+        :math:`R`.
+    angular : ndarray, shape (n, d)
+        :math:`S`, whose rows sum to one.
+
+    Examples
+    --------
+    The angular part is uniform on the simplex, so each of its coordinates has
+    mean :math:`1/d` -- and this does not depend on the family or the parameter:
+
+    >>> import numpy as np, rcopula as rc
+    >>> from rcopula.transforms import radial_simplex
+    >>> for copula in (rc.ClaytonCopula(3.0, dim=4), rc.GumbelCopula(2.0, dim=4)):
+    ...     u = copula.rvs(20000, random_state=0)
+    ...     angular = radial_simplex(copula, u)[1]
+    ...     print(bool(np.all(np.abs(angular.mean(axis=0) - 0.25) < 0.01)))
+    True
+    True
+    """
+    if not isinstance(copula, ArchimedeanCopula):
+        raise TypeError(
+            f"the radial-simplex decomposition is Archimedean; got "
+            f"{type(copula).__name__}. Elliptical copulas have their own "
+            "(radius, direction) decomposition on the sphere rather than the "
+            "simplex."
+        )
+    u = np.atleast_2d(np.asarray(u, dtype=float))
+    if u.shape[1] != copula.dim:
+        raise ValueError(f"u has {u.shape[1]} columns but the copula has dim {copula.dim}")
+    theta = float(copula.params[0])
+    inverse = np.column_stack([copula.generator.ipsi(u[:, j], theta) for j in range(copula.dim)])
+    radial = np.asarray(inverse.sum(axis=1), dtype=float)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        angular = inverse / radial[:, None]
+    return radial, np.asarray(angular, dtype=float)
+
+
+def htrafo(copula: ArchimedeanCopula, u: ArrayLike) -> NDArray[np.float64]:
+    r"""Hering-Hofert transform: Archimedean data to independent uniforms.
+
+    The Rosenblatt transform (:func:`rosenblatt`) does the same job by
+    conditioning one coordinate at a time, which needs :math:`d-1` derivatives
+    of the generator and loses accuracy fast as :math:`d` grows. This transform
+    goes through the simplex decomposition instead, so it needs no high-order
+    derivatives at all and stays usable at :math:`d = 100` -- which is why it
+    exists.
+
+    Writing :math:`S_j = \sum_{k \le j} \psi^{-1}(U_k)`,
+
+    .. math::
+
+        Y_j = \left(\frac{S_j}{S_{j+1}}\right)^{j}, \quad j = 1, \dots, d-1,
+        \qquad Y_d = K\bigl(\psi(S_d)\bigr),
+
+    with :math:`K` the Kendall distribution function. Under the null that ``u``
+    came from this copula the :math:`Y_j` are independent and uniform, so any
+    test of multivariate uniformity becomes a goodness-of-fit test.
+
+    The first :math:`d-1` components come from the angular part and the last
+    from the radial part; since those are independent, so are the two groups.
+
+    Parameters
+    ----------
+    copula : ArchimedeanCopula
+    u : array_like, shape (n, d)
+
+    Returns
+    -------
+    ndarray, shape (n, d)
+
+    See Also
+    --------
+    rosenblatt : the conditioning-based alternative, exact but derivative-hungry.
+    radial_simplex : the decomposition this is built on.
+
+    Examples
+    --------
+    Data from the copula transforms to uniforms; data from a different copula
+    does not:
+
+    >>> import numpy as np, rcopula as rc
+    >>> from scipy import stats
+    >>> from rcopula.transforms import htrafo
+    >>> copula = rc.ClaytonCopula(2.0, dim=5)
+    >>> y = htrafo(copula, copula.rvs(4000, random_state=0))
+    >>> bool(stats.kstest(y.ravel(), "uniform").pvalue > 0.01)
+    True
+    >>> wrong = htrafo(copula, rc.GumbelCopula(3.0, dim=5).rvs(4000, random_state=0))
+    >>> bool(stats.kstest(wrong.ravel(), "uniform").pvalue < 1e-6)
+    True
+
+    It still works where the Rosenblatt transform's derivatives would not:
+
+    >>> big = rc.GumbelCopula(2.0, dim=50)
+    >>> y = htrafo(big, big.rvs(500, random_state=0))
+    >>> bool(np.all(np.isfinite(y)) and y.shape == (500, 50))
+    True
+    """
+    from rcopula.kendall import kendall_cdf
+
+    radial, _ = radial_simplex(copula, u)
+    u = np.atleast_2d(np.asarray(u, dtype=float))
+    dim = copula.dim
+    theta = float(copula.params[0])
+    inverse = np.column_stack([copula.generator.ipsi(u[:, j], theta) for j in range(dim)])
+
+    partial = np.cumsum(inverse, axis=1)
+    out = np.empty_like(partial)
+    for j in range(1, dim):
+        with np.errstate(invalid="ignore", divide="ignore"):
+            ratio = partial[:, j - 1] / partial[:, j]
+        out[:, j - 1] = np.clip(ratio, 0.0, 1.0) ** j
+    # The last component carries everything the angular part discarded: the
+    # radial variable, mapped through K, which is exactly the copula's Kendall
+    # distribution function evaluated at C(u).
+    out[:, dim - 1] = kendall_cdf(copula, copula.generator.psi(radial, theta))
+    return np.clip(out, 0.0, 1.0)

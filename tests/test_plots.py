@@ -274,9 +274,7 @@ class TestStructurePlots:
         assert "Frank" in " ".join(t.get_text() for t in grid[1].texts)
 
     def test_vine_trees_can_be_truncated(self) -> None:
-        vine = rc.VineCopula(
-            [[rc.GaussianCopula(0.5)] * (4 - k) for k in range(4)], structure="C"
-        )
+        vine = rc.VineCopula([[rc.GaussianCopula(0.5)] * (4 - k) for k in range(4)], structure="C")
         assert len(vine_trees(vine, max_trees=2)) == 2
 
     def test_nested_tree_shows_every_node_and_leaf(self) -> None:
@@ -299,8 +297,13 @@ class TestStructurePlots:
         cop = NestedArchimedean(
             rc.ClaytonCopula(0.4),
             [4],
-            [NestedArchimedean(rc.ClaytonCopula(1.5), [3],
-                               [NestedArchimedean(rc.ClaytonCopula(4.0), [0, 1, 2])])],
+            [
+                NestedArchimedean(
+                    rc.ClaytonCopula(1.5),
+                    [3],
+                    [NestedArchimedean(rc.ClaytonCopula(4.0), [0, 1, 2])],
+                )
+            ],
         )
         ax = nested_tree(cop)
         assert len(ax.collections) >= 8  # five leaves plus three nodes
@@ -316,8 +319,8 @@ class TestStructurePlots:
         tau = cop.tau_matrix()
         ax = dependence_heatmap(tau, names=list("abcde"))
         text = {t.get_text() for t in ax.texts}
-        assert f"{tau[0, 1]:.2f}" in text   # within the first block
-        assert f"{tau[0, 3]:.2f}" in text   # across blocks
+        assert f"{tau[0, 1]:.2f}" in text  # within the first block
+        assert f"{tau[0, 3]:.2f}" in text  # across blocks
         assert [label.get_text() for label in ax.get_xticklabels()] == list("abcde")
 
     def test_dependence_heatmap_rejects_a_non_square_matrix(self) -> None:
