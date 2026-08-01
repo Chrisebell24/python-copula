@@ -263,3 +263,70 @@ def test_with_params_preserves_structure() -> None:
     assert other.dispstr == "toep"
     assert other.dim == 3
     assert np.allclose(other.params, [0.3, 0.1])
+
+
+class TestStudentSpearmanRho:
+    """Spearman's rho for the t copula is NOT the Gaussian expression.
+
+    Kendall's tau is ``(2/pi) arcsin(rho)`` for *every* elliptical copula, so it
+    is tempting to assume Spearman's rho transfers too. It does not:
+    ``(6/pi) arcsin(rho/2)`` is specific to the Gaussian copula. R declines the
+    question and returns ``NA`` for ``rho(tCopula(...))``; this package computes
+    it by quadrature instead.
+    """
+
+    def test_differs_from_the_gaussian_value(self) -> None:
+        student = rc.StudentCopula(0.5, df=4.0).rho()
+        gaussian = rc.GaussianCopula(0.5).rho()
+        assert student == pytest.approx(0.4690201700, abs=1e-9)
+        assert gaussian == pytest.approx(0.4825837395, abs=1e-9)
+        assert student < gaussian
+
+    @pytest.mark.parametrize("correlation", [-0.7, -0.3, 0.3, 0.7, 0.9])
+    def test_is_below_the_gaussian_in_magnitude(self, correlation: float) -> None:
+        """Heavier tails spread the ranks, weakening rank correlation."""
+        student = rc.StudentCopula(correlation, df=3.0).rho()
+        gaussian = rc.GaussianCopula(correlation).rho()
+        assert abs(student) < abs(gaussian)
+        assert np.sign(student) == np.sign(correlation)
+
+    @pytest.mark.parametrize("df", [10.0, 100.0, 1e4, 1e6])
+    def test_converges_to_the_gaussian_as_df_grows(self, df: float) -> None:
+        gap = abs(rc.StudentCopula(0.6, df=df).rho() - rc.GaussianCopula(0.6).rho())
+        assert gap < 3.0 / df
+
+    @pytest.mark.parametrize(("correlation", "df"), [(0.5, 4.0), (0.8, 2.5), (-0.4, 6.0)])
+    def test_matches_the_empirical_rank_correlation(self, correlation: float, df: float) -> None:
+        """The independent check: simulate and measure."""
+        cop = rc.StudentCopula(correlation, df=df)
+        sample = cop.rvs(200_000, random_state=0)
+        empirical = stats.spearmanr(sample[:, 0], sample[:, 1]).statistic
+        assert empirical == pytest.approx(cop.rho(), abs=0.006)
+
+    def test_zero_correlation_gives_zero(self) -> None:
+        assert rc.StudentCopula(0.0, df=3.0).rho() == 0.0
+
+    def test_from_rho_inverts_it(self) -> None:
+        for target in (-0.6, -0.2, 0.3, 0.75):
+            cop = rc.StudentCopula.from_rho(target, df=3.0)
+            assert cop.rho() == pytest.approx(target, abs=1e-8)
+
+    def test_from_rho_differs_from_the_gaussian_calibration(self) -> None:
+        """The correlation needed for a given rank correlation is *higher*."""
+        target, df = 0.6, 3.0
+        student = rc.StudentCopula.from_rho(target, df=df).params[0]
+        gaussian = rc.GaussianCopula.from_rho(target).params[0]
+        assert student > gaussian
+
+    def test_kendall_tau_is_unaffected(self) -> None:
+        """The contrast: tau *is* shared across elliptical copulas."""
+        for correlation in (0.3, 0.7):
+            assert rc.StudentCopula(correlation, df=2.5).tau() == pytest.approx(
+                rc.GaussianCopula(correlation).tau()
+            )
+
+    def test_higher_dimensions_report_one_value_per_pair(self) -> None:
+        cop = rc.StudentCopula([0.6, 0.3, 0.2], dim=3, dispstr="un", df=4.0)
+        values = cop.rho()
+        assert np.asarray(values).shape == (3,)
+        assert np.all(np.diff(values) < 0)  # decreasing, as the correlations are

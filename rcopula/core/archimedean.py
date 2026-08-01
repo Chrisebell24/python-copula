@@ -118,6 +118,26 @@ class ArchimedeanGenerator(ABC):
     def rvs_frailty(self, size: int, theta: float, rng: np.random.Generator) -> NDArray[np.float64]:
         """Draw the frailty :math:`V_0` whose Laplace transform is ``psi``."""
 
+    def has_frailty(self, theta: float) -> bool:
+        """Whether the Marshall-Olkin frailty representation applies at ``theta``.
+
+        Sampling an Archimedean copula as :math:`U_j = \\psi(E_j / V)` requires
+        :math:`\\psi` to be *completely* monotone, i.e. a Laplace transform. That
+        holds only on the positively-dependent half of Clayton, Frank and AMH.
+        On the negative half -- which exists in ``d = 2`` and is the reason
+        those families are used at all -- there is no frailty, and the copula
+        has to be sampled by conditional inversion instead.
+        """
+        return theta > 0.0
+
+    def is_independent(self, theta: float) -> bool:
+        """Whether this ``theta`` gives the independence copula.
+
+        The degenerate point where most generators divide by zero, so callers
+        short-circuit rather than evaluate.
+        """
+        return theta == 0.0
+
     def rho(self, theta: float) -> float:
         r"""Population Spearman's rho.
 
@@ -235,19 +255,34 @@ class _ClaytonGenerator(ArchimedeanGenerator):
         return (-1.0, np.inf) if dim == 2 else (0.0, np.inf)
 
     def psi(self, t, theta):
-        return (1.0 + t) ** (-1.0 / theta)
+        # For theta < 0 the generator has *finite support*: psi(t) = 0 once
+        # 1 + t <= 0. That region is where C hits the Frechet lower bound, and
+        # it is reached for perfectly ordinary (u, v), so it has to be handled
+        # rather than left to produce nan from a fractional power of a negative.
+        return np.maximum(1.0 + t, 0.0) ** (-1.0 / theta)
 
     def ipsi(self, u, theta):
         return u ** (-theta) - 1.0
 
     def log_abs_dpsi(self, t, theta):
-        return -np.log(theta) - (1.0 / theta + 1.0) * np.log1p(t)
+        # log|theta|, not log(theta): theta is negative on the whole
+        # negative-dependence half of the family, where Clayton is still a
+        # perfectly good bivariate copula.
+        inside = 1.0 + t > 0.0
+        safe = np.where(inside, t, 0.0)
+        value = -np.log(abs(theta)) - (1.0 / theta + 1.0) * np.log1p(safe)
+        return np.where(inside, value, -np.inf)
 
     def log_abs_dpsi_d(self, t, theta, d):
-        # psi^(d)(t) = (-1)^d prod_{k=0}^{d-1}(1/theta + k) (1+t)^{-1/theta-d}
+        # psi^(d)(t) = (-1)^d prod_{k=0}^{d-1}(1/theta + k) (1+t)^{-1/theta-d}.
+        # For theta < 0 the factors change sign, so take the magnitude of each;
+        # the density needs |psi^(d)| and the signs cancel against those of psi'.
         k = np.arange(d)
-        log_coef = np.sum(np.log(1.0 / theta + k))
-        return log_coef - (1.0 / theta + d) * np.log1p(t)
+        log_coef = float(np.sum(np.log(np.abs(1.0 / theta + k))))
+        inside = 1.0 + t > 0.0
+        safe = np.where(inside, t, 0.0)
+        value = log_coef - (1.0 / theta + d) * np.log1p(safe)
+        return np.where(inside, value, -np.inf)
 
     def tau(self, theta):
         return theta / (theta + 2.0)
@@ -272,6 +307,12 @@ class _GumbelGenerator(ArchimedeanGenerator):
     """
 
     name = "Gumbel"
+
+    def has_frailty(self, theta):
+        return True
+
+    def is_independent(self, theta):
+        return theta == 1.0
 
     def bounds(self, dim: int) -> tuple[float, float]:
         return (1.0, np.inf)
@@ -373,19 +414,29 @@ class _FrankGenerator(ArchimedeanGenerator):
         return z, one_minus_z
 
     def log_abs_dpsi(self, t, theta):
+        # For theta < 0, h = 1 - e^{-theta} is negative and so is z. The
+        # derivative's magnitude is |z| / (|1 - z| |theta|); logging z directly
+        # would give nan across the entire negative-dependence half of the
+        # family, which is the half Frank exists for.
         z, omz = self._z_and_1mz(t, theta)
-        return np.log(z) - np.log(omz) - np.log(abs(theta))
+        return np.log(np.abs(z)) - np.log(omz) - np.log(abs(theta))
 
     def log_abs_dpsi_d(self, t, theta, d):
-        r"""|psi^(d)(t)| = Li_{-(d-1)}(h e^{-t}) / |theta|.
+        r"""|psi^(d)(t)| = |Li_{-(d-1)}(h e^{-t})| / |theta|.
 
         Expanding ``psi`` as a geometric-type series gives
         ``psi^(d)(t) = ((-1)^d / theta) sum_k k^{d-1} (h e^{-t})^k``, i.e. a
         polylogarithm of negative integer order, which has the closed form
         used by :func:`_polylog_neg_int` (Eulerian numbers).
+
+        For ``theta < 0`` the argument ``z = h e^{-t}`` is negative and can be
+        large in magnitude, so the polylogarithm changes sign with the order.
+        The rational closed form is the analytic continuation and stays valid
+        there; only its *sign* varies, and the magnitude is what a log density
+        needs.
         """
         z, omz = self._z_and_1mz(t, theta)
-        return np.log(_polylog_neg_int(z, d - 1, omz)) - np.log(abs(theta))
+        return np.log(np.abs(_polylog_neg_int(z, d - 1, omz))) - np.log(abs(theta))
 
     def tau(self, theta):
         if theta == 0.0:
@@ -429,6 +480,12 @@ class _JoeGenerator(ArchimedeanGenerator):
     """
 
     name = "Joe"
+
+    def has_frailty(self, theta):
+        return True
+
+    def is_independent(self, theta):
+        return theta == 1.0
 
     def bounds(self, dim: int) -> tuple[float, float]:
         return (1.0, np.inf)
@@ -720,6 +777,11 @@ class ArchimedeanCopula(Copula):
         theta = float(params[0])
         d = self._dim
         g = self.generator
+        # The independence point is a removable singularity for most generators
+        # -- Clayton and Frank both divide by theta -- and it sits inside the
+        # admissible interval, so an optimiser reaches it.
+        if g.is_independent(theta):
+            return np.zeros(u.shape[0])
         t_j = g.ipsi(u, theta)
         t = t_j.sum(axis=1)
         return g.log_abs_dpsi_d(t, theta, d) - g.log_abs_dpsi(t_j, theta).sum(axis=1)
@@ -727,15 +789,61 @@ class ArchimedeanCopula(Copula):
     def _cdf(self, u, params):
         theta = float(params[0])
         g = self.generator
+        if g.is_independent(theta):
+            return np.asarray(u.prod(axis=1))
         return g.psi(g.ipsi(u, theta).sum(axis=1), theta)
 
     def _rvs(self, size, params, rng):
         theta = float(params[0])
         g = self.generator
+        if g.is_independent(theta):
+            return rng.uniform(size=(size, self._dim))
+        if not g.has_frailty(theta):
+            return self._rvs_conditional(size, theta, rng)
         # Marshall-Olkin (1988): U_j = psi(E_j / V), with V the frailty.
         v = g.rvs_frailty(size, theta, rng)[:, None]
         e = rng.exponential(1.0, size=(size, self._dim))
         return g.psi(e / v, theta)
+
+    def _rvs_conditional(
+        self, size: int, theta: float, rng: np.random.Generator
+    ) -> NDArray[np.float64]:
+        r"""Sample by conditional inversion, for parameters with no frailty.
+
+        Clayton on :math:`[-1, 0)`, Frank on :math:`(-\infty, 0)` and AMH on
+        :math:`[-1, 0)` are perfectly good bivariate copulas but their
+        generators are not Laplace transforms, so the Marshall-Olkin
+        construction does not apply. Draw :math:`U_1` and an independent
+        :math:`W`, then solve
+
+        .. math::
+            h(u_2 \mid u_1) = \frac{\psi'(\psi^{-1}(u_2) + \psi^{-1}(u_1))}
+                                   {\psi'(\psi^{-1}(u_1))} = W
+
+        for :math:`u_2`. The h-function is increasing in :math:`u_2`, so 60
+        bisections take the bracket to machine precision.
+        """
+        if self._dim != 2:
+            raise ValueError(
+                f"{self.name} copula with theta={theta:g} has no frailty representation, "
+                "and conditional sampling is implemented for dim=2 only"
+            )
+        g = self.generator
+        u1 = rng.uniform(size=size)
+        w = rng.uniform(size=size)
+        t1 = g.ipsi(u1, theta)
+        log_denominator = g.log_abs_dpsi(t1, theta)
+
+        lo = np.full(size, 1e-12)
+        hi = np.full(size, 1.0 - 1e-12)
+        with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                h = np.exp(g.log_abs_dpsi(g.ipsi(mid, theta) + t1, theta) - log_denominator)
+                below = np.nan_to_num(h, nan=0.0) < w
+                lo = np.where(below, mid, lo)
+                hi = np.where(below, hi, mid)
+        return np.column_stack([u1, 0.5 * (lo + hi)])
 
     # -- dependence measures -------------------------------------------
 

@@ -119,12 +119,32 @@ def _numeric_hessian(
     return out
 
 
+def _usable_hessian(hessian: NDArray[np.float64]) -> bool:
+    """Whether the averaged negative Hessian can support an asymptotic variance.
+
+    At an interior maximum of a regular model it is positive definite. When it
+    is not, the numerical differentiation has crossed something it should not
+    have -- most often a support boundary that *moves with the parameter*, as in
+    Clayton for ``theta < 0``, where the density vanishes outside
+    :math:`u^{-\\theta} + v^{-\\theta} > 1`. That is a non-regular model in the
+    textbook sense, like estimating the endpoint of a uniform, and the usual
+    asymptotics do not apply to it.
+
+    The sandwich :math:`H^{-1}\\Sigma H^{-1}` is positive whatever the sign of
+    :math:`H`, so without this check a meaningless number comes back looking
+    perfectly respectable.
+    """
+    return bool(np.all(np.isfinite(hessian)) and np.all(np.linalg.eigvalsh(hessian) > 0.0))
+
+
 def _sandwich(
     hessian: NDArray[np.float64],
     score_cov: NDArray[np.float64],
     n: int,
 ) -> NDArray[np.float64] | None:
-    """``H^-1 Sigma H^-1 / n``, or ``None`` if ``H`` is singular."""
+    """``H^-1 Sigma H^-1 / n``, or ``None`` if ``H`` is not usable."""
+    if not _usable_hessian(hessian):
+        return None
     try:
         h_inv = np.linalg.inv(hessian)
     except np.linalg.LinAlgError:  # pragma: no cover - degenerate fits only
@@ -179,6 +199,8 @@ def var_ml(
         Number of observations.
     """
     _, hessian = _score_and_hessian(logpdf, theta)
+    if not _usable_hessian(hessian):
+        return None
     try:
         cov = np.linalg.inv(hessian) / n
     except np.linalg.LinAlgError:  # pragma: no cover - degenerate fits only
@@ -186,6 +208,13 @@ def var_ml(
     if not np.all(np.isfinite(cov)) or np.any(np.diag(cov) < 0):
         return None
     return cov
+
+
+#: Largest fraction of observations whose mixed derivative may be discarded
+#: before the pseudo-likelihood covariance is refused outright. A handful of
+#: boundary points is normal for a family with moving support; a tenth of the
+#: sample means the asymptotic approximation does not apply.
+_MAX_DROPPED = 0.02
 
 
 def mpl_influence(
@@ -239,12 +268,27 @@ def mpl_influence(
             _numeric_gradient(at(hi), theta) - _numeric_gradient(at(lo), theta)
         ) / width
 
+    # A family with a *moving* support boundary -- Clayton for theta < 0, whose
+    # density vanishes once psi's argument leaves [0, 1) -- gives -inf at a few
+    # observations, and the perturbations above straddle the boundary. Because
+    # the correction below averages over j, one such observation would turn the
+    # entire influence matrix to nan. Drop those contributions instead, and
+    # report the loss so the caller can refuse a covariance built on too few.
+    finite = np.isfinite(mixed)
+    dropped = 1.0 - float(finite.all(axis=(1, 2)).mean())
+    mixed = np.where(finite, mixed, 0.0)
+    scores = np.where(np.isfinite(scores), scores, 0.0)
+
     # W_k(U_ik) = mean_j mixed[j,:,k] * (1{U_ik <= U_jk} - U_jk)
     correction = np.zeros((n, p))
     for k in range(d):
         indicator = (u[:, k][:, None] <= u[:, k][None, :]).astype(np.float64)
         correction += (indicator - u[:, k][None, :]) @ mixed[:, :, k] / n
 
+    if dropped > _MAX_DROPPED:
+        # Too much of the sample sits on a boundary for the asymptotics to mean
+        # anything; a number here would be worse than no number.
+        return np.full((n, p), np.nan), hessian
     return scores + correction, hessian
 
 

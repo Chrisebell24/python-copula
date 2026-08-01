@@ -409,12 +409,23 @@ def select_copula(
     >>> rc.select_copula(v, families="archimedean").best_name
     'gumbel'
 
-    Independent data prefers the parameter-free baseline, because AIC charges
-    for the parameter nobody needed:
+    On independent data no candidate separates from the parameter-free baseline.
+    Twice the log-likelihood is the likelihood-ratio statistic against
+    independence, and for a one-parameter family it stays below the 0.1% point
+    of a chi-squared with one degree of freedom. *Which* family tops the table
+    there is a coin flip, and reading it as a result would be a mistake:
 
-    >>> w = rc.IndependenceCopula(2).rvs(1000, random_state=0)
-    >>> rc.select_copula(w, families=["independence", "gaussian", "frank"]).best_name
-    'independence'
+    >>> w = rc.IndependenceCopula(2).rvs(2000, random_state=0)
+    >>> table = rc.select_copula(w, families=["independence", "gaussian", "frank"]).table
+    >>> bool((2 * table["loglik"] < 10.83).all())
+    True
+
+    Dependence of any real size settles it immediately:
+
+    >>> x = rc.FrankCopula(4.0).rvs(2000, random_state=0)
+    >>> table = rc.select_copula(x, families=["independence", "gaussian", "frank"]).table
+    >>> bool(table.loc["independence", "aic"] - table["aic"].min() > 100)
+    True
     """
     if criterion not in CRITERIA:
         raise ValueError(f"criterion must be one of {CRITERIA}, got {criterion!r}")

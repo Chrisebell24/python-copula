@@ -379,6 +379,20 @@ class Copula(ABC):
             f"{cls.__name__} does not implement calibration from Spearman's rho"
         )
 
+    def calibrated(self, measure: str, value: float) -> Copula:
+        """Return a copy of this family calibrated to a target ``tau`` or ``rho``.
+
+        The instance-level counterpart of :meth:`from_tau` / :meth:`from_rho`,
+        and what :func:`~rcopula.fit.fit` calls for ``method="itau"`` and
+        ``"irho"``. Families whose construction needs more than
+        ``(value, dim)`` -- a rotation has to know *what* it is rotating --
+        override this instead of the classmethods.
+        """
+        if measure not in ("tau", "rho"):
+            raise ValueError(f"measure must be 'tau' or 'rho', got {measure!r}")
+        factory = type(self).from_tau if measure == "tau" else type(self).from_rho
+        return factory(value, dim=self._dim)
+
     # ------------------------------------------------------------------
     # Presentation
     # ------------------------------------------------------------------

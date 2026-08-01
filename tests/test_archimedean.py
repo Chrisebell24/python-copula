@@ -9,6 +9,8 @@ differ.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 from scipy import stats
@@ -330,3 +332,175 @@ class TestAMHAtZero:
         u = rc.AMHCopula(0.05).rvs(600, random_state=0)
         res = rc.fit(rc.AMHCopula(), u, method="mpl")
         assert res.copula.theta == pytest.approx(0.05, abs=0.35)
+
+
+def _mixed_second_difference(cop: rc.Copula, x: float, y: float, h: float = 1e-5) -> float:
+    """d2C/dudv by central differences -- an independent check on the density."""
+    corners = np.array([[x + h, y + h], [x + h, y - h], [x - h, y + h], [x - h, y - h]])
+    c = cop.cdf(corners)
+    return float((c[0] - c[1] - c[2] + c[3]) / (4.0 * h * h))
+
+
+class TestNegativeDependence:
+    """Clayton, Frank and AMH admit negative theta in d = 2 -- and it was broken.
+
+    Frank's density was ``nan`` for *every* negative theta, Clayton's for every
+    negative theta, and none of the three could be sampled at all. All three
+    failures came from the same place: closed forms written assuming the
+    positively-dependent branch, where a quantity that is genuinely negative
+    (``theta`` itself, the polylogarithm, the generator argument) was passed to
+    ``log`` unsigned, or a frailty was drawn from a distribution that does not
+    exist there.
+
+    The negative branch is not an edge case: it is the only reason to prefer
+    Frank over Gumbel, and the reason Clayton has a lower bound of -1 rather
+    than 0.
+    """
+
+    NEGATIVE: ClassVar[list[tuple[type, float]]] = [
+        (rc.ClaytonCopula, -0.9),
+        (rc.ClaytonCopula, -0.5),
+        (rc.ClaytonCopula, -0.1),
+        (rc.FrankCopula, -0.5),
+        (rc.FrankCopula, -2.0),
+        (rc.FrankCopula, -8.0),
+        (rc.FrankCopula, -25.0),
+        (rc.AMHCopula, -0.3),
+        (rc.AMHCopula, -0.9),
+    ]
+
+    @pytest.mark.parametrize(("family", "theta"), NEGATIVE)
+    def test_the_density_is_finite_and_positive(self, family: type, theta: float) -> None:
+        u = np.array([[0.2, 0.7], [0.5, 0.5], [0.9, 0.1], [0.05, 0.95], [0.3, 0.3]])
+        pdf = family(theta).pdf(u)
+        assert np.all(np.isfinite(pdf))
+        assert np.all(pdf >= 0.0)
+
+    @pytest.mark.parametrize(("family", "theta"), NEGATIVE)
+    def test_the_density_is_the_derivative_of_the_cdf(self, family: type, theta: float) -> None:
+        """The check that catches a sign error rather than merely a nan."""
+        cop = family(theta)
+        for x, y in [(0.3, 0.5), (0.6, 0.6), (0.8, 0.4), (0.45, 0.25)]:
+            if cop.cdf([[x, y]])[0] <= 0.0:
+                continue  # outside the support, where Clayton's density is 0
+            assert cop.pdf([[x, y]])[0] == pytest.approx(
+                _mixed_second_difference(cop, x, y), abs=1e-5, rel=1e-4
+            )
+
+    @pytest.mark.parametrize(("family", "theta"), NEGATIVE)
+    def test_sampling_reproduces_the_theoretical_tau(self, family: type, theta: float) -> None:
+        """There is no frailty on this branch, so sampling goes by inversion."""
+        cop = family(theta)
+        sample = cop.rvs(40_000, random_state=0)
+        assert stats.kendalltau(sample[:, 0], sample[:, 1]).statistic == pytest.approx(
+            cop.tau(), abs=0.01
+        )
+
+    @pytest.mark.parametrize(("family", "theta"), NEGATIVE)
+    def test_samples_have_uniform_margins(self, family: type, theta: float) -> None:
+        sample = family(theta).rvs(20_000, random_state=1)
+        for j in range(2):
+            assert stats.kstest(sample[:, j], "uniform").pvalue > 0.01
+
+    @pytest.mark.parametrize(("family", "theta"), NEGATIVE)
+    def test_estimation_recovers_the_parameter(self, family: type, theta: float) -> None:
+        """Within three standard errors, using the fit's own reported error.
+
+        A fixed tolerance would be wrong here: Frank at theta = -0.5 has
+        tau = -0.055, so the parameter is barely identified and its standard
+        error is an order of magnitude larger than at theta = -8. Judging every
+        case by the same absolute gap would either fail on the weak ones or pass
+        vacuously on the strong ones.
+        """
+        sample = family(theta).rvs(6000, random_state=0)
+        # The itau standard error is the yardstick because it always exists:
+        # its asymptotics rest on a rank statistic, not on differentiating a
+        # likelihood whose support may move -- see the Clayton test below.
+        reference = rc.fit(family(), sample, method="itau")
+        assert reference.bse is not None
+        for method in ("mpl", "itau"):
+            estimate = rc.fit(family(), sample, method=method).params[0]
+            assert abs(estimate - theta) < 3.0 * reference.bse[0]
+
+    @pytest.mark.parametrize("theta", [-0.9, -0.5])
+    def test_clayton_below_zero_refuses_a_pseudo_likelihood_standard_error(
+        self, theta: float
+    ) -> None:
+        """A non-regular model, and the code has to say so rather than guess.
+
+        For ``theta < 0`` the Clayton density vanishes outside
+        ``u^-theta + v^-theta > 1``, so the *support depends on the parameter* --
+        the textbook irregular case, like estimating the endpoint of a uniform.
+        Differentiating the likelihood across that moving boundary gives a
+        negative "negative Hessian", and the sandwich ``H^-1 S H^-1`` is
+        positive whatever the sign of ``H``, so a meaningless number would
+        otherwise come back looking perfectly respectable.
+
+        The point estimate is still good; only the standard error is refused.
+        """
+        sample = rc.ClaytonCopula(theta).rvs(3000, random_state=0)
+        mpl = rc.fit(rc.ClaytonCopula(), sample, method="mpl")
+        assert mpl.params[0] == pytest.approx(theta, abs=0.05)
+        assert mpl.bse is None
+        assert "not computed" in mpl.summary()
+
+        inversion = rc.fit(rc.ClaytonCopula(), sample, method="itau")
+        assert inversion.bse is not None
+        assert inversion.bse[0] > 0.0
+
+    @pytest.mark.parametrize(("family", "theta"), [(rc.FrankCopula, -4.0), (rc.AMHCopula, -0.6)])
+    def test_families_with_fixed_support_still_report_one(self, family: type, theta: float) -> None:
+        """The refusal above must be specific to the moving boundary, not blanket."""
+        sample = family(theta).rvs(3000, random_state=0)
+        res = rc.fit(family(), sample, method="mpl")
+        assert res.bse is not None
+        assert res.bse[0] > 0.0
+
+    @pytest.mark.parametrize(("family", "theta"), NEGATIVE)
+    def test_tau_and_rho_are_negative(self, family: type, theta: float) -> None:
+        cop = family(theta)
+        assert cop.tau() < 0.0
+        assert cop.rho() < 0.0
+
+    def test_clayton_has_finite_support_below_zero(self) -> None:
+        """psi(t) = 0 once 1 + t <= 0, so C reaches the Frechet lower bound.
+
+        Reached at ordinary (u, v) -- here C(0.2, 0.7) is exactly zero at
+        theta = -0.9 -- so it is a branch that has to be handled, not an
+        asymptotic curiosity.
+        """
+        cop = rc.ClaytonCopula(-0.9)
+        assert cop.cdf([[0.2, 0.7]])[0] == 0.0
+        assert cop.pdf([[0.2, 0.7]])[0] == 0.0
+        # W(u, v) = max(u + v - 1, 0) is the bound it is pressed against.
+        assert cop.cdf([[0.4, 0.4]])[0] >= max(0.4 + 0.4 - 1.0, 0.0)
+
+    def test_clayton_approaches_the_lower_frechet_bound(self) -> None:
+        cop = rc.ClaytonCopula(-1.0 + 1e-9)
+        u = np.array([[0.3, 0.9], [0.6, 0.6], [0.8, 0.5]])
+        assert np.allclose(cop.cdf(u), np.maximum(u.sum(axis=1) - 1.0, 0.0), atol=1e-6)
+
+    @pytest.mark.parametrize(
+        "cop",
+        [
+            rc.ClaytonCopula(0.0),
+            rc.FrankCopula(0.0),
+            rc.AMHCopula(0.0),
+            rc.GumbelCopula(1.0),
+            rc.JoeCopula(1.0),
+        ],
+    )
+    def test_the_independence_point_is_reachable(self, cop: rc.Copula) -> None:
+        """Every family's degenerate theta, where the generator divides by zero."""
+        u = np.array([[0.2, 0.7], [0.5, 0.5], [0.9, 0.1]])
+        assert np.allclose(cop.pdf(u), 1.0, atol=1e-6)
+        assert np.allclose(cop.cdf(u), u.prod(axis=1), atol=1e-6)
+        sample = cop.rvs(20_000, random_state=0)
+        assert abs(stats.kendalltau(sample[:, 0], sample[:, 1]).statistic) < 0.02
+
+    def test_negative_theta_is_rejected_above_two_dimensions(self) -> None:
+        """The generator stops being d-monotone; the bounds must say so."""
+        with pytest.raises(ValueError, match="outside admissible range"):
+            rc.ClaytonCopula(-0.5, dim=3)
+        with pytest.raises(ValueError, match="outside admissible range"):
+            rc.FrankCopula(-2.0, dim=3)

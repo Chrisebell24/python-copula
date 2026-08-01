@@ -52,12 +52,28 @@ class TestFamilyRecovery:
         ranking = select_copula(u, families=["gaussian", "student"])
         assert ranking.best_name == "gaussian"
 
-    def test_independence_wins_on_independent_data(self) -> None:
-        u = rc.IndependenceCopula(2).rvs(2000, random_state=3)
-        ranking = select_copula(u, families=["independence", "gaussian", "frank", "clayton"])
-        assert ranking.best_name == "independence"
-        assert ranking.table.loc["independence", "n_params"] == 0
-        assert ranking.table.loc["independence", "loglik"] == 0.0
+    @pytest.mark.parametrize("seed", [0, 1, 2, 3])
+    def test_independent_data_leaves_nothing_to_choose(self, seed: int) -> None:
+        """No candidate separates from the baseline, at any seed.
+
+        Asserting that ``independence`` *wins* would be seed-lucky: on truly
+        independent data the ordering among near-identical scores is noise,
+        which is the caution the module docstring gives. So is a fixed AIC gap
+        -- the gap is ``2 - LR`` with ``LR`` asymptotically chi-squared on one
+        degree of freedom, so it passes 2 about 5% of the time by chance. The
+        robust statement is the likelihood-ratio test itself, here at the 0.1%
+        level.
+        """
+        u = rc.IndependenceCopula(2).rvs(2000, random_state=seed)
+        table = select_copula(u, families=["independence", "gaussian", "frank", "clayton"]).table
+        assert table.loc["independence", "n_params"] == 0
+        assert table.loc["independence", "loglik"] == 0.0
+        assert (2.0 * table["loglik"] < 10.83).all()
+
+    def test_real_dependence_buries_the_independence_baseline(self) -> None:
+        u = rc.FrankCopula(4.0).rvs(2000, random_state=0)
+        table = select_copula(u, families=["independence", "gaussian", "frank"]).table
+        assert table.loc["independence", "aic"] - table["aic"].min() > 100.0
 
     def test_the_winner_comes_back_fitted(self) -> None:
         u = rc.ClaytonCopula(3.0).rvs(1500, random_state=0)

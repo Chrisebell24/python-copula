@@ -178,8 +178,11 @@ def _fit_by_inversion(
 ) -> CopulaFitResult:
     """Estimate by inverting Kendall's tau or Spearman's rho."""
     d = copula.dim
-    ctor = type(copula)
-    from_measure = ctor.from_tau if measure == "tau" else ctor.from_rho
+
+    def from_measure(value: float, dim: int = 2) -> Copula:
+        # Instance-level, so structural copulas (a rotation, say) can calibrate
+        # the family they wrap rather than being reconstructed from scratch.
+        return copula.calibrated(measure, value)
 
     if isinstance(copula, EllipticalCopula) and copula.dispstr == "un" and d > 2:
         # Invert each pair separately, then repair the matrix.

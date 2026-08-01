@@ -37,6 +37,7 @@ Demarta, S. and McNeil, A. J. (2005). The t copula and related copulas.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -448,6 +449,39 @@ class StudentCopula(EllipticalCopula):
         value = 2.0 * student_t.cdf(-np.sqrt((nu + 1.0) * (1.0 - rho) / (1.0 + rho)), df=nu + 1.0)
         return TailDependence(lower=float(value), upper=float(value))
 
+    def rho(self) -> Any:
+        r"""Spearman's rho, by quadrature.
+
+        Kendall's tau is :math:`\frac{2}{\pi}\arcsin\rho` for *every* elliptical
+        copula, so the t copula inherits the Gaussian expression. **Spearman's
+        rho does not.** The relation
+        :math:`\rho_S = \frac{6}{\pi}\arcsin(\rho/2)` is specific to the
+        Gaussian copula, and applying it to a t copula is simply wrong: at
+        :math:`\rho = 0.5` with 4 degrees of freedom it gives 0.4826 where the
+        true value is 0.4690.
+
+        R declines the question and returns ``NA``. There is no closed form, but
+        :math:`\rho_S = 12\int\int C - 3` is a two-dimensional integral of a
+        smooth function, and tanh-sinh quadrature settles it to twelve digits.
+        The result is cached, since the integral costs about 80 ms.
+
+        Examples
+        --------
+        Below the Gaussian value at the same correlation, and converging up to
+        it as the degrees of freedom grow:
+
+        >>> from rcopula import GaussianCopula, StudentCopula
+        >>> float(round(StudentCopula(0.5, df=4).rho(), 6))
+        0.46902
+        >>> float(round(GaussianCopula(0.5).rho(), 6))
+        0.482584
+        >>> bool(abs(StudentCopula(0.5, df=1e6).rho() - GaussianCopula(0.5).rho()) < 1e-5)
+        True
+        """
+        self._require_specified()
+        values = np.array([_student_rho(float(r), self.df) for r in P2p(self.sigma())])
+        return float(values[0]) if self.dispstr == "ex" or self._dim == 2 else values
+
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> StudentCopula:
         if not -1.0 < tau < 1.0:
@@ -456,13 +490,58 @@ class StudentCopula(EllipticalCopula):
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> StudentCopula:
-        """Calibrate from Spearman's rho.
+        r"""Calibrate from Spearman's rho, by inverting :meth:`rho` numerically.
 
-        Uses the Gaussian relation :math:`\\rho_P = 2\\sin(\\pi\\rho_S/6)`, as R
-        does: the t copula's Spearman rho has no closed form, and the Gaussian
-        expression is an excellent approximation that becomes exact as
-        ``df -> inf``.
+        The Gaussian relation :math:`\rho_P = 2\sin(\pi\rho_S/6)` -- which R
+        uses, and which this method used to use -- is not valid for a t copula,
+        so the inversion is done against the quadrature value instead. It starts
+        from the Gaussian answer, which is close, and refines by bisection.
+
+        Examples
+        --------
+        >>> from rcopula import StudentCopula
+        >>> cop = StudentCopula.from_rho(0.6, df=3)
+        >>> bool(abs(cop.rho() - 0.6) < 1e-8)
+        True
         """
         if not -1.0 < rho < 1.0:
             raise ValueError(f"rho must lie in (-1, 1), got {rho}")
-        return cls(2.0 * np.sin(np.pi * rho / 6.0), dim, **kwargs)
+        df = float(kwargs.get("df", 4.0))
+        start = 2.0 * np.sin(np.pi * rho / 6.0)
+        if rho == 0.0:
+            return cls(0.0, dim, **kwargs)
+
+        # rho_S is strictly increasing in the correlation, and the Gaussian
+        # value brackets the answer once nudged either way.
+        lo, hi = (
+            (start, min(start + 0.2, 1.0 - 1e-12))
+            if rho > 0
+            else (max(start - 0.2, -1.0 + 1e-12), start)
+        )
+        for _ in range(80):
+            mid = 0.5 * (lo + hi)
+            if _student_rho(mid, df) < rho:
+                lo = mid
+            else:
+                hi = mid
+        return cls(0.5 * (lo + hi), dim, **kwargs)
+
+
+#: Quadrature level for the Student-t Spearman rho. The bivariate t CDF is
+#: smooth, so the tanh-sinh rule is converged to twelve digits well before this;
+#: 40 nodes costs ~80 ms and buys a large margin.
+_STUDENT_RHO_LEVEL = 40
+
+
+@lru_cache(maxsize=256)
+def _student_rho(correlation: float, df: float) -> float:
+    """Spearman's rho of a bivariate t copula, cached.
+
+    Separate from the method so the cache is keyed on the two scalars that
+    actually determine the answer, rather than on a copula object.
+    """
+    from rcopula.core.measures import rho_by_quadrature
+
+    if correlation == 0.0:
+        return 0.0
+    return rho_by_quadrature(StudentCopula(correlation, df=df), level=_STUDENT_RHO_LEVEL)
