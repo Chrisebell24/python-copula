@@ -76,6 +76,7 @@ addopts = "--doctest-modules"
 markers = [
     "golden: parity tests against R-generated golden fixtures",
     "slow: long-running (bootstrap / Monte-Carlo level studies)",
+    "network: reaches the internet; skipped unless --run-network is passed",
 ]
 filterwarnings = ["error::RuntimeWarning"]
 

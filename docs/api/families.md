@@ -52,3 +52,7 @@
 ## Dependence measures
 
 ::: rcopula.dependence
+
+## Datasets
+
+::: rcopula.datasets

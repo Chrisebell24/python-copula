@@ -94,6 +94,18 @@ x = mv.rvs(1000, random_state=0)
 rc.gof_test(rc.ClaytonCopula(dim=3), x, simulation="mult")
 ```
 
+## Datasets
+
+Nothing is bundled: R `copula`'s datasets are GPL-3 and this package is MIT, so
+copying them in would be a licence conflict. Instead the loader ships URLs,
+licences and SHA-256 digests, and fetches permissively-licensed sources on first
+use.
+
+```python
+flood = rc.datasets.load("nwis_peaks")     # USGS, public domain
+flood.attrs["citation"]
+```
+
 ## Examples
 
 Fourteen scripts in [`examples/`](examples/), each of which **runs and asserts
