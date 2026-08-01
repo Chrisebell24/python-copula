@@ -46,6 +46,7 @@ from rcopula.dependence import beta_n, cor_kendall, cor_spearman, pseudo_obs
 from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, fit, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test
+from rcopula.htest import TestResult, ev_test, exch_test, indep_test, rad_sym_test
 
 __version__ = "0.1.0.dev0"
 
@@ -78,14 +79,19 @@ __all__ = [
     "TEVCopula",
     "TailDependence",
     "TawnCopula",
+    "TestResult",
     "__version__",
     "beta_n",
     "cor_kendall",
     "cor_spearman",
+    "ev_test",
+    "exch_test",
     "fit",
     "gof_statistic",
     "gof_test",
+    "indep_test",
     "loglik_copula",
     "p2P",
     "pseudo_obs",
+    "rad_sym_test",
 ]
