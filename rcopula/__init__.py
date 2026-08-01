@@ -48,6 +48,7 @@ from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, fit, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test
 from rcopula.htest import TestResult, ev_test, exch_test, indep_test, rad_sym_test
+from rcopula.select import SelectionResult, cross_validate, select_copula
 from rcopula.transforms import conditional_cdf, conditional_ppf, rosenblatt
 
 __version__ = "0.1.0.dev0"
@@ -77,6 +78,7 @@ __all__ = [
     "MarshallOlkinCopula",
     "P2p",
     "PlackettCopula",
+    "SelectionResult",
     "StudentCopula",
     "TEVCopula",
     "TailDependence",
@@ -89,6 +91,7 @@ __all__ = [
     "cor_kendall",
     "cor_spearman",
     "credit",
+    "cross_validate",
     "derivatives",
     "ev_test",
     "exch_test",
@@ -105,4 +108,5 @@ __all__ = [
     "rad_sym_test",
     "risk",
     "rosenblatt",
+    "select_copula",
 ]

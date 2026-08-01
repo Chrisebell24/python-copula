@@ -555,12 +555,20 @@ class _AMHGenerator(ArchimedeanGenerator):
         Expanding ``psi(t) = (1-theta) sum_{k>=1} theta^{k-1} e^{-kt}`` and
         differentiating termwise gives a polylogarithm of negative integer
         order, which :func:`_polylog_neg_int` evaluates in closed form.
+
+        The ``1/theta`` is a *removable* singularity -- at ``theta = 0`` AMH is
+        the independence copula and the derivative is simply ``e^{-t}`` -- so
+        the division is done symbolically instead, via
+        :func:`_polylog_neg_int_over_z`, which absorbs the ``theta`` that
+        ``Li_{-d}(theta e^{-t})`` contributes. Dividing numerically would raise
+        at ``theta = 0``, and ``theta = 0`` sits squarely inside the admissible
+        interval, so an optimiser walks straight into it.
         """
         z = theta * np.exp(-t)
-        # For theta < 0 both (1-theta)/theta and Li_{-d}(z) are negative, and
-        # their product is positive. Take the absolute value of the *product*,
-        # not of each factor: logging a negative polylog gives nan.
-        return np.log(np.abs((1.0 - theta) / theta * _polylog_neg_int(z, d)))
+        # For theta < 0 both (1-theta) e^{-t} and Li_{-d}(z)/z can carry signs
+        # that cancel. Take the absolute value of the *product*, not of each
+        # factor: logging a negative polylog gives nan.
+        return np.log1p(-theta) - t + np.log(np.abs(_polylog_neg_int_over_z(z, d)))
 
     def tau(self, theta):
         r""":math:`\tau = 1 - 2[(1-\theta)^2 \log(1-\theta) + \theta] / (3\theta^2)`."""
@@ -648,6 +656,26 @@ def _polylog_neg_int(
     a = eulerian_all(n)  # A(n, k), k = 0..n-1
     k = np.arange(n)
     num = np.sum(a * z[..., None] ** (n - k), axis=-1)
+    return num / omz ** (n + 1)
+
+
+def _polylog_neg_int_over_z(
+    z: NDArray[np.float64], n: int, one_minus_z: NDArray[np.float64] | None = None
+) -> NDArray[np.float64]:
+    r"""``Li_{-n}(z) / z``, which is finite at ``z = 0``.
+
+    Every term of :math:`\mathrm{Li}_{-n}(z) = \sum_{k\ge1} k^n z^k` carries at
+    least one factor of ``z``, so the ratio is a polynomial and tends to 1 as
+    ``z \to 0``. Cancelling the factor symbolically -- dropping the exponent by
+    one in the Eulerian closed form -- lets callers divide by a parameter that
+    is proportional to ``z`` without ever forming ``0/0``.
+    """
+    omz = (1.0 - z) if one_minus_z is None else one_minus_z
+    if n == 0:
+        return 1.0 / omz
+    a = eulerian_all(n)  # A(n, k), k = 0..n-1
+    k = np.arange(n)
+    num = np.sum(a * z[..., None] ** (n - k - 1), axis=-1)
     return num / omz ** (n + 1)
 
 

@@ -323,3 +323,44 @@ class TestNearestCorrelation:
     def test_leaves_a_valid_matrix_essentially_alone(self) -> None:
         good = rc.GaussianCopula([0.5, 0.3, 0.2], dim=3, dispstr="un").sigma()
         assert np.allclose(nearest_correlation(good), good, atol=1e-8)
+
+
+class TestParameterFreeFit:
+    """A copula with nothing to estimate still has a log-likelihood.
+
+    Returning it -- rather than handing an empty parameter vector to an
+    optimiser, which raises inside scipy -- is what lets the independence copula
+    take part in an AIC comparison as the null model it is.
+    """
+
+    def test_independence_fits_trivially(self) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(300, random_state=0)
+        res = rc.fit(rc.IndependenceCopula(2), u)
+        assert res.n_params == 0
+        assert res.loglik == 0.0
+        assert res.aic == 0.0 and res.bic == 0.0
+        assert res.converged
+        assert res.params.shape == (0,)
+
+    @pytest.mark.parametrize("method", ["mpl", "ml", "itau", "irho"])
+    def test_every_method_agrees_there_is_nothing_to_do(self, method: str) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(200, random_state=0)
+        assert rc.fit(rc.IndependenceCopula(2), u, method=method).n_params == 0
+
+    def test_a_fully_pinned_copula_reports_its_likelihood_at_that_point(self) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(400, random_state=0)
+        pinned = rc.ClaytonCopula(1.5).fix_params([False])
+        res = rc.fit(pinned, u)
+        assert res.n_params == 0
+        # u is already on the unit cube, so fit passes it through untransformed.
+        assert res.loglik == pytest.approx(float(np.sum(pinned.logpdf(u))))
+        assert res.copula.theta == 1.5
+
+    def test_it_loses_to_the_free_fit_on_dependent_data(self) -> None:
+        """Sanity: the trivial fit must not accidentally win a real comparison."""
+        u = rc.ClaytonCopula(3.0).rvs(600, random_state=0)
+        assert rc.fit(rc.ClaytonCopula(), u).aic < rc.fit(rc.IndependenceCopula(2), u).aic
+
+    def test_summary_is_printable_with_no_parameters(self) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(200, random_state=0)
+        assert "Independence" in rc.fit(rc.IndependenceCopula(2), u).summary()

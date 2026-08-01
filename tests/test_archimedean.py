@@ -277,3 +277,56 @@ def test_fixed_parameters_are_reported() -> None:
     cop = rc.ClaytonCopula(2.0).fix_params([False])
     assert cop.n_params == 0
     assert "fixed" in cop.describe()
+
+
+class TestAMHAtZero:
+    """theta = 0 sits inside AMH's admissible interval [-1, 1).
+
+    The closed form for the generator derivatives carries a ``1/theta``, so a
+    naive implementation raises exactly where an optimiser is most likely to
+    step -- and the singularity is removable: at theta = 0 AMH *is* the
+    independence copula.
+    """
+
+    def test_the_density_is_one(self) -> None:
+        u = np.array([[0.2, 0.7], [0.5, 0.5], [0.9, 0.1], [0.01, 0.99]])
+        assert np.allclose(rc.AMHCopula(0.0).pdf(u), 1.0, rtol=1e-12)
+
+    def test_the_cdf_is_the_product(self) -> None:
+        u = np.array([[0.2, 0.7], [0.5, 0.5], [0.9, 0.1]])
+        assert np.allclose(rc.AMHCopula(0.0).cdf(u), u.prod(axis=1), rtol=1e-12)
+
+    @pytest.mark.parametrize("dim", [2, 3, 5])
+    def test_the_density_is_one_in_every_dimension(self, dim: int) -> None:
+        u = np.random.default_rng(0).uniform(0.05, 0.95, size=(20, dim))
+        assert np.allclose(rc.AMHCopula(0.0, dim=dim).pdf(u), 1.0, rtol=1e-12)
+
+    def test_the_density_is_continuous_across_zero(self) -> None:
+        u = np.array([[0.3, 0.8], [0.6, 0.4]])
+        left = rc.AMHCopula(-1e-7).pdf(u)
+        here = rc.AMHCopula(0.0).pdf(u)
+        right = rc.AMHCopula(1e-7).pdf(u)
+        assert np.allclose(left, here, atol=1e-6)
+        assert np.allclose(right, here, atol=1e-6)
+        # And genuinely monotone through the point, not merely equal at it.
+        assert np.all(left > right)
+
+    def test_generator_derivatives_stay_finite(self) -> None:
+        gen = rc.AMHCopula(0.0).generator
+        t = np.array([1e-8, 0.1, 1.0, 10.0, 40.0])
+        for theta in (0.0, 1e-14, -1e-14, 1e-6):
+            for order in (1, 2, 3, 4):
+                assert np.all(np.isfinite(gen.log_abs_dpsi_d(t, theta, order)))
+
+    def test_the_first_derivative_is_exactly_minus_t_in_logs(self) -> None:
+        """psi(t) = e^{-t} at theta = 0, so |psi^(d)(t)| = e^{-t} for every d."""
+        gen = rc.AMHCopula(0.0).generator
+        t = np.array([0.1, 1.0, 5.0, 40.0])
+        for order in (1, 2, 3):
+            assert np.allclose(gen.log_abs_dpsi_d(t, 0.0, order), -t, rtol=1e-13)
+
+    def test_fitting_walks_through_zero_without_raising(self) -> None:
+        """The failure this guards: an optimiser stepping onto theta = 0."""
+        u = rc.AMHCopula(0.05).rvs(600, random_state=0)
+        res = rc.fit(rc.AMHCopula(), u, method="mpl")
+        assert res.copula.theta == pytest.approx(0.05, abs=0.35)

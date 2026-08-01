@@ -398,6 +398,24 @@ def fit(
         raise ValueError(f"data has {u.shape[1]} column(s) but the copula has dim={copula.dim}")
     n = u.shape[0]
 
+    if not np.any(copula.free):
+        # Nothing to estimate -- either a parameter-free family such as
+        # independence, or every parameter pinned by fix_params. There is still
+        # a log-likelihood to report, and returning it lets such copulas take
+        # part in AIC/BIC comparisons instead of raising inside an optimiser
+        # that was handed an empty parameter vector.
+        return CopulaFitResult(
+            copula=copula,
+            params=np.empty(0),
+            param_names=(),
+            loglik=_safe_loglik(copula, u),
+            n_obs=n,
+            method=method,
+            cov_params=np.empty((0, 0)),
+            converged=True,
+            message="no free parameters to estimate",
+        )
+
     if method in ("itau", "irho"):
         return _fit_by_inversion(copula, u, method[1:], estimate_variance)
 
