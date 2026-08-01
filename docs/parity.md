@@ -62,3 +62,54 @@ wide as they should be.
   df = 4 the true value is 0.4690, not 0.4826.
 - A variance for `joeCopula` fitted by `itau`.
 - Standard errors for `itau`/`irho` above two dimensions.
+
+## Validation that does not mention R at all
+
+Agreeing with R is a useful check and an insufficient one: it would also be
+satisfied by faithfully reproducing an R bug. `tests/test_literature.py` asks a
+different question — **does this agree with the definition?** — and consults no
+fixture at all. 240 checks, each computing a quantity from its published
+definition by a completely different route than the package uses:
+
+| quantity | definition evaluated | agreement |
+|---|---|---|
+| Spearman's ρ | $12\iint C\,du\,dv - 3$, tensor Gauss–Legendre | ~1e-11 |
+| Kendall's τ | $1 - 4\iint \partial_u C\,\partial_v C\,du\,dv$ | ~1e-9 |
+| Blomqvist's β | $4C(\tfrac12,\tfrac12) - 1$ | exact |
+| λ_L, λ_U | the limits along the diagonal, as sequences | converging |
+| $W \le C \le M$ | on a 1600-point grid | exact |
+
+Every bivariate family is run through all of them, including the structural
+constructions (rotated, Khoudraji, mixture), because a definition that holds for
+six families and fails for the seventh is exactly what a hand-picked example
+misses.
+
+Alongside those, the identities that connect different parts of the theory and
+would break loudly if either side were wrong:
+
+- **Gamma frailty gives Clayton** and **positive-stable frailty gives Gumbel** —
+  built by sampling the frailty and dividing exponentials by it, then measuring
+  τ. The generator is checked directly as the frailty's Laplace transform.
+- **$\tau = \frac{2}{\pi}\arcsin\rho$ for *every* elliptical copula** at any
+  degrees of freedom, while ρ_S demonstrably is not shared — the two measures
+  are often described as interchangeable and here they are not.
+- **The Nataf transform is a Gaussian copula**, so structural reliability
+  inherits zero tail dependence.
+- **Mutual information is copula entropy**, against $-\tfrac12\log(1-\rho^2)$.
+- **The nonparanormal identity** $\Sigma = \sin(\pi\tau/2)$ under two brutal but
+  increasing marginal transforms.
+
+Two constants are pinned against `mpmath` at 25 digits rather than against
+anything in this package:
+
+| constant | value | note |
+|---|---|---|
+| ρ_S of Frank, τ at θ = 5 | 0.45670095816011690 | Debye integral at 30 digits |
+| ρ_S of Clayton at θ = 2 | 0.68223383328065629 | $12\iint C - 3$ at 25 digits |
+
+The second doubles as a cross-family regression test: **Clayton and Gumbel have
+the same Spearman ρ at τ = ½**, verified equal to 20 digits in arbitrary
+precision despite different CDFs, different tails and different generators.
+Their ρ curves cross exactly there, and the test checks the crossing is
+transversal — unequal at τ = 0.45 and 0.55 — so it cannot be passed by two
+implementations that have collapsed into each other.
