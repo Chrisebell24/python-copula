@@ -92,6 +92,21 @@ x = mv.rvs(1000, random_state=0)
 rc.gof_test(rc.ClaytonCopula(dim=3), x, simulation="mult")
 ```
 
+## Examples
+
+Fourteen scripts in [`examples/`](examples/), each of which **runs and asserts
+its own claims** — so they cannot drift out of date without failing:
+
+```bash
+python examples/04_tail_dependence.py     # what tau does not tell you
+python examples/13_hydrology_return_periods.py
+pytest tests/test_examples.py             # run them all
+```
+
+They cover the R book chapters, the applied finance topics (CDO tranches, basket
+and CMS spread options, pairs trading, copula-GARCH, operational risk), and
+hydrology.
+
 ## Coming from R?
 
 The API is Pythonic (scipy/statsmodels verbs), but R's option strings are preserved so you
