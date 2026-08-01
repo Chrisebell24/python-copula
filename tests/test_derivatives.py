@@ -16,15 +16,23 @@ identities:
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
+from scipy import integrate, optimize, stats
 
 import rcopula as rc
 from rcopula.derivatives import (
+    CmsLeg,
     SmileMargin,
+    _par_bond,
     basket_implied_vol,
     basket_option,
     black76,
+    cms_convexity_adjustment,
+    cms_margin,
+    cms_spread_option,
     implied_volatility,
     kirk_spread,
     lognormal_terminal,
@@ -291,3 +299,273 @@ class TestBasketImpliedVol:
             random_state=0,
         )
         assert vols[0] > vols[-1]  # downward-sloping, as the components are
+
+
+# ======================================================================
+# CMS rates
+# ======================================================================
+
+
+def _exact_convexity_adjustment(
+    forward: float, vol: float, maturity: float, tenor: float, frequency: int = 2
+) -> float:
+    """E[y_T] - y_0 solved exactly, without the second-order Taylor step.
+
+    The adjustment exists because the bond's forward *price* is the martingale:
+    ``E[G(y_T)] = G(y_0)``. :func:`cms_convexity_adjustment` expands that to
+    second order; here it is solved numerically instead, by quadrature over the
+    lognormal law of the rate plus a root-find for its median. Any error in the
+    bond function, its derivatives, or the sign of the adjustment shows up
+    immediately as a mismatch.
+    """
+    level = _par_bond(forward, forward, tenor, frequency)[0]
+    s = vol * np.sqrt(maturity)
+
+    def gap(log_median: float) -> float:
+        median = np.exp(log_median)
+        integrand = lambda z: (  # noqa: E731
+            _par_bond(median * np.exp(s * z), forward, tenor, frequency)[0] * stats.norm.pdf(z)
+        )
+        return integrate.quad(integrand, -8.0, 8.0, limit=200)[0] - level
+
+    median = np.exp(optimize.brentq(gap, np.log(forward * 0.5), np.log(forward * 2.0), xtol=1e-14))
+    return float(median * np.exp(0.5 * s**2) - forward)
+
+
+class TestParBond:
+    def test_a_par_bond_prices_at_one(self) -> None:
+        """G(y) = 1 when the coupon equals the yield -- the definition of par."""
+        for y in (0.01, 0.05, 0.12):
+            price, _, _ = _par_bond(y, y, 10.0, 2)
+            assert price == pytest.approx(1.0, abs=1e-12)
+
+    def test_derivatives_match_finite_differences(self) -> None:
+        y, h = 0.05, 1e-6
+        _, d1, d2 = _par_bond(y, 0.05, 10.0, 2)
+        up = _par_bond(y + h, 0.05, 10.0, 2)[0]
+        mid = _par_bond(y, 0.05, 10.0, 2)[0]
+        down = _par_bond(y - h, 0.05, 10.0, 2)[0]
+        assert d1 == pytest.approx((up - down) / (2 * h), rel=1e-6)
+        assert d2 == pytest.approx((up - 2 * mid + down) / h**2, rel=1e-3)
+
+    def test_price_falls_and_convexity_is_positive(self) -> None:
+        _, d1, d2 = _par_bond(0.05, 0.05, 10.0, 2)
+        assert d1 < 0.0
+        assert d2 > 0.0
+
+    def test_rejects_a_degenerate_schedule(self) -> None:
+        with pytest.raises(ValueError, match="shorter than one coupon period"):
+            _par_bond(0.05, 0.05, 0.1, 2)
+
+
+class TestCmsConvexityAdjustment:
+    @pytest.mark.parametrize(
+        ("forward", "vol", "maturity", "tenor"),
+        [(0.05, 0.20, 5.0, 10.0), (0.05, 0.20, 5.0, 30.0), (0.03, 0.15, 2.0, 5.0)],
+    )
+    def test_matches_the_exact_solution(
+        self, forward: float, vol: float, maturity: float, tenor: float
+    ) -> None:
+        """The Taylor form must land within its own O(sigma^4 T^2) error."""
+        approx = cms_convexity_adjustment(forward, vol, maturity, tenor)
+        exact = _exact_convexity_adjustment(forward, vol, maturity, tenor)
+        assert approx == pytest.approx(exact, rel=0.10)
+
+    def test_the_approximation_improves_as_variance_falls(self) -> None:
+        """A second-order expansion: halving the vol should cut the error faster."""
+
+        def relative_error(vol: float) -> float:
+            approx = cms_convexity_adjustment(0.05, vol, 5.0, 10.0)
+            exact = _exact_convexity_adjustment(0.05, vol, 5.0, 10.0)
+            return abs(approx / exact - 1.0)
+
+        assert relative_error(0.10) < 0.4 * relative_error(0.30)
+
+    def test_is_positive(self) -> None:
+        assert cms_convexity_adjustment(0.05, 0.2, 5.0, 10.0) > 0.0
+
+    def test_grows_with_variance_expiry_and_tenor(self) -> None:
+        base = cms_convexity_adjustment(0.04, 0.20, 5.0, 10.0)
+        assert cms_convexity_adjustment(0.04, 0.30, 5.0, 10.0) > base
+        assert cms_convexity_adjustment(0.04, 0.20, 8.0, 10.0) > base
+        assert cms_convexity_adjustment(0.04, 0.20, 5.0, 20.0) > base
+
+    def test_scales_with_variance(self) -> None:
+        """The formula is exactly linear in Var[y_T]."""
+        a = cms_convexity_adjustment(0.04, 0.20, 5.0, 10.0)
+        b = cms_convexity_adjustment(0.04, 0.40, 5.0, 10.0)
+        assert b == pytest.approx(4.0 * a, rel=1e-12)
+
+    def test_vanishes_without_uncertainty(self) -> None:
+        assert cms_convexity_adjustment(0.05, 0.0, 5.0, 10.0) == 0.0
+        assert cms_convexity_adjustment(0.05, 0.2, 0.0, 10.0) == 0.0
+
+    def test_normal_and_lognormal_agree_at_matched_variance(self) -> None:
+        """Only the variance enters, so a matched normal vol gives the same number."""
+        forward, vol = 0.04, 0.25
+        lognormal = cms_convexity_adjustment(forward, vol, 5.0, 10.0)
+        normal = cms_convexity_adjustment(forward, vol * forward, 5.0, 10.0, model="normal")
+        assert normal == pytest.approx(lognormal, rel=1e-12)
+
+    def test_rejects_bad_input(self) -> None:
+        with pytest.raises(ValueError, match="model must be"):
+            cms_convexity_adjustment(0.05, 0.2, 5.0, 10.0, model="sabr")
+        with pytest.raises(ValueError, match="vol must be non-negative"):
+            cms_convexity_adjustment(0.05, -0.2, 5.0, 10.0)
+        with pytest.raises(ValueError, match="maturity must be non-negative"):
+            cms_convexity_adjustment(0.05, 0.2, -1.0, 10.0)
+
+
+class TestCmsMargin:
+    def test_mean_is_the_adjusted_rate(self) -> None:
+        m = cms_margin(0.045, 0.22, 5.0, 10.0)
+        expected = 0.045 + cms_convexity_adjustment(0.045, 0.22, 5.0, 10.0)
+        assert m.mean() == pytest.approx(expected, rel=1e-12)
+
+    def test_normal_model_is_symmetric_about_the_adjusted_rate(self) -> None:
+        m = cms_margin(0.02, 0.008, 5.0, 10.0, model="normal")
+        centre = 0.02 + cms_convexity_adjustment(0.02, 0.008, 5.0, 10.0, model="normal")
+        assert m.ppf(0.5) == pytest.approx(centre, rel=1e-10)
+        assert m.std() == pytest.approx(0.008 * np.sqrt(5.0), rel=1e-12)
+
+    def test_normal_model_admits_negative_rates(self) -> None:
+        """The reason it exists: a lognormal rate cannot go below zero."""
+        assert cms_margin(0.002, 0.008, 5.0, 10.0, model="normal").ppf(0.05) < 0.0
+        assert cms_margin(0.002, 0.30, 5.0, 10.0).ppf(1e-8) > 0.0
+
+
+class TestCmsSpreadOption:
+    LEGS: ClassVar[list[CmsLeg]] = [CmsLeg(0.045, 0.22, 10.0), CmsLeg(0.030, 0.28, 2.0)]
+
+    def test_reduces_to_margrabe_at_zero_strike(self) -> None:
+        """Gaussian copula, lognormal legs, K=0: an exchange option, exactly priced.
+
+        The convexity adjustments move each leg's forward, so Margrabe is fed
+        the adjusted forwards -- which is the point of checking it here rather
+        than only in :class:`TestSpreadOptionAgainstMargrabe`.
+        """
+        maturity = 5.0
+        adjusted = [
+            leg.forward + cms_convexity_adjustment(leg.forward, leg.vol, maturity, leg.tenor)
+            for leg in self.LEGS
+        ]
+        exact = margrabe(
+            adjusted[0], adjusted[1], self.LEGS[0].vol, self.LEGS[1].vol, 0.85, maturity
+        )
+        mc = cms_spread_option(
+            rc.GaussianCopula(0.85), self.LEGS, 0.0, maturity, n=400_000, random_state=0
+        )
+        assert mc.price == pytest.approx(exact, abs=4 * mc.standard_error)
+
+    def test_matches_kirk_at_a_positive_strike(self) -> None:
+        maturity, strike = 5.0, 0.01
+        adjusted = [
+            leg.forward + cms_convexity_adjustment(leg.forward, leg.vol, maturity, leg.tenor)
+            for leg in self.LEGS
+        ]
+        approx = kirk_spread(
+            adjusted[0],
+            adjusted[1],
+            strike,
+            self.LEGS[0].vol,
+            self.LEGS[1].vol,
+            0.85,
+            maturity,
+        )
+        mc = cms_spread_option(
+            rc.GaussianCopula(0.85), self.LEGS, strike, maturity, n=400_000, random_state=0
+        )
+        assert mc.price == pytest.approx(approx, rel=0.05)
+
+    def test_ignoring_convexity_underprices_a_steepener(self) -> None:
+        """The longer leg carries the larger adjustment, so the two do not cancel."""
+        maturity, strike = 5.0, 0.015
+        with_adjustment = cms_spread_option(
+            rc.GaussianCopula(0.85), self.LEGS, strike, maturity, n=300_000, random_state=0
+        )
+        flat = spread_option(
+            rc.GaussianCopula(0.85),
+            [lognormal_terminal(leg.forward, leg.vol, maturity) for leg in self.LEGS],
+            strike,
+            maturity,
+            n=300_000,
+            random_state=0,
+        )
+        assert with_adjustment.price > flat.price + 2 * with_adjustment.standard_error
+
+    def test_correlation_cheapens_the_option(self) -> None:
+        loose = cms_spread_option(
+            rc.GaussianCopula(0.60), self.LEGS, 0.015, 5.0, n=300_000, random_state=0
+        )
+        tight = cms_spread_option(
+            rc.GaussianCopula(0.97), self.LEGS, 0.015, 5.0, n=300_000, random_state=0
+        )
+        assert tight.price < loose.price
+
+    def test_put_call_parity_on_the_spread(self) -> None:
+        """call - put = discounted (E[spread] - K), the forward spread."""
+        maturity, strike, rate = 5.0, 0.010, 0.02
+        adjusted = [
+            leg.forward + cms_convexity_adjustment(leg.forward, leg.vol, maturity, leg.tenor)
+            for leg in self.LEGS
+        ]
+        call = cms_spread_option(
+            rc.GaussianCopula(0.85),
+            self.LEGS,
+            strike,
+            maturity,
+            rate=rate,
+            n=400_000,
+            random_state=1,
+        )
+        put = cms_spread_option(
+            rc.GaussianCopula(0.85),
+            self.LEGS,
+            strike,
+            maturity,
+            rate=rate,
+            kind="put",
+            n=400_000,
+            random_state=1,
+        )
+        forward = np.exp(-rate * maturity) * (adjusted[0] - adjusted[1] - strike)
+        assert call.price - put.price == pytest.approx(
+            forward, abs=4 * (call.standard_error + put.standard_error)
+        )
+
+    def test_notional_scales_the_price(self) -> None:
+        one = cms_spread_option(
+            rc.GaussianCopula(0.85), self.LEGS, 0.015, 5.0, n=100_000, random_state=0
+        )
+        million = cms_spread_option(
+            rc.GaussianCopula(0.85),
+            self.LEGS,
+            0.015,
+            5.0,
+            notional=1e6,
+            n=100_000,
+            random_state=0,
+        )
+        assert million.price == pytest.approx(1e6 * one.price, rel=1e-12)
+
+    def test_tail_dependence_reprices_at_equal_rank_correlation(self) -> None:
+        """Same Kendall tau, different joint tail, different price."""
+        gaussian = rc.GaussianCopula(0.85)
+        clayton = rc.ClaytonCopula.from_tau(gaussian.tau())
+        a = cms_spread_option(gaussian, self.LEGS, 0.015, 5.0, n=400_000, random_state=0)
+        b = cms_spread_option(clayton, self.LEGS, 0.015, 5.0, n=400_000, random_state=0)
+        assert abs(a.price - b.price) > 3 * (a.standard_error + b.standard_error)
+
+    def test_mixed_marginal_models_are_allowed(self) -> None:
+        """A lognormal long leg and a normal short leg, as a low-rate desk would."""
+        legs = [CmsLeg(0.030, 0.25, 10.0), CmsLeg(0.004, 0.006, 2.0, model="normal")]
+        mc = cms_spread_option(rc.GaussianCopula(0.7), legs, 0.01, 5.0, n=200_000, random_state=0)
+        assert mc.price > 0.0
+
+    def test_rejects_bad_input(self) -> None:
+        with pytest.raises(ValueError, match="bivariate"):
+            cms_spread_option(rc.GaussianCopula(0.5, dim=3), self.LEGS, 0.0, 5.0)
+        with pytest.raises(ValueError, match="expected 2 legs"):
+            cms_spread_option(rc.GaussianCopula(0.5), self.LEGS[:1], 0.0, 5.0)
+        with pytest.raises(ValueError, match="kind must be"):
+            cms_spread_option(rc.GaussianCopula(0.5), self.LEGS, 0.0, 5.0, kind="digital")

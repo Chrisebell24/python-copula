@@ -13,6 +13,9 @@ from its own smile, and supply the dependence separately** -- which is what
 :func:`basket_option`         Option on a weighted basket.
 :func:`rainbow_option`        Best-of / worst-of on several assets.
 :func:`spread_option`         Option on the difference of two assets.
+:func:`cms_spread_option`     Option on a spread of two CMS rates.
+:func:`cms_convexity_adjustment`  The CMS convexity correction.
+:func:`cms_margin`            A convexity-adjusted CMS rate, as a margin.
 :func:`black76`               Single-asset closed form.
 :func:`margrabe`              Exchange option -- exact, the validation anchor.
 :func:`kirk_spread`           Kirk's spread-option approximation.
@@ -41,6 +44,12 @@ Cherubini, U., Luciano, E. and Vecchiato, W. (2004). *Copula Methods in
     Finance*. Wiley.
 Black, F. (1976). The pricing of commodity contracts.
     *Journal of Financial Economics* 3(1-2), 167-179.
+Hull, J. C. (2018). *Options, Futures, and Other Derivatives*, 10th ed.,
+    ch. 34. The convexity adjustment used by
+    :func:`cms_convexity_adjustment`.
+Hagan, P. S. (2003). Convexity conundrums: pricing CMS swaps, caps, and floors.
+    *Wilmott Magazine*, March, 38-44.
+    The replication view of the same adjustment.
 """
 
 from __future__ import annotations
@@ -56,11 +65,15 @@ from rcopula.core.base import Copula
 from rcopula.distribution import CopulaDistribution, Margin
 
 __all__ = [
+    "CmsLeg",
     "MonteCarloPrice",
     "SmileMargin",
     "basket_implied_vol",
     "basket_option",
     "black76",
+    "cms_convexity_adjustment",
+    "cms_margin",
+    "cms_spread_option",
     "implied_volatility",
     "kirk_spread",
     "lognormal_terminal",
@@ -525,6 +538,280 @@ def spread_option(
     prices = _terminal_prices(copula, margins, n, random_state)
     payoff = np.maximum(prices[:, 0] - prices[:, 1] - strike, 0.0)
     return _mc(payoff, rate, maturity)
+
+
+# ======================================================================
+# Constant-maturity swap (CMS) rates
+# ======================================================================
+
+
+def _par_bond(y: float, coupon: float, tenor: float, frequency: int) -> tuple[float, float, float]:
+    r"""Price of a fixed-coupon bond as a function of its yield, with derivatives.
+
+    :math:`G(y) = \sum_{i=1}^{N} \frac{c/m}{(1+y/m)^i} + \frac{1}{(1+y/m)^N}`,
+    the standard yield-to-price map for a bond paying ``coupon`` ``frequency``
+    times a year for ``tenor`` years. Returns :math:`(G, G', G'')`.
+    """
+    m = float(frequency)
+    n_periods = round(tenor * m)
+    if n_periods < 1:
+        raise ValueError(f"tenor {tenor} is shorter than one coupon period")
+    if 1.0 + y / m <= 0.0:
+        raise ValueError(f"yield {y} is below -{m:g}, where the bond price diverges")
+
+    i = np.arange(1, n_periods + 1, dtype=np.float64)
+    disc = (1.0 + y / m) ** (-i)
+    c = coupon / m
+
+    price = float(c * disc.sum() + disc[-1])
+    d1 = float(
+        (c * (-i / m) * disc / (1.0 + y / m)).sum() + (-n_periods / m) * disc[-1] / (1.0 + y / m)
+    )
+    d2 = float(
+        (c * (i * (i + 1.0) / m**2) * disc / (1.0 + y / m) ** 2).sum()
+        + (n_periods * (n_periods + 1.0) / m**2) * disc[-1] / (1.0 + y / m) ** 2
+    )
+    return price, d1, d2
+
+
+def cms_convexity_adjustment(
+    forward: float,
+    vol: float,
+    maturity: float,
+    tenor: float,
+    frequency: int = 2,
+    model: str = "lognormal",
+) -> float:
+    r"""Convexity adjustment for a constant-maturity swap rate.
+
+    A CMS payoff references a swap rate but pays on a single date, not over the
+    swap's own schedule. The forward swap rate is a martingale under the
+    *annuity* measure, not the payment measure, so the expected rate that
+    actually gets paid is **higher** than the forward. The correction follows
+    from the fact that the bond's forward *price* is the martingale: expanding
+    :math:`G(y_T)` to second order in
+    :math:`\mathbb{E}[G(y_T)] = G(y_0)` gives
+
+    .. math::
+        \mathbb{E}^T[y_T] - y_0 \;\approx\;
+            -\tfrac{1}{2}\,\mathrm{Var}[y_T]\,\frac{G''(y_0)}{G'(y_0)},
+
+    with :math:`\mathrm{Var}[y_T] = y_0^2\sigma^2 T` for a lognormal rate and
+    :math:`\sigma^2 T` for a normal one. Since :math:`G' < 0` and
+    :math:`G'' > 0`, the adjustment is positive.
+
+    Ignoring it is not a rounding error: at a 5% rate, 20% vol and 5 years to
+    expiry on a 10-year swap it is worth several basis points, and a CMS spread
+    option is a difference of two such rates, so the two adjustments do not
+    cancel -- the longer tenor carries the larger one, which is the whole
+    directional content of the trade.
+
+    Parameters
+    ----------
+    forward : float
+        Forward swap rate, as a decimal.
+    vol : float
+        Lognormal (or normal, if ``model="normal"``) volatility of that rate.
+    maturity : float
+        Time to the fixing, in years.
+    tenor : float
+        Tenor of the underlying swap, in years.
+    frequency : int
+        Fixed-leg payments per year.
+    model : {"lognormal", "normal"}
+        Dynamics assumed for the swap rate. Normal (Bachelier) is the market
+        standard for rates near or below zero, where a lognormal vol is
+        meaningless.
+
+    Returns
+    -------
+    float
+        The additive adjustment, in the same units as ``forward``.
+
+    Notes
+    -----
+    This is the second-order approximation. Hagan's replication approach prices
+    the same quantity as a strip of swaptions and so captures the smile; that is
+    more accurate but needs a full swaption surface. What this function gives is
+    the standard first-cut number, and :func:`cms_margin` builds on it.
+
+    Examples
+    --------
+    Around 24 basis points on a 10-year rate fixing in 5 years -- far too large
+    to leave out of a spread that is itself only ~150 bp wide:
+
+    >>> from rcopula.derivatives import cms_convexity_adjustment
+    >>> ca = cms_convexity_adjustment(0.05, 0.20, 5.0, 10.0)
+    >>> float(round(ca * 1e4, 2))
+    23.62
+
+    It is positive, and grows with volatility, expiry and tenor:
+
+    >>> longer = cms_convexity_adjustment(0.05, 0.20, 5.0, 30.0)
+    >>> bool(longer > ca > 0)
+    True
+
+    With no volatility there is nothing to adjust:
+
+    >>> cms_convexity_adjustment(0.05, 0.0, 5.0, 10.0)
+    0.0
+    """
+    if model not in ("lognormal", "normal"):
+        raise ValueError(f"model must be 'lognormal' or 'normal', got {model!r}")
+    if vol < 0.0:
+        raise ValueError(f"vol must be non-negative, got {vol}")
+    if maturity < 0.0:
+        raise ValueError(f"maturity must be non-negative, got {maturity}")
+    if vol == 0.0 or maturity == 0.0:
+        return 0.0
+
+    variance = (forward**2 if model == "lognormal" else 1.0) * vol**2 * maturity
+    _, d1, d2 = _par_bond(forward, forward, tenor, frequency)
+    return float(-0.5 * variance * d2 / d1)
+
+
+def cms_margin(
+    forward: float,
+    vol: float,
+    maturity: float,
+    tenor: float,
+    frequency: int = 2,
+    model: str = "lognormal",
+) -> Margin:
+    """A CMS rate's terminal distribution, convexity-adjusted.
+
+    The mean is the forward swap rate plus
+    :func:`cms_convexity_adjustment`; the shape is lognormal or normal
+    according to ``model``. Plugging these into a copula is how a CMS spread
+    option gets priced with each leg keeping its own dynamics.
+
+    Examples
+    --------
+    The mean is the adjusted rate, not the forward:
+
+    >>> from rcopula.derivatives import cms_convexity_adjustment, cms_margin
+    >>> m = cms_margin(0.05, 0.20, 5.0, 10.0)
+    >>> ca = cms_convexity_adjustment(0.05, 0.20, 5.0, 10.0)
+    >>> bool(abs(m.mean() - (0.05 + ca)) < 1e-12)
+    True
+    """
+    adjusted = forward + cms_convexity_adjustment(forward, vol, maturity, tenor, frequency, model)
+    if model == "normal":
+        return stats.norm(loc=adjusted, scale=vol * np.sqrt(maturity))
+    return lognormal_terminal(adjusted, vol, maturity)
+
+
+class CmsLeg(NamedTuple):
+    """One leg of a CMS spread: a swap rate with its own dynamics.
+
+    Attributes
+    ----------
+    forward : float
+        Forward swap rate.
+    vol : float
+        Volatility of that rate, on the scale implied by ``model``.
+    tenor : float
+        Swap tenor in years -- the "constant maturity".
+    frequency : int
+        Fixed-leg payment frequency.
+    model : {"lognormal", "normal"}
+        Marginal dynamics.
+    """
+
+    forward: float
+    vol: float
+    tenor: float
+    frequency: int = 2
+    model: str = "lognormal"
+
+
+def cms_spread_option(
+    copula: Copula,
+    legs: list[CmsLeg],
+    strike: float,
+    maturity: float,
+    rate: float = 0.0,
+    notional: float = 1.0,
+    kind: str = "call",
+    n: int = 200_000,
+    random_state: np.random.Generator | int | None = None,
+) -> MonteCarloPrice:
+    r"""Option on the spread between two CMS rates.
+
+    Payoff :math:`N \max(y_1 - y_2 - K, 0)` on the two convexity-adjusted swap
+    rates. The classic trade is 10-year minus 2-year: a bet on the slope of the
+    curve rather than on its level.
+
+    This is a case where the copula is doing real work. The two rates are
+    strongly dependent but not lognormally so; the spread is a small difference
+    of two large numbers, so its distribution is extremely sensitive to how the
+    joint tails behave; and the market quotes each leg's smile separately. A
+    single correlation applied to two lognormals gets all three wrong at once.
+    Choosing the dependence structure explicitly at least makes the assumption
+    visible -- and, in the Gaussian-copula/lognormal case, reduces to the
+    Margrabe/Kirk answer that desks already use.
+
+    Parameters
+    ----------
+    copula : Copula
+        Bivariate dependence between the two rates.
+    legs : list of CmsLeg
+        The two legs, in the order they appear in the spread.
+    strike : float
+        Spread strike, as a decimal.
+    maturity : float
+        Fixing date, in years.
+    rate, notional : float
+        Discount rate and notional.
+    kind : {"call", "put"}
+        A call pays when the curve steepens beyond the strike; a put when it
+        flattens.
+
+    Examples
+    --------
+    A 10y-2y steepener struck at the current spread:
+
+    >>> import rcopula as rc
+    >>> from rcopula.derivatives import CmsLeg, cms_spread_option
+    >>> legs = [CmsLeg(0.045, 0.22, 10.0), CmsLeg(0.030, 0.28, 2.0)]
+    >>> mc = cms_spread_option(rc.GaussianCopula(0.85), legs, 0.015, 5.0,
+    ...                        n=200_000, random_state=0)
+    >>> bool(mc.price > 0.0)
+    True
+
+    Higher correlation squeezes the spread's distribution and so cheapens the
+    option -- the correlation exposure that makes these trades interesting:
+
+    >>> tight = cms_spread_option(rc.GaussianCopula(0.97), legs, 0.015, 5.0,
+    ...                           n=200_000, random_state=0)
+    >>> bool(tight.price < mc.price)
+    True
+
+    Lower-tail dependence, which pins the two rates together when both fall,
+    prices differently again even at the same rank correlation:
+
+    >>> clayton = cms_spread_option(rc.ClaytonCopula.from_tau(rc.GaussianCopula(0.85).tau()),
+    ...                             legs, 0.015, 5.0, n=200_000, random_state=0)
+    >>> bool(abs(clayton.price - mc.price) > clayton.standard_error)
+    True
+    """
+    if copula.dim != 2:
+        raise ValueError(f"a CMS spread option is bivariate; got dim={copula.dim}")
+    if len(legs) != 2:
+        raise ValueError(f"expected 2 legs, got {len(legs)}")
+    if kind not in ("call", "put"):
+        raise ValueError(f"kind must be 'call' or 'put', got {kind!r}")
+
+    margins = [
+        cms_margin(leg.forward, leg.vol, maturity, leg.tenor, leg.frequency, leg.model)
+        for leg in legs
+    ]
+    rates = _terminal_prices(copula, margins, n, random_state)
+    spread = rates[:, 0] - rates[:, 1]
+    payoff = (
+        np.maximum(spread - strike, 0.0) if kind == "call" else np.maximum(strike - spread, 0.0)
+    )
+    return _mc(notional * payoff, rate, maturity)
 
 
 def basket_implied_vol(
