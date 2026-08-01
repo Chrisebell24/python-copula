@@ -79,6 +79,7 @@ __all__ = [
     "diversification_benefit",
     "expected_shortfall",
     "marginal_expected_shortfall",
+    "rank_reorder",
     "risk_contributions",
     "simulate_losses",
     "stress_scenario",
@@ -163,6 +164,59 @@ def expected_shortfall(losses: ArrayLike, alpha: float = 0.99) -> float:
     tail = x[x >= threshold]
     # The tail is never empty: the quantile is attained by at least one point.
     return float(tail.mean())
+
+
+def rank_reorder(
+    samples: ArrayLike,
+    copula: Copula,
+    random_state: np.random.Generator | int | None = None,
+) -> NDArray[np.float64]:
+    r"""Impose a copula's dependence on given marginal samples, by reordering.
+
+    Each column is sorted and then re-ordered to follow the ranks of a draw from
+    ``copula``. The marginal distributions survive **exactly** -- the same values
+    come back, only rearranged -- while the dependence becomes the copula's.
+
+    This is the standard move in risk aggregation when the marginals are already
+    fixed: capital models arrive with an approved loss distribution per business
+    line and the question is only how to combine them. Refitting the margins to
+    make a joint model tractable would change numbers that have been signed off;
+    reordering does not touch them.
+
+    Parameters
+    ----------
+    samples : array_like
+        ``(n, d)`` marginal samples, one column per risk.
+    copula : Copula
+        The dependence structure to impose.
+
+    Examples
+    --------
+    The margins are preserved to the last value:
+
+    >>> import numpy as np
+    >>> from rcopula import ClaytonCopula
+    >>> from rcopula.risk import rank_reorder
+    >>> rng = np.random.default_rng(0)
+    >>> x = np.column_stack([rng.lognormal(size=5000), rng.exponential(size=5000)])
+    >>> y = rank_reorder(x, ClaytonCopula(4.0), random_state=0)
+    >>> bool(np.array_equal(np.sort(x, axis=0), np.sort(y, axis=0)))
+    True
+
+    ...while the dependence becomes the copula's:
+
+    >>> from scipy import stats
+    >>> bool(abs(stats.kendalltau(y[:, 0], y[:, 1]).statistic - 2 / 3) < 0.03)
+    True
+    """
+    x = np.atleast_2d(np.asarray(samples, dtype=np.float64))
+    n, d = x.shape
+    if d != copula.dim:
+        raise ValueError(f"samples have {d} columns but the copula has dim={copula.dim}")
+
+    u = copula.rvs(n, random_state=random_state)
+    ranks = np.argsort(np.argsort(u, axis=0), axis=0)
+    return np.column_stack([np.sort(x[:, j])[ranks[:, j]] for j in range(d)])
 
 
 def _summary(losses: NDArray[np.float64], alpha: float) -> RiskSummary:
