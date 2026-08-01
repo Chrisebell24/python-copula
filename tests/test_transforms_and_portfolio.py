@@ -209,6 +209,29 @@ class TestPairsTrading:
         # A flat position earns exactly zero, never a stale return.
         assert np.all(result.returns[result.positions == 0] == 0.0)
 
+    @pytest.mark.slow
+    def test_no_look_ahead_bias_on_unexploitable_data(self) -> None:
+        """On IID data the strategy must earn approximately nothing.
+
+        This is the sharpest available check on the backtest. The simulated
+        pairs have dependence but no mean reversion, so there is nothing for a
+        relative-value signal to capture and the expected return of every trade
+        is exactly zero. A strategy that peeked at time-t data when forming the
+        time-t signal would show a spuriously positive Sharpe here; a causal one
+        shows noise around zero.
+        """
+        mv = rc.CopulaDistribution(rc.ClaytonCopula(5.0), [stats.norm(0, 0.012)] * 2)
+        means = []
+        for seed in range(8):
+            r = mv.rvs(900, random_state=seed)
+            result = backtest_pairs(r, rc.ClaytonCopula(), train=250, refit_every=25)
+            active = result.returns[result.positions != 0]
+            if active.size > 20:
+                means.append(active.mean() / active.std(ddof=1) * np.sqrt(active.size))
+
+        # Per-run t-statistics should straddle zero, not sit systematically above.
+        assert abs(float(np.mean(means))) < 2.0
+
     def test_backtest_rejects_short_or_malformed_input(self) -> None:
         with pytest.raises(ValueError, match=r"\(n, 2\)"):
             backtest_pairs(np.zeros((100, 3)), rc.ClaytonCopula())
