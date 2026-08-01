@@ -58,7 +58,14 @@ from rcopula.kendall import (
     return_period_level,
 )
 from rcopula.select import SelectionResult, cross_validate, select_copula
-from rcopula.structural import KhoudrajiCopula, MixtureCopula, RotatedCopula, survival
+from rcopula.structural import (
+    KhoudrajiCopula,
+    MixtureCopula,
+    NestedArchimedean,
+    RotatedCopula,
+    fit_nested,
+    survival,
+)
 from rcopula.transforms import conditional_cdf, conditional_ppf, rosenblatt
 
 __version__ = "0.1.0.dev0"
@@ -88,6 +95,7 @@ __all__ = [
     "Margin",
     "MarshallOlkinCopula",
     "MixtureCopula",
+    "NestedArchimedean",
     "P2p",
     "PlackettCopula",
     "RotatedCopula",
@@ -109,6 +117,7 @@ __all__ = [
     "ev_test",
     "exch_test",
     "fit",
+    "fit_nested",
     "garch",
     "gof_statistic",
     "gof_test",

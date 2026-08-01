@@ -43,7 +43,7 @@ from scipy.special import gammaln
 
 from rcopula.special.logexp import log1mexp
 
-__all__ = ["rlog_series", "rsibuya", "rstable_positive", "sinc"]
+__all__ = ["retstable", "rlog_series", "rsibuya", "rstable_positive", "sinc"]
 
 
 def sinc(x: NDArray[np.float64] | float) -> NDArray[np.float64]:
@@ -290,3 +290,125 @@ def rsibuya(size: int, alpha: float, rng: np.random.Generator) -> NDArray[np.flo
 
     out[idx] = np.maximum(k, 1.0)
     return out
+
+
+#: Attempts allowed per element before :func:`retstable` gives up. Each round
+#: accepts with probability at least ``e^-1``, so exceeding this many is not a
+#: slow case but a broken one.
+_RETSTABLE_MAX_ROUNDS = 100_000
+
+
+def retstable(
+    size: int,
+    alpha: float,
+    v0: NDArray[np.float64] | float,
+    h: float,
+    rng: np.random.Generator,
+) -> NDArray[np.float64]:
+    r"""Draw from the **exponentially tilted** positive stable distribution.
+
+    Defined by its Laplace transform,
+
+    .. math::
+        \mathbb{E}\bigl[e^{-tV}\bigr]
+            = \exp\bigl(-V_0\,\bigl[(t + h)^{\alpha} - h^{\alpha}\bigr]\bigr),
+
+    which is the inner frailty of a **nested Clayton** copula and the reason
+    nested Archimedean copulas have never been available in Python: this
+    distribution has no closed-form density, no quantile function, and no
+    implementation in NumPy, SciPy or any copula package.
+
+    Parameters
+    ----------
+    size : int
+        Number of draws. Ignored when ``v0`` is an array, whose length wins.
+    alpha : float
+        Stability index in ``(0, 1]``. At ``alpha = 1`` the law is degenerate at
+        ``v0``.
+    v0 : float or ndarray
+        The multiplier in the exponent. May vary per draw, which is what the
+        nested sampler needs -- each observation carries its own outer frailty.
+    h : float
+        Tilt. ``h = 0`` gives the untilted stable.
+    rng : Generator
+
+    Notes
+    -----
+    **Method.** Rejection from the untilted stable accepts with probability
+    exactly :math:`e^{-V_0 h^\alpha}`, which is fine for a small exponent and
+    hopeless otherwise -- worse, for ``V0 ~ Gamma(k, 1)`` with ``k >= 1`` the
+    *expected* number of attempts is infinite, so a naive implementation does
+    not merely run slowly, it occasionally does not finish.
+
+    Infinite divisibility fixes it. The law is the sum of ``k`` independent
+    draws with ``V0/k`` in place of ``V0`` -- the Laplace transforms multiply to
+    give back the original -- and each of those accepts with probability
+    :math:`e^{-V_0 h^\alpha / k}`. Taking :math:`k = \lceil V_0 h^\alpha\rceil`
+    puts every piece's acceptance at about :math:`e^{-1}`, so the work becomes
+    **linear** in :math:`V_0 h^\alpha` rather than exponential. The result is
+    exact: no approximation enters at any point.
+
+    Examples
+    --------
+    The defining Laplace transform, checked by Monte Carlo:
+
+    >>> import numpy as np
+    >>> rng = np.random.default_rng(0)
+    >>> alpha, v0, h, t = 0.5, 2.0, 1.0, 0.8
+    >>> v = retstable(200_000, alpha, v0, h, rng)
+    >>> want = np.exp(-v0 * ((t + h) ** alpha - h ** alpha))
+    >>> bool(abs(np.mean(np.exp(-t * v)) - want) < 3e-3)
+    True
+
+    The mean is ``alpha * v0 * h**(alpha - 1)``, by differentiating it:
+
+    >>> bool(abs(v.mean() - alpha * v0 * h ** (alpha - 1)) < 0.02)
+    True
+
+    A zero tilt gives the ordinary positive stable back:
+
+    >>> untilted = retstable(5, 0.5, 1.0, 0.0, np.random.default_rng(1))
+    >>> bool(np.all(untilted > 0))
+    True
+    """
+    if not 0.0 < alpha <= 1.0:
+        raise ValueError(f"alpha must lie in (0, 1], got {alpha}")
+    if h < 0.0:
+        raise ValueError(f"h must be non-negative, got {h}")
+
+    values = np.asarray(v0, dtype=np.float64)
+    values = np.full(int(size), float(values)) if values.ndim == 0 else values.ravel()
+    if np.any(values < 0.0):
+        raise ValueError("v0 must be non-negative")
+
+    if alpha == 1.0:
+        # The exponent collapses to V0 * t, a point mass.
+        return values.copy()
+    if h == 0.0:
+        return values ** (1.0 / alpha) * rstable_positive(values.size, alpha, rng)
+
+    exponent = values * h**alpha
+    pieces = np.maximum(1, np.ceil(exponent)).astype(np.int64)
+    per_piece = values / pieces
+    scale = per_piece ** (1.0 / alpha)
+    tilt = scale * h  # so each piece accepts with probability about e^-1
+
+    total = np.zeros(values.size)
+    outstanding = pieces.copy()
+    for _ in range(_RETSTABLE_MAX_ROUNDS):
+        active = np.flatnonzero(outstanding > 0)
+        if active.size == 0:
+            return total
+        pending = active
+        while pending.size:
+            draw = rstable_positive(pending.size, alpha, rng)
+            with np.errstate(under="ignore"):
+                accepted = rng.uniform(size=pending.size) < np.exp(-tilt[pending] * draw)
+            total[pending[accepted]] += scale[pending[accepted]] * draw[accepted]
+            pending = pending[~accepted]
+        outstanding[active] -= 1
+
+    raise RuntimeError(  # pragma: no cover - unreachable for valid parameters
+        "retstable failed to converge; each round accepts with probability at "
+        "least exp(-1), so this indicates a bug rather than a slow case"
+    )

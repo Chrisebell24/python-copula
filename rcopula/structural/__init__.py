@@ -14,6 +14,7 @@ unchanged.
 :func:`survival`            The survival copula -- every coordinate reflected.
 :class:`KhoudrajiCopula`    Break exchangeability with a shape per coordinate.
 :class:`MixtureCopula`      Convex combination -- both tails at once.
+:class:`NestedArchimedean`  A tree: dependence that varies by branch.
 ==========================  ==================================================
 """
 
@@ -21,6 +22,14 @@ from __future__ import annotations
 
 from rcopula.structural.khoudraji import KhoudrajiCopula
 from rcopula.structural.mixture import MixtureCopula
+from rcopula.structural.nested import NestedArchimedean, fit_nested
 from rcopula.structural.rotated import RotatedCopula, survival
 
-__all__ = ["KhoudrajiCopula", "MixtureCopula", "RotatedCopula", "survival"]
+__all__ = [
+    "KhoudrajiCopula",
+    "MixtureCopula",
+    "NestedArchimedean",
+    "RotatedCopula",
+    "fit_nested",
+    "survival",
+]

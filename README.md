@@ -16,6 +16,8 @@ are fragmented, and roughly **60–70% of R `copula`'s statistical surface has n
 equivalent at all**:
 
 - no multiplier-bootstrap goodness-of-fit anywhere;
+- no nested Archimedean copulas anywhere, because they need an exponentially
+  tilted stable sampler that does not exist in NumPy, SciPy or any copula package;
 - no Khoudraji device, general rotation wrapper, or arbitrary-copula mixtures;
 - no Kendall distribution function `K`, no general Rosenblatt transform;
 - **not one Python package returns standard errors for a fitted copula**;
@@ -127,6 +129,9 @@ can paste them across.
 | `rotCopula(cop, flip)` | `rc.RotatedCopula(cop, flip)` / `rc.survival(cop)` |
 | `khoudrajiCopula(c1, c2, shapes)` | `rc.KhoudrajiCopula(c1, c2, shapes)` |
 | `mixCopula(list(c1, c2), w)` | `rc.MixtureCopula([c1, c2], w)` |
+| `onacopula("G", C(1.5, , list(C(4, 1:3))))` | `rc.NestedArchimedean(rc.GumbelCopula(1.5), ...)` |
+| `enacopula(u, cop, method = "etau")` | `rc.fit_nested(structure, u)` |
+| `retstable(n, V0, h, alpha)` | `rcopula.special.stable.retstable(...)` |
 | `pK(t, cop, d)` / `qK` / `dK` / `rK` | `rc.kendall_cdf/ppf/pdf/rvs(cop, ...)` |
 | `Kn(u, x)` | `rc.kendall_empirical(x, u)` |
 | `xvCopula(cop, x, k)` | `rc.cross_validate(cop, x, k)` |
