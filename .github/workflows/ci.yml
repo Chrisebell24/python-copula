@@ -54,3 +54,32 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
       - run: pytest -q -m slow
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,docs]"
+      # --strict fails on a broken link or an unresolved reference, and the
+      # tests additionally check the API reference is not silently empty.
+      - run: mkdocs build --strict
+      - run: pytest -q tests/test_docs.py
+
+  publish-docs:
+    needs: [lint, test, docs]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[docs]"
+      - run: mkdocs gh-deploy --force

@@ -139,7 +139,9 @@ can paste them across.
 | *(no equivalent)* | `rc.select_copula(u)` — rank every admissible family |
 | *(no equivalent)* | `rc.plots.tail_concentration(u, [c1, c2])` — where families disagree |
 
-The full translation table is in the [documentation](https://chrisebell24.github.io/python-copula/).
+The full translation table, an API reference, and the notes on where R is the
+less accurate side are in the [documentation](https://chrisebell24.github.io/python-copula/)
+(`make docs` to read it locally).
 
 ## How parity is verified
 

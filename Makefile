@@ -1,7 +1,7 @@
 PY := .venv/bin/python
 PYTEST := .venv/bin/pytest
 
-.PHONY: help venv install test test-fast test-slow golden lint fmt typecheck docs clean
+.PHONY: help venv install test test-fast test-slow golden lint fmt typecheck docs docs-build clean
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -39,6 +39,9 @@ typecheck:  ## Type-check with mypy
 
 docs:  ## Serve the documentation locally
 	.venv/bin/mkdocs serve
+
+docs-build:  ## Build the documentation, failing on any broken reference
+	.venv/bin/mkdocs build --strict
 
 clean:  ## Remove build and cache artefacts
 	rm -rf build dist *.egg-info .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage

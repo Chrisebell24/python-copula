@@ -1,0 +1,65 @@
+site_name: rcopula
+site_description: Copula modelling in Python, verified against R's copula package
+repo_url: https://github.com/Chrisebell24/python-copula
+repo_name: Chrisebell24/python-copula
+edit_uri: ""
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/weather-sunny, name: Light mode}
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            filters: ["!^_"]
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.arithmatex: {generic: true}
+  - tables
+  - toc: {permalink: true}
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - What copulas are for: concepts.md
+  - Choosing a family: choosing.md
+  - Coming from R: r-translation.md
+  - How parity is verified: parity.md
+  - Examples: examples.md
+  - API reference:
+      - Copula families: api/families.md
+      - Structural constructions: api/structural.md
+      - Inference: api/inference.md
+      - Goodness of fit: api/gof.md
+      - Transforms and Kendall: api/transforms.md
+      - Plots: api/plots.md
+      - Applications: api/applications.md
+      - Special functions: api/special.md
