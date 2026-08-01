@@ -27,13 +27,16 @@ from rcopula.plots import (
     _concentration,
     _independence_order_statistics,
     contour,
+    dependence_heatmap,
     kendall_plot,
+    nested_tree,
     pickands_plot,
     scatter_matrix,
     surface,
     tail_concentration,
+    vine_trees,
 )
-from rcopula.structural import KhoudrajiCopula
+from rcopula.structural import KhoudrajiCopula, NestedArchimedean
 
 
 @pytest.fixture(autouse=True)
@@ -244,3 +247,79 @@ class TestPlotsRejectBadInput:
     def test_pickands_plot_refuses_a_non_extreme_value_copula(self) -> None:
         with pytest.raises(ValueError, match="not an extreme-value copula"):
             pickands_plot(rc.ClaytonCopula(2.0))
+
+
+class TestStructurePlots:
+    """The three added for the constructions whose point is that dependence
+    is not a single number."""
+
+    def test_vine_trees_draws_one_panel_per_tree(self) -> None:
+        vine = rc.VineCopula(
+            [[rc.ClaytonCopula(3.0), rc.GumbelCopula(2.5)], [rc.FrankCopula(4.0)]],
+            structure="D",
+        )
+        grid = vine_trees(vine)
+        assert len(grid) == 2
+        assert grid[0].get_title() == "tree 1"
+        assert grid[1].get_title() == "tree 2"
+
+    def test_vine_trees_labels_every_edge_with_its_family(self) -> None:
+        vine = rc.VineCopula(
+            [[rc.ClaytonCopula(3.0), rc.GumbelCopula(2.5)], [rc.FrankCopula(4.0)]],
+            structure="D",
+        )
+        grid = vine_trees(vine)
+        first = " ".join(t.get_text() for t in grid[0].texts)
+        assert "Clayton" in first and "Gumbel" in first
+        assert "Frank" in " ".join(t.get_text() for t in grid[1].texts)
+
+    def test_vine_trees_can_be_truncated(self) -> None:
+        vine = rc.VineCopula(
+            [[rc.GaussianCopula(0.5)] * (4 - k) for k in range(4)], structure="C"
+        )
+        assert len(vine_trees(vine, max_trees=2)) == 2
+
+    def test_nested_tree_shows_every_node_and_leaf(self) -> None:
+        cop = NestedArchimedean(
+            rc.GumbelCopula(1.5),
+            children=[
+                NestedArchimedean(rc.GumbelCopula(4.0), [0, 1, 2]),
+                NestedArchimedean(rc.GumbelCopula(3.0), [3, 4]),
+            ],
+        )
+        ax = nested_tree(cop)
+        text = " ".join(t.get_text() for t in ax.texts)
+        for leaf in range(5):
+            assert str(leaf) in text
+        # each node is annotated with its parameter and tau
+        assert "tau" in text
+        assert "4.00" in text and "3.00" in text and "1.50" in text
+
+    def test_nested_tree_handles_a_deep_chain(self) -> None:
+        cop = NestedArchimedean(
+            rc.ClaytonCopula(0.4),
+            [4],
+            [NestedArchimedean(rc.ClaytonCopula(1.5), [3],
+                               [NestedArchimedean(rc.ClaytonCopula(4.0), [0, 1, 2])])],
+        )
+        ax = nested_tree(cop)
+        assert len(ax.collections) >= 8  # five leaves plus three nodes
+
+    def test_dependence_heatmap_annotates_the_numbers(self) -> None:
+        cop = NestedArchimedean(
+            rc.GumbelCopula(1.5),
+            children=[
+                NestedArchimedean(rc.GumbelCopula(4.0), [0, 1, 2]),
+                NestedArchimedean(rc.GumbelCopula(3.0), [3, 4]),
+            ],
+        )
+        tau = cop.tau_matrix()
+        ax = dependence_heatmap(tau, names=list("abcde"))
+        text = {t.get_text() for t in ax.texts}
+        assert f"{tau[0, 1]:.2f}" in text   # within the first block
+        assert f"{tau[0, 3]:.2f}" in text   # across blocks
+        assert [label.get_text() for label in ax.get_xticklabels()] == list("abcde")
+
+    def test_dependence_heatmap_rejects_a_non_square_matrix(self) -> None:
+        with pytest.raises(ValueError, match="square matrix"):
+            dependence_heatmap(np.zeros((2, 3)))

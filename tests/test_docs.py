@@ -106,6 +106,8 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "cms_spread_option",
                 "backtest_pairs",
                 "CopulaGarch",
+                "DynamicCopula",
+                "fit_dcc",
                 "operational_risk_capital",
             ],
         ),

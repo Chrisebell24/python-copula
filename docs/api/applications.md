@@ -8,4 +8,5 @@ libraries**. Each module states its modelling assumptions.
 ::: rcopula.derivatives
 ::: rcopula.portfolio
 ::: rcopula.garch
+::: rcopula.dynamic
 ::: rcopula.insurance

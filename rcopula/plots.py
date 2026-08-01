@@ -15,6 +15,9 @@ The five here are chosen because each answers a question the others cannot.
 :func:`tail_concentration`     **Fitted against empirical, in the corners.**
 :func:`kendall_plot`           A dependence diagnostic needing no fitted model.
 :func:`pickands_plot`          The Pickands function inside its bounds.
+:func:`vine_trees`             A vine's trees, edge by edge.
+:func:`nested_tree`            A nested copula's hierarchy.
+:func:`dependence_heatmap`     A pairwise matrix, when one number will not do.
 =============================  ===============================================
 
 :func:`tail_concentration` is the one to reach for after fitting. Two families
@@ -52,11 +55,14 @@ from rcopula.kendall import kendall_empirical
 
 __all__ = [
     "contour",
+    "dependence_heatmap",
     "kendall_plot",
+    "nested_tree",
     "pickands_plot",
     "scatter_matrix",
     "surface",
     "tail_concentration",
+    "vine_trees",
 ]
 
 #: Grid points per axis for the surface and contour plots. The default keeps a
@@ -456,4 +462,198 @@ def pickands_plot(
     ax.set_ylim(0.45, 1.02)
     ax.set_title("Pickands dependence function")
     ax.legend()
+    return ax
+
+
+def vine_trees(
+    vine: Any,
+    max_trees: int | None = None,
+    axes: Any = None,
+    **kwargs: Any,
+) -> Any:
+    """Draw a vine's trees, edge labels annotated with each pair-copula.
+
+    A vine is a sequence of trees, and the thing a reader needs to see is which
+    pairs each tree joins, what it conditions on, and which family was selected
+    there. Tree 1 carries most of the dependence and is where a misspecified
+    family costs most; the higher trees are usually where a fit is spending
+    parameters on noise, which this makes visible at a glance.
+
+    Parameters
+    ----------
+    vine : VineCopula
+        A fitted or specified vine.
+    max_trees : int, optional
+        Draw only the first few trees. Defaults to all of them.
+
+    Examples
+    --------
+    >>> import matplotlib
+    >>> matplotlib.use("Agg")
+    >>> import rcopula as rc
+    >>> from rcopula.plots import vine_trees
+    >>> vine = rc.VineCopula(
+    ...     [[rc.ClaytonCopula(3.0), rc.GumbelCopula(2.5)], [rc.FrankCopula(4.0)]],
+    ...     structure="D",
+    ... )
+    >>> grid = vine_trees(vine)
+    >>> len(grid)
+    2
+    """
+    depth = len(vine.pair_copulas) if max_trees is None else min(max_trees, len(vine.pair_copulas))
+    if axes is None:
+        import matplotlib.pyplot as plt
+
+        _, axes = plt.subplots(1, depth, figsize=(4.2 * depth, 3.8), squeeze=False)
+        axes = axes[0]
+
+    for k in range(depth):
+        ax = axes[k]
+        # Lay the tree's nodes on a circle: readable for a star and for a path.
+        nodes = sorted({idx for i in range(len(vine.pair_copulas[k]))
+                        for idx in vine._edge_indices(k, i)[:2]})
+        angle = {node: 2 * np.pi * j / len(nodes) for j, node in enumerate(nodes)}
+        position = {node: (np.cos(a), np.sin(a)) for node, a in angle.items()}
+
+        for i, copula in enumerate(vine.pair_copulas[k]):
+            a, b, conditioning = vine._edge_indices(k, i)
+            (x0, y0), (x1, y1) = position[a], position[b]
+            ax.plot([x0, x1], [y0, y1], color="0.6", linewidth=1.0, zorder=1, **kwargs)
+            ax.text(
+                0.5 * (x0 + x1), 0.5 * (y0 + y1),
+                f"{copula.name}\n{_short_params(copula)}",
+                ha="center", va="center", fontsize=7,
+                bbox={"facecolor": "white", "edgecolor": "0.8", "boxstyle": "round,pad=0.2"},
+                zorder=3,
+            )
+        for node, (x, y) in position.items():
+            label = str(vine.order[node])
+            conditioning = vine._edge_indices(k, 0)[2]
+            if k > 0 and conditioning:
+                label = f"{vine.order[node]}|·"
+            ax.scatter([x], [y], s=280, color="0.9", edgecolor="0.4", zorder=2)
+            ax.text(x, y, label, ha="center", va="center", fontsize=8, zorder=4)
+
+        ax.set_title(f"tree {k + 1}")
+        ax.set_xlim(-1.4, 1.4)
+        ax.set_ylim(-1.4, 1.4)
+        ax.set_aspect("equal")
+        ax.axis("off")
+    return axes
+
+
+def _short_params(copula: Copula) -> str:
+    """A compact parameter string for an edge label."""
+    if not len(copula.params):
+        return ""
+    return ", ".join(f"{v:.2f}" for v in copula.params)
+
+
+def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
+    """Draw a nested Archimedean copula's hierarchy.
+
+    The whole point of nesting is that dependence varies by branch, so the
+    picture worth drawing is the tree with each node's parameter and Kendall's
+    tau on it -- from which the pairwise tau of any two leaves can be read off
+    directly, since two variables meet at exactly one node.
+
+    Examples
+    --------
+    >>> import matplotlib
+    >>> matplotlib.use("Agg")
+    >>> import rcopula as rc
+    >>> from rcopula.plots import nested_tree
+    >>> from rcopula.structural import NestedArchimedean
+    >>> cop = NestedArchimedean(
+    ...     rc.GumbelCopula(1.5),
+    ...     children=[
+    ...         NestedArchimedean(rc.GumbelCopula(4.0), [0, 1, 2]),
+    ...         NestedArchimedean(rc.GumbelCopula(3.0), [3, 4]),
+    ...     ],
+    ... )
+    >>> ax = nested_tree(cop)
+    >>> ax.get_title()
+    'Nested Gumbel copula'
+    """
+    ax = _axes(ax)
+    leaf_x = [0.0]
+
+    def draw(current: Any, depth: int) -> float:
+        """Place children first, then centre the parent over them."""
+        spots = []
+        for leaf in current.components:
+            x = leaf_x[0]
+            leaf_x[0] += 1.0
+            ax.scatter([x], [-depth - 1.0], s=220, color="white", edgecolor="0.4", zorder=3)
+            ax.text(x, -depth - 1.0, str(leaf), ha="center", va="center", fontsize=8, zorder=4)
+            spots.append(x)
+        for child in current.children:
+            spots.append(draw(child, depth + 1))
+
+        centre = float(np.mean(spots)) if spots else 0.0
+        for x in spots:
+            ax.plot([centre, x], [-depth, -depth - 1.0], color="0.6", linewidth=1.0, zorder=1)
+        ax.scatter([centre], [-depth], s=520, color="0.92", edgecolor="0.35", zorder=3, **kwargs)
+        ax.text(
+            centre, -depth,
+            f"{current.theta:.2f}\ntau {current.generator_copula.tau():.2f}",
+            ha="center", va="center", fontsize=7, zorder=4,
+        )
+        return centre
+
+    draw(node, 0)
+    ax.set_title(f"Nested {node.generator_copula.name} copula")
+    ax.axis("off")
+    ax.margins(0.15)
+    return ax
+
+
+def dependence_heatmap(
+    values: ArrayLike,
+    names: list[str] | None = None,
+    label: str = "Kendall's tau",
+    ax: Any = None,
+    **kwargs: Any,
+) -> Any:
+    """Heat map of a pairwise dependence matrix, annotated with the numbers.
+
+    Useful precisely for the constructions whose whole point is that dependence
+    is *not* one number: a nested copula's :meth:`tau_matrix`, or the empirical
+    matrix from a sample.
+
+    Examples
+    --------
+    >>> import matplotlib
+    >>> matplotlib.use("Agg")
+    >>> import rcopula as rc
+    >>> from rcopula.plots import dependence_heatmap
+    >>> from rcopula.structural import NestedArchimedean
+    >>> cop = NestedArchimedean(
+    ...     rc.GumbelCopula(1.5),
+    ...     children=[
+    ...         NestedArchimedean(rc.GumbelCopula(4.0), [0, 1, 2]),
+    ...         NestedArchimedean(rc.GumbelCopula(3.0), [3, 4]),
+    ...     ],
+    ... )
+    >>> ax = dependence_heatmap(cop.tau_matrix())
+    >>> ax.get_title()
+    "Kendall's tau"
+    """
+    matrix = np.atleast_2d(np.asarray(values, dtype=np.float64))
+    d = matrix.shape[0]
+    if matrix.shape != (d, d):
+        raise ValueError(f"expected a square matrix, got {matrix.shape}")
+    labels = names or [str(j) for j in range(d)]
+
+    ax = _axes(ax)
+    kwargs.setdefault("cmap", "RdBu_r")
+    kwargs.setdefault("vmin", -1.0)
+    kwargs.setdefault("vmax", 1.0)
+    ax.imshow(matrix, **kwargs)
+    for i in range(d):
+        for j in range(d):
+            ax.text(j, i, f"{matrix[i, j]:.2f}", ha="center", va="center", fontsize=7)
+    ax.set_xticks(range(d), labels)
+    ax.set_yticks(range(d), labels)
+    ax.set_title(label)
     return ax

@@ -34,6 +34,7 @@ sit in a comment block beside the Python so the two can be compared directly.
 | [10](10_pairs_trading.py) | Conditional copula probabilities as a trading signal |
 | [11](11_copula_garch.py) | Volatility in time, dependence in the cross-section |
 | [12](12_operational_risk.py) | Loss-distribution approach and the Basel 99.9% capital number |
+| [19](19_time_varying_dependence.py) | Dependence that moves: Patton, GAS and DCC |
 
 ## Beyond finance
 
@@ -41,3 +42,12 @@ sit in a comment block beside the Python so the two can be compared directly.
 |---|---|
 | [13](13_hydrology_return_periods.py) | Kendall return periods, and why the univariate one is the wrong number |
 | [14](14_asymmetric_dependence.py) | Breaking exchangeability, and getting both tails at once |
+| [17](17_science_and_engineering.py) | Compound climate extremes, structural reliability, frailty and survival |
+| [18](18_machine_learning.py) | Mutual information, robust covariance, synthetic data, conditional independence |
+
+## High dimensions and diagnostics
+
+| | |
+|---|---|
+| [15](15_vine_copulas.py) | Pair-copula constructions: a different family on every edge |
+| [16](16_diagnostic_plots.py) | The nine plots, and what each one is for |
