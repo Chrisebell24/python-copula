@@ -48,8 +48,17 @@ from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, fit, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test
 from rcopula.htest import TestResult, ev_test, exch_test, indep_test, rad_sym_test
+from rcopula.kendall import (
+    kendall_cdf,
+    kendall_empirical,
+    kendall_pdf,
+    kendall_ppf,
+    kendall_return_period,
+    kendall_rvs,
+    return_period_level,
+)
 from rcopula.select import SelectionResult, cross_validate, select_copula
-from rcopula.structural import RotatedCopula, survival
+from rcopula.structural import KhoudrajiCopula, MixtureCopula, RotatedCopula, survival
 from rcopula.transforms import conditional_cdf, conditional_ppf, rosenblatt
 
 __version__ = "0.1.0.dev0"
@@ -75,8 +84,10 @@ __all__ = [
     "HuslerReissCopula",
     "IndependenceCopula",
     "JoeCopula",
+    "KhoudrajiCopula",
     "Margin",
     "MarshallOlkinCopula",
+    "MixtureCopula",
     "P2p",
     "PlackettCopula",
     "RotatedCopula",
@@ -103,11 +114,18 @@ __all__ = [
     "gof_test",
     "indep_test",
     "insurance",
+    "kendall_cdf",
+    "kendall_empirical",
+    "kendall_pdf",
+    "kendall_ppf",
+    "kendall_return_period",
+    "kendall_rvs",
     "loglik_copula",
     "p2P",
     "portfolio",
     "pseudo_obs",
     "rad_sym_test",
+    "return_period_level",
     "risk",
     "rosenblatt",
     "select_copula",

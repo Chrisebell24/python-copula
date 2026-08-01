@@ -13,13 +13,15 @@ a formula:
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 from scipy import stats
 
 import rcopula as rc
 from rcopula.core.measures import rho_by_quadrature, tau_by_quadrature
-from rcopula.structural import RotatedCopula, survival
+from rcopula.structural import KhoudrajiCopula, MixtureCopula, RotatedCopula, survival
 
 GRID = np.array([[0.2, 0.7], [0.5, 0.5], [0.85, 0.15], [0.35, 0.9], [0.6, 0.4]])
 
@@ -291,3 +293,316 @@ class TestSurvivalChangesTheAnswer:
         plain = rc.ClaytonCopula.from_tau(0.5)
         assert es(plain) < es(rc.GaussianCopula.from_tau(0.5)) < es(survival(plain))
         assert survival(plain).tau() == pytest.approx(plain.tau())
+
+
+# ======================================================================
+# Khoudraji's device
+# ======================================================================
+
+KHOUDRAJI = [
+    KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(3.0), [0.4, 0.95]),
+    KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(2.0), [0.3, 0.9]),
+    KhoudrajiCopula(rc.GumbelCopula(1.8), rc.GalambosCopula(2.0), [0.2, 0.8]),
+    KhoudrajiCopula(rc.ClaytonCopula(2.0), rc.GumbelCopula(3.0), [0.35, 0.85]),
+]
+
+
+class TestKhoudrajiIsACopula:
+    @pytest.mark.parametrize("cop", KHOUDRAJI)
+    def test_margins_are_uniform(self, cop: rc.Copula) -> None:
+        u = np.linspace(0.02, 0.98, 25)
+        assert np.allclose(cop.cdf(np.column_stack([u, np.ones_like(u)])), u, atol=1e-12)
+        assert np.allclose(cop.cdf(np.column_stack([np.ones_like(u), u])), u, atol=1e-12)
+
+    @pytest.mark.parametrize("cop", KHOUDRAJI)
+    def test_density_is_the_mixed_derivative_of_the_cdf(self, cop: rc.Copula) -> None:
+        """Ties the product-rule density to the CDF it is supposed to differentiate."""
+        for x, y in [(0.3, 0.4), (0.5, 0.5), (0.7, 0.75), (0.2, 0.85), (0.85, 0.2)]:
+            assert cop.pdf([[x, y]])[0] == pytest.approx(
+                mixed_second_difference(cop, x, y), rel=1e-5
+            )
+
+    @pytest.mark.parametrize("cop", KHOUDRAJI)
+    def test_the_sampler_reproduces_the_cdf(self, cop: rc.Copula) -> None:
+        """The max-of-two-independent-draws construction, checked against C itself."""
+        sample = cop.rvs(200_000, random_state=0)
+        pts = np.array([[0.2, 0.3], [0.5, 0.5], [0.8, 0.6], [0.35, 0.9], [0.9, 0.35]])
+        empirical = np.array([np.mean((sample[:, 0] <= a) & (sample[:, 1] <= b)) for a, b in pts])
+        assert np.allclose(cop.cdf(pts), empirical, atol=4e-3)
+        for j in range(2):
+            assert stats.kstest(sample[:, j], "uniform").pvalue > 0.01
+
+    @pytest.mark.parametrize("cop", KHOUDRAJI)
+    def test_tau_and_rho_match_the_sample(self, cop: rc.Copula) -> None:
+        sample = cop.rvs(200_000, random_state=0)
+        assert cop.tau() == pytest.approx(
+            stats.kendalltau(sample[:, 0], sample[:, 1]).statistic, abs=5e-3
+        )
+        assert cop.rho() == pytest.approx(
+            stats.spearmanr(sample[:, 0], sample[:, 1]).statistic, abs=5e-3
+        )
+
+    @pytest.mark.parametrize("cop", KHOUDRAJI)
+    def test_the_cdf_respects_the_frechet_bounds(self, cop: rc.Copula) -> None:
+        c = cop.cdf(GRID)
+        assert np.all(c >= np.maximum(GRID.sum(axis=1) - 1.0, 0.0) - 1e-12)
+        assert np.all(c <= GRID.min(axis=1) + 1e-12)
+
+
+class TestKhoudrajiAsymmetry:
+    def test_unequal_shapes_break_exchangeability(self) -> None:
+        """The entire point: no Archimedean or exchangeable elliptical can do this."""
+        cop = KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(3.0), [0.4, 0.95])
+        assert not cop.is_exchangeable
+        assert abs(cop.cdf([[0.3, 0.7]])[0] - cop.cdf([[0.7, 0.3]])[0]) > 0.01
+
+    @pytest.mark.parametrize("shape", [0.1, 0.5, 0.9])
+    def test_equal_shapes_leave_it_exchangeable(self, shape: float) -> None:
+        cop = KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(3.0), [shape, shape])
+        assert cop.is_exchangeable
+        flipped = GRID[:, ::-1]
+        assert np.allclose(cop.cdf(GRID), cop.cdf(flipped), atol=1e-14)
+
+    @pytest.mark.parametrize("shape", [0.1, 0.5, 0.9])
+    def test_two_identical_components_give_that_component_back(self, shape: float) -> None:
+        """C1 = C2 = C means C(u^{1-a}) C(u^a) = C(u) for any equal shapes.
+
+        A sharp self-consistency check: it must hold exactly, at every shape.
+        """
+        base = rc.GumbelCopula(3.0)
+        cop = KhoudrajiCopula(base, base, [shape, shape])
+        assert np.allclose(cop.cdf(GRID), base.cdf(GRID), atol=1e-14)
+        assert cop.lambda_().upper == pytest.approx(base.lambda_().upper, abs=1e-12)
+
+    def test_the_shapes_interpolate_between_the_components(self) -> None:
+        first, second = rc.ClaytonCopula(2.0), rc.GumbelCopula(3.0)
+        at_zero = KhoudrajiCopula(first, second, [1e-9, 1e-9])
+        at_one = KhoudrajiCopula(first, second, [1 - 1e-9, 1 - 1e-9])
+        assert np.allclose(at_zero.cdf(GRID), first.cdf(GRID), atol=1e-8)
+        assert np.allclose(at_one.cdf(GRID), second.cdf(GRID), atol=1e-8)
+
+
+class TestKhoudrajiExtremeValueStructure:
+    """Both components extreme-value means the result is too -- so tail
+    dependence is exact rather than estimated."""
+
+    EV: ClassVar[list[rc.Copula]] = KHOUDRAJI[:3]
+
+    @pytest.mark.parametrize("cop", EV)
+    def test_the_pickands_function_reproduces_the_cdf(self, cop: rc.Copula) -> None:
+        assert cop.is_extreme_value
+        for u, v in [(0.4, 0.7), (0.2, 0.9), (0.6, 0.6), (0.95, 0.15)]:
+            log_uv = np.log(u) + np.log(v)
+            via_a = float(np.exp(log_uv * cop.pickands(np.log(v) / log_uv)))
+            assert via_a == pytest.approx(float(cop.cdf([[u, v]])[0]), rel=1e-12)
+
+    @pytest.mark.parametrize("cop", EV)
+    def test_the_pickands_function_satisfies_its_defining_bounds(self, cop: rc.Copula) -> None:
+        t = np.linspace(1e-6, 1 - 1e-6, 2001)
+        a = cop.pickands(t)
+        assert np.all(a >= np.maximum(t, 1 - t) - 1e-12)
+        assert np.all(a <= 1.0 + 1e-12)
+        assert np.all(np.diff(a, 2) >= -1e-12)  # convex
+
+    @pytest.mark.parametrize("cop", EV)
+    def test_tail_dependence_matches_the_diagonal_limit(self, cop: rc.Copula) -> None:
+        """2(1 - A(1/2)) against lim (1 - 2u + C(u,u))/(1-u), computed from the CDF.
+
+        Deliberately not against an empirical exceedance rate: that estimator is
+        badly biased at any reachable quantile, and reads 0.42 where the truth
+        is 0.377.
+        """
+        q = 1 - 1e-9
+        limit = (1 - 2 * q + float(cop.cdf([[q, q]])[0])) / (1 - q)
+        assert cop.lambda_().upper == pytest.approx(limit, abs=1e-6)
+        assert cop.lambda_().lower == 0.0
+
+    def test_a_non_extreme_value_component_refuses_rather_than_guesses(self) -> None:
+        cop = KhoudrajiCopula(rc.ClaytonCopula(2.0), rc.GumbelCopula(3.0), [0.35, 0.85])
+        assert not cop.is_extreme_value
+        with pytest.raises(NotImplementedError, match="no closed form"):
+            cop.lambda_()
+        with pytest.raises(NotImplementedError, match="extreme-value"):
+            cop.pickands(0.5)
+
+
+class TestKhoudrajiPlumbing:
+    def test_fitting_recovers_the_shapes(self) -> None:
+        truth = KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(3.0), [0.4, 0.95])
+        res = rc.fit(
+            KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(), [0.5, 0.5]),
+            truth.rvs(4000, random_state=0),
+            method="mpl",
+        )
+        assert res.copula.copula2.theta == pytest.approx(3.0, rel=0.2)
+        assert np.allclose(res.copula.shapes, [0.4, 0.95], atol=0.12)
+
+    def test_it_works_above_two_dimensions_except_for_the_density(self) -> None:
+        cop = KhoudrajiCopula(
+            rc.IndependenceCopula(3), rc.GumbelCopula(3.0, dim=3), [0.3, 0.6, 0.9]
+        )
+        u = np.linspace(0.02, 0.98, 20)
+        pts = np.ones((20, 3))
+        pts[:, 1] = u
+        assert np.allclose(cop.cdf(pts), u, atol=1e-12)
+        sample = cop.rvs(20_000, random_state=0)
+        for j in range(3):
+            assert stats.kstest(sample[:, j], "uniform").pvalue > 0.01
+        with pytest.raises(NotImplementedError, match="dim=2"):
+            cop.pdf([[0.5, 0.5, 0.5]])
+
+    def test_it_rejects_mismatched_input(self) -> None:
+        with pytest.raises(ValueError, match="share a dimension"):
+            KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(2.0, dim=3), [0.5, 0.5])
+        with pytest.raises(ValueError, match="shapes has length"):
+            KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(2.0), [0.5, 0.5, 0.5])
+        with pytest.raises(ValueError, match="outside admissible range"):
+            KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(2.0), [0.5, 1.5])
+
+
+# ======================================================================
+# Mixtures
+# ======================================================================
+
+
+class TestMixtureIsACopula:
+    MIXTURES: ClassVar[list[rc.Copula]] = [
+        MixtureCopula([rc.ClaytonCopula(3.0), rc.GumbelCopula(2.5)], [0.4, 0.6]),
+        MixtureCopula(
+            [rc.ClaytonCopula(4.0), rc.GumbelCopula(3.0), rc.FrankCopula(5.0)], [0.3, 0.3, 0.4]
+        ),
+        MixtureCopula([rc.GaussianCopula(0.7), rc.GaussianCopula(-0.7)], [0.5, 0.5]),
+    ]
+
+    @pytest.mark.parametrize("cop", MIXTURES)
+    def test_margins_are_uniform(self, cop: rc.Copula) -> None:
+        u = np.linspace(0.02, 0.98, 25)
+        assert np.allclose(cop.cdf(np.column_stack([u, np.ones_like(u)])), u, atol=1e-12)
+
+    @pytest.mark.parametrize("cop", MIXTURES)
+    def test_density_is_the_mixed_derivative_of_the_cdf(self, cop: rc.Copula) -> None:
+        for x, y in [(0.3, 0.4), (0.5, 0.5), (0.7, 0.75)]:
+            assert cop.pdf([[x, y]])[0] == pytest.approx(
+                mixed_second_difference(cop, x, y), rel=1e-5
+            )
+
+    @pytest.mark.parametrize("cop", MIXTURES)
+    def test_the_sampler_reproduces_the_cdf(self, cop: rc.Copula) -> None:
+        sample = cop.rvs(200_000, random_state=0)
+        pts = np.array([[0.2, 0.3], [0.5, 0.5], [0.8, 0.6]])
+        empirical = np.array([np.mean((sample[:, 0] <= a) & (sample[:, 1] <= b)) for a, b in pts])
+        assert np.allclose(cop.cdf(pts), empirical, atol=4e-3)
+        for j in range(2):
+            assert stats.kstest(sample[:, j], "uniform").pvalue > 0.01
+
+    def test_it_works_above_two_dimensions(self) -> None:
+        cop = MixtureCopula(
+            [rc.GaussianCopula(0.5, dim=3), rc.ClaytonCopula(2.0, dim=3)], [0.6, 0.4]
+        )
+        u = np.linspace(0.02, 0.98, 20)
+        pts = np.ones((20, 3))
+        pts[:, 2] = u
+        assert np.allclose(cop.cdf(pts), u, atol=1e-12)
+        sample = cop.rvs(40_000, random_state=0)
+        for j in range(3):
+            assert stats.kstest(sample[:, j], "uniform").pvalue > 0.01
+
+
+class TestMixtureDependenceIsLinearExceptWhereItIsNot:
+    """Three measures mix exactly; Kendall's tau does not. Getting that backwards
+    is the natural mistake, so both halves are pinned."""
+
+    PARTS: ClassVar[list[rc.Copula]] = [rc.ClaytonCopula(3.0), rc.GumbelCopula(2.5)]
+    WEIGHTS: ClassVar[list[float]] = [0.4, 0.6]
+
+    def test_spearman_rho_is_the_weighted_average(self) -> None:
+        cop = MixtureCopula(self.PARTS, self.WEIGHTS)
+        expected = float(np.dot(self.WEIGHTS, [c.rho() for c in self.PARTS]))
+        assert cop.rho() == pytest.approx(expected, abs=1e-12)
+
+    def test_tail_dependence_is_the_weighted_average_in_both_tails(self) -> None:
+        cop = MixtureCopula(self.PARTS, self.WEIGHTS)
+        pairs = [c.lambda_() for c in self.PARTS]
+        assert cop.lambda_().lower == pytest.approx(
+            float(np.dot(self.WEIGHTS, [p.lower for p in pairs])), abs=1e-12
+        )
+        assert cop.lambda_().upper == pytest.approx(
+            float(np.dot(self.WEIGHTS, [p.upper for p in pairs])), abs=1e-12
+        )
+
+    def test_blomqvist_beta_is_the_weighted_average(self) -> None:
+        cop = MixtureCopula(self.PARTS, self.WEIGHTS)
+        expected = float(np.dot(self.WEIGHTS, [c.beta() for c in self.PARTS]))
+        assert cop.beta() == pytest.approx(expected, abs=1e-10)
+
+    def test_kendall_tau_is_not(self) -> None:
+        """Half comonotone, half independent: rho is exactly 0.5, tau is 0.416."""
+        cop = MixtureCopula([rc.FrechetUpperCopula(2), rc.IndependenceCopula(2)], [0.5, 0.5])
+        assert cop.rho() == pytest.approx(0.5, abs=1e-10)
+        assert cop.tau() == pytest.approx(0.4159, abs=1e-3)
+        assert abs(cop.tau() - 0.5) > 0.08
+
+    @pytest.mark.parametrize(
+        ("parts", "weights"),
+        [
+            ([rc.ClaytonCopula(3.0), rc.GumbelCopula(2.5)], [0.4, 0.6]),
+            ([rc.ClaytonCopula(8.0), rc.GumbelCopula(1.05)], [0.5, 0.5]),
+            ([rc.ClaytonCopula(6.0), rc.FrankCopula(-8.0)], [0.5, 0.5]),
+        ],
+    )
+    def test_the_quadrature_tau_matches_the_sample(self, parts: list, weights: list) -> None:
+        cop = MixtureCopula(parts, weights)
+        sample = cop.rvs(200_000, random_state=0)
+        assert cop.tau() == pytest.approx(
+            stats.kendalltau(sample[:, 0], sample[:, 1]).statistic, abs=5e-3
+        )
+
+    def test_a_mixture_can_have_dependence_in_both_tails(self) -> None:
+        """The reason to build one: no single family here manages it."""
+        cop = MixtureCopula([rc.ClaytonCopula(4.0), rc.GumbelCopula(3.0)], [0.5, 0.5])
+        lam = cop.lambda_()
+        assert lam.lower > 0.3
+        assert lam.upper > 0.3
+        for part in cop.copulas:
+            assert min(part.lambda_()) == 0.0
+
+
+class TestMixturePlumbing:
+    def test_the_weights_round_trip_through_the_log_odds_scale(self) -> None:
+        for weights in ([0.25, 0.75], [0.1, 0.2, 0.7], [0.5, 0.5], [1e-8, 1 - 1e-8]):
+            parts = [rc.ClaytonCopula(2.0)] * len(weights)
+            assert np.allclose(MixtureCopula(parts, weights).weights, weights, atol=1e-9)
+
+    def test_the_log_odds_scale_is_unconstrained(self) -> None:
+        """Which is the point: an optimiser sees a box, not a simplex."""
+        cop = MixtureCopula([rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0)], [0.3, 0.7])
+        lo, hi = cop.param_bounds[-1]
+        assert lo < 0 < hi
+        moved = cop.with_params([*cop.params[:-1], 5.0])
+        assert np.isclose(moved.weights.sum(), 1.0)
+        assert moved.weights[0] > 0.99
+
+    def test_fitting_recovers_the_weights(self) -> None:
+        truth = MixtureCopula([rc.ClaytonCopula(4.0), rc.GumbelCopula(3.0)], [0.3, 0.7])
+        res = rc.fit(
+            MixtureCopula([rc.ClaytonCopula(), rc.GumbelCopula()], [0.5, 0.5]),
+            truth.rvs(4000, random_state=0),
+            method="mpl",
+        )
+        assert np.allclose(res.copula.weights, [0.3, 0.7], atol=0.12)
+
+    def test_a_degenerate_weight_reduces_to_the_other_component(self) -> None:
+        cop = MixtureCopula([rc.ClaytonCopula(3.0), rc.GumbelCopula(2.5)], [1e-14, 1 - 1e-14])
+        assert np.allclose(cop.cdf(GRID), rc.GumbelCopula(2.5).cdf(GRID), atol=1e-12)
+
+    def test_it_rejects_bad_input(self) -> None:
+        with pytest.raises(ValueError, match="at least two components"):
+            MixtureCopula([rc.ClaytonCopula(2.0)])
+        with pytest.raises(ValueError, match="share a dimension"):
+            MixtureCopula([rc.ClaytonCopula(2.0), rc.ClaytonCopula(2.0, dim=3)])
+        with pytest.raises(ValueError, match="must sum to 1"):
+            MixtureCopula([rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0)], [0.5, 0.7])
+        with pytest.raises(ValueError, match="non-negative"):
+            MixtureCopula([rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0)], [-0.5, 1.5])
+        with pytest.raises(ValueError, match="weights for"):
+            MixtureCopula([rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0)], [0.2, 0.3, 0.5])

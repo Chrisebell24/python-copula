@@ -12,11 +12,15 @@ unchanged.
 ==========================  ==================================================
 :class:`RotatedCopula`      Reflect any subset of coordinates.
 :func:`survival`            The survival copula -- every coordinate reflected.
+:class:`KhoudrajiCopula`    Break exchangeability with a shape per coordinate.
+:class:`MixtureCopula`      Convex combination -- both tails at once.
 ==========================  ==================================================
 """
 
 from __future__ import annotations
 
+from rcopula.structural.khoudraji import KhoudrajiCopula
+from rcopula.structural.mixture import MixtureCopula
 from rcopula.structural.rotated import RotatedCopula, survival
 
-__all__ = ["RotatedCopula", "survival"]
+__all__ = ["KhoudrajiCopula", "MixtureCopula", "RotatedCopula", "survival"]

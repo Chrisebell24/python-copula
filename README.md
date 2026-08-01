@@ -16,7 +16,7 @@ are fragmented, and roughly **60–70% of R `copula`'s statistical surface has n
 equivalent at all**:
 
 - no multiplier-bootstrap goodness-of-fit anywhere;
-- no nested Archimedean copulas, Khoudraji device, or general rotation wrapper;
+- no Khoudraji device, general rotation wrapper, or arbitrary-copula mixtures;
 - no Kendall distribution function `K`, no general Rosenblatt transform;
 - **not one Python package returns standard errors for a fitted copula**;
 - families missing under one API: Joe, AMH, Plackett, FGM, Marshall–Olkin, Galambos,
@@ -109,6 +109,13 @@ can paste them across.
 | `mvdc(cop, margins, paramMargins)` | `rc.CopulaDistribution(cop, margins=[...])` |
 | `cCopula(u, cop)` | `rc.rosenblatt(cop, u)` |
 | `gofCopula(cop, x, simulation = "mult")` | `rc.gof_test(cop, x, simulation="mult")` |
+| `rotCopula(cop, flip)` | `rc.RotatedCopula(cop, flip)` / `rc.survival(cop)` |
+| `khoudrajiCopula(c1, c2, shapes)` | `rc.KhoudrajiCopula(c1, c2, shapes)` |
+| `mixCopula(list(c1, c2), w)` | `rc.MixtureCopula([c1, c2], w)` |
+| `pK(t, cop, d)` / `qK` / `dK` / `rK` | `rc.kendall_cdf/ppf/pdf/rvs(cop, ...)` |
+| `Kn(u, x)` | `rc.kendall_empirical(x, u)` |
+| `xvCopula(cop, x, k)` | `rc.cross_validate(cop, x, k)` |
+| *(no equivalent)* | `rc.select_copula(u)` — rank every admissible family |
 
 The full translation table is in the [documentation](https://chrisebell24.github.io/python-copula/).
 
