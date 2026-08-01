@@ -108,6 +108,8 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "CopulaGarch",
                 "DynamicCopula",
                 "fit_dcc",
+                "discrete_pmf",
+                "tau_upper_bound",
                 "operational_risk_capital",
             ],
         ),

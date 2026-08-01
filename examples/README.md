@@ -44,6 +44,7 @@ sit in a comment block beside the Python so the two can be compared directly.
 | [14](14_asymmetric_dependence.py) | Breaking exchangeability, and getting both tails at once |
 | [17](17_science_and_engineering.py) | Compound climate extremes, structural reliability, frailty and survival |
 | [18](18_machine_learning.py) | Mutual information, robust covariance, synthetic data, conditional independence |
+| [20](20_discrete_margins.py) | Counts and categories, and the copula that is only half identified |
 
 ## High dimensions and diagnostics
 

@@ -116,7 +116,11 @@ class CopulaDistribution:
         if len(marg) != copula.dim:
             raise ValueError(f"got {len(marg)} margin(s) for a copula of dimension {copula.dim}")
         for j, m in enumerate(marg):
-            missing = [a for a in ("cdf", "pdf", "ppf") if not hasattr(m, a)]
+            # A discrete margin has pmf where a continuous one has pdf. Both are
+            # accepted; which is which decides how the density is computed.
+            missing = [a for a in ("cdf", "ppf") if not hasattr(m, a)]
+            if not hasattr(m, "pdf") and not hasattr(m, "pmf"):
+                missing.append("pdf or pmf")
             if missing:
                 raise TypeError(
                     f"margin {j} ({type(m).__name__}) is missing {missing}; "
@@ -125,6 +129,11 @@ class CopulaDistribution:
 
         self.copula = copula
         self.margins = marg
+        #: Which coordinates are discrete. A margin with ``pmf`` and no ``pdf``
+        #: is discrete; scipy's frozen discrete distributions are exactly that.
+        self.discrete = np.array(
+            [not hasattr(m, "pdf") and hasattr(m, "pmf") for m in marg], dtype=bool
+        )
         self.names = list(names) if names is not None else None
         if self.names is not None and len(self.names) != copula.dim:
             raise ValueError(f"got {len(self.names)} names for dimension {copula.dim}")
@@ -165,17 +174,29 @@ class CopulaDistribution:
         it in logs matters: in even moderate dimensions the product of marginal
         densities underflows long before the joint density is genuinely zero.
         """
+        with np.errstate(divide="ignore"):
+            return np.log(self.pdf(x))
+
+    def pdf(self, x: ArrayLike) -> NDArray[np.float64]:
+        r"""Joint density, or mass, or the mixture of the two.
+
+        With continuous margins this is
+        :math:`c(F_1(x_1),\dots)\prod_j f_j(x_j)`. With any discrete margin it
+        is not a derivative in that coordinate but a finite difference, so the
+        work is handed to :func:`rcopula.discrete.mixed_pdf` -- see that module
+        for what identifiability means once a margin has atoms.
+        """
         arr = self._validate_x(x)
+        if self.discrete.any():
+            from rcopula.discrete import mixed_pdf
+
+            return mixed_pdf(self.copula, arr, self.margins, self.discrete)
         u = self._to_uniform(arr)
         with np.errstate(divide="ignore"):
             marginal = np.sum(
                 [np.log(m.pdf(arr[:, j])) for j, m in enumerate(self.margins)], axis=0
             )
-        return self.copula.logpdf(u) + marginal
-
-    def pdf(self, x: ArrayLike) -> NDArray[np.float64]:
-        """Joint density."""
-        return np.exp(self.logpdf(x))
+        return np.asarray(np.exp(self.copula.logpdf(u) + marginal))
 
     def rvs(
         self,
