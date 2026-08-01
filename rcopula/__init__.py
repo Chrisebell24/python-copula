@@ -76,6 +76,7 @@ from rcopula.structural import (
     survival,
 )
 from rcopula.transforms import conditional_cdf, conditional_ppf, rosenblatt
+from rcopula.vine import VineCopula, fit_vine
 
 __version__ = "0.1.0.dev0"
 
@@ -114,6 +115,7 @@ __all__ = [
     "TailDependence",
     "TawnCopula",
     "TestResult",
+    "VineCopula",
     "__version__",
     "beta_n",
     "conditional_cdf",
@@ -128,6 +130,7 @@ __all__ = [
     "exch_test",
     "fit",
     "fit_nested",
+    "fit_vine",
     "garch",
     "gof_statistic",
     "gof_test",

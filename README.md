@@ -102,7 +102,7 @@ licences and SHA-256 digests, and fetches permissively-licensed sources on first
 use.
 
 ```python
-flood = rc.datasets.load("nwis_peaks")     # USGS, public domain
+flood = rc.datasets.load("nwis_peaks")  # USGS, public domain
 flood.attrs["citation"]
 ```
 
@@ -143,6 +143,7 @@ can paste them across.
 | `mixCopula(list(c1, c2), w)` | `rc.MixtureCopula([c1, c2], w)` |
 | `onacopula("G", C(1.5, , list(C(4, 1:3))))` | `rc.NestedArchimedean(rc.GumbelCopula(1.5), ...)` |
 | `enacopula(u, cop, method = "etau")` | `rc.fit_nested(structure, u)` |
+| *(VineCopula::RVineStructureSelect)* | `rc.fit_vine(u, structure="D")` |
 | `retstable(n, V0, h, alpha)` | `rcopula.special.stable.retstable(...)` |
 | `pK(t, cop, d)` / `qK` / `dK` / `rK` | `rc.kendall_cdf/ppf/pdf/rvs(cop, ...)` |
 | `Kn(u, x)` | `rc.kendall_empirical(x, u)` |
