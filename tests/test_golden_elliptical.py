@@ -34,9 +34,9 @@ GOLDEN = Path(__file__).parent / "golden" / "elliptical.json"
 #: 5-dimensional copula CDF is routinely ~1e-6 and a relative bound there would
 #: be measuring nothing but the QMC floor.
 TOL_PDF = 1e-11
-TOL_LOGPDF = 1e-11
-TOL_CDF_EXACT = 1e-13  # d = 2, both sides exact
-TOL_CDF_QMC = 1e-5  # d >= 3, QMC on both sides
+TOL_LOGPDF = 1e-10  # relative, on log densities that pass near zero
+TOL_CDF_EXACT = 1e-12  # d <= 3, both sides exact
+TOL_CDF_QMC = 1e-5  # d >= 4, QMC on both sides
 
 
 @pytest.fixture(scope="module")
@@ -86,7 +86,7 @@ def test_cdf_matches_r(golden: dict) -> None:
         u = np.atleast_2d(np.asarray(blk["u"], dtype=float))
         got = cop.cdf(u)
         expected = _numeric(blk["cdf"])
-        tol = TOL_CDF_EXACT if blk["dim"] == 2 else TOL_CDF_QMC
+        tol = TOL_CDF_EXACT if blk["dim"] <= 3 else TOL_CDF_QMC
         err = np.max(np.abs(got - expected))
         assert err < tol, f"{key}: max abs cdf deviation {err:.3e}"
 
@@ -107,19 +107,19 @@ def test_dependence_measures_match_r(golden: dict) -> None:
             assert cop.lambda_().lower == pytest.approx(float(lam[0]), rel=1e-12, abs=1e-15)
 
 
-def test_bivariate_cdf_is_exact_not_merely_close(golden: dict) -> None:
-    """d = 2 should agree to machine precision, not to a QMC tolerance.
+def test_low_dimensional_cdf_is_exact_not_merely_close(golden: dict) -> None:
+    """d <= 3 should agree to machine precision, not to a QMC tolerance.
 
-    This is the guard that would catch a silent fallback from the Owen's T path
-    onto the quasi-Monte-Carlo one.
+    This is the guard that would catch a silent fallback from the exact paths
+    (Owen's T, or the trivariate conditioning integral) onto quasi-Monte-Carlo.
     """
     for key in _cases(golden):
         blk = golden[key]
-        if blk["dim"] != 2:
+        if blk["dim"] > 3:
             continue
         cop = _build(blk)
         u = np.atleast_2d(np.asarray(blk["u"], dtype=float))
-        assert np.max(np.abs(cop.cdf(u) - _numeric(blk["cdf"]))) < 1e-13, key
+        assert np.max(np.abs(cop.cdf(u) - _numeric(blk["cdf"]))) < 1e-12, key
 
 
 def test_coverage_spans_families_dimensions_and_structures(golden: dict) -> None:

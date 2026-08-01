@@ -99,11 +99,12 @@ for (d in c(2, 3, 5)) {
           df = if (fam == "t") 4 else NA_real_,
           u = u,
           pdf = dCopula(u, cop), logpdf = dCopula(u, cop, log = TRUE),
-          # Do NOT use pCopula's default algorithm here. For 3 <= d <= 5 it
-          # picks Miwa() with 128 steps, which carries ~1e-4 error -- far worse
-          # than rcopula's integrator, so it would be a misleading oracle.
-          # GenzBretz with a tight abseps gives a genuine reference.
-          cdf = pCopula(u, cop, algorithm = GenzBretz(maxpts = 250000, abseps = 1e-8)),
+          # Do NOT use pCopula's default algorithm. For 3 <= d <= 5 it picks
+          # Miwa() with 128 steps, which carries ~1e-4 error. Use TVPACK where
+          # it applies (d <= 3, essentially exact) and a tight GenzBretz
+          # otherwise, so the fixture is never the less accurate side.
+          cdf = if (d <= 3) pCopula(u, cop, algorithm = TVPACK(abseps = 1e-14))
+                else pCopula(u, cop, algorithm = GenzBretz(maxpts = 250000, abseps = 1e-8)),
           tau = maybe(tau(cop)), rho_s = maybe(rho(cop)),
           lambdaL = maybe(lambda(cop)[["lower"]]),
           lambdaU = maybe(lambda(cop)[["upper"]])
@@ -121,7 +122,7 @@ for (fam in c("normal", "t")) {
     family = fam, dim = 3, dispstr = "un", rho = c(0.6, 0.3, 0.2),
     df = if (fam == "t") 5 else NA_real_,
     u = u3, pdf = dCopula(u3, cop), logpdf = dCopula(u3, cop, log = TRUE),
-    cdf = pCopula(u3, cop, algorithm = GenzBretz(maxpts = 250000, abseps = 1e-8)), tau = maybe(tau(cop)), rho_s = maybe(rho(cop)),
+    cdf = pCopula(u3, cop, algorithm = TVPACK(abseps = 1e-14)), tau = maybe(tau(cop)), rho_s = maybe(rho(cop)),
     lambdaL = maybe(lambda(cop)[["lower"]]), lambdaU = maybe(lambda(cop)[["upper"]])
   )
 }
