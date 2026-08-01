@@ -115,7 +115,9 @@ can paste them across.
 | `pK(t, cop, d)` / `qK` / `dK` / `rK` | `rc.kendall_cdf/ppf/pdf/rvs(cop, ...)` |
 | `Kn(u, x)` | `rc.kendall_empirical(x, u)` |
 | `xvCopula(cop, x, k)` | `rc.cross_validate(cop, x, k)` |
+| `contour(cop, dCopula)` / `persp(...)` | `rc.plots.contour(cop)` / `rc.plots.surface(cop)` |
 | *(no equivalent)* | `rc.select_copula(u)` — rank every admissible family |
+| *(no equivalent)* | `rc.plots.tail_concentration(u, [c1, c2])` — where families disagree |
 
 The full translation table is in the [documentation](https://chrisebell24.github.io/python-copula/).
 
