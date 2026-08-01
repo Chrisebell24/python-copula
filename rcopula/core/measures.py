@@ -36,7 +36,7 @@ from numpy.typing import NDArray
 
 from rcopula.core.base import Copula
 
-__all__ = ["rho_by_quadrature", "tau_by_quadrature"]
+__all__ = ["rho_by_quadrature", "tau_by_partials", "tau_by_quadrature"]
 
 #: Half-width of the tanh-sinh node index. 140 gives roughly 150 usable nodes
 #: per axis and ~1e-9 even on families with a divergent corner density.
@@ -124,3 +124,74 @@ def tau_by_quadrature(copula: Copula, level: int = _LEVEL) -> float:
         density = copula.pdf(points)
     value = 4.0 * float(np.sum(weights * copula.cdf(points) * np.nan_to_num(density))) - 1.0
     return float(np.clip(value, -1.0, 1.0))
+
+
+#: Gauss-Legendre nodes per axis for :func:`tau_by_partials`. The integrand
+#: there is bounded in ``[0, 1]``, so an ordinary rule is appropriate and 400
+#: nodes reproduce closed-form tau to eight digits.
+_PARTIAL_NODES = 400
+
+#: Step for differencing the CDF. Large enough that the difference is not
+#: dominated by rounding in ``cdf``, small enough that the derivative is local.
+_PARTIAL_STEP = 1e-6
+
+
+def tau_by_partials(copula: Copula, nodes: int = _PARTIAL_NODES) -> float:
+    r"""Kendall's tau as :math:`1 - 4\int\int \partial_1 C\,\partial_2 C\,du\,dv`.
+
+    The same quantity as :func:`tau_by_quadrature`, integrated a different way,
+    and better in two situations that matter.
+
+    * **It needs only the CDF.** The :math:`\int\int C\,dC` form silently
+      assumes the copula is absolutely continuous: a copula with a singular
+      component -- Marshall-Olkin, or Clayton below zero -- carries mass that no
+      density represents, and integrating the density alone misses it. Here the
+      partial derivatives are conditional distribution functions, which exist
+      regardless.
+    * **The integrand is bounded in** :math:`[0, 1]`. Under strong dependence
+      the density concentrates into a near-delta on the diagonal and no
+      quadrature can resolve it: at Plackett ``theta = 1e4`` the density form
+      returns 1.0 against a true 0.9756. The bounded form gets 0.97572.
+
+    The trade is a numerical derivative, so it carries about 4e-8 rather than
+    1e-8 -- immaterial next to what it buys.
+
+    Examples
+    --------
+    Agrees with the closed forms:
+
+    >>> from rcopula import ClaytonCopula, GumbelCopula
+    >>> from rcopula.core.measures import tau_by_partials
+    >>> for cop in (ClaytonCopula(2.0), GumbelCopula(3.0)):
+    ...     print(bool(abs(tau_by_partials(cop) - cop.tau()) < 1e-7))
+    True
+    True
+
+    And works where the density form cannot -- Marshall-Olkin puts mass on a
+    curve, so its density integrates to less than one:
+
+    >>> from rcopula import MarshallOlkinCopula
+    >>> cop = MarshallOlkinCopula(0.7, 0.4)
+    >>> bool(abs(tau_by_partials(cop) - cop.tau()) < 1e-3)
+    True
+    """
+    if copula.dim != 2:
+        raise ValueError(f"quadrature is bivariate; got dim={copula.dim}")
+    x, w = np.polynomial.legendre.leggauss(nodes)
+    x, w = 0.5 * (x + 1.0), 0.5 * w
+    uu, vv = np.meshgrid(x, x, indexing="ij")
+    u, v = uu.ravel(), vv.ravel()
+
+    step = _PARTIAL_STEP
+    hi_u, lo_u = np.minimum(u + step, 1.0), np.maximum(u - step, 0.0)
+    hi_v, lo_v = np.minimum(v + step, 1.0), np.maximum(v - step, 0.0)
+    with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+        d1 = (copula.cdf(np.column_stack([hi_u, v])) - copula.cdf(np.column_stack([lo_u, v]))) / (
+            hi_u - lo_u
+        )
+        d2 = (copula.cdf(np.column_stack([u, hi_v])) - copula.cdf(np.column_stack([u, lo_v]))) / (
+            hi_v - lo_v
+        )
+
+    integrand = np.nan_to_num(d1 * d2).reshape(uu.shape)
+    return float(np.clip(1.0 - 4.0 * np.einsum("i,j,ij->", w, w, integrand), -1.0, 1.0))

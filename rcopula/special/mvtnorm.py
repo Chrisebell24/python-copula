@@ -45,6 +45,12 @@ _QMC_SEED = 20260731
 #: Gauss-Legendre nodes for the Student-t radial integral.
 _T_RADIAL_NODES = 128
 
+#: Degrees of freedom below which the radial integral switches to the
+#: probability scale. The density factor ``s^{df-1}`` is non-smooth at the
+#: origin for ``df < 2`` -- divergent below 1, infinite-derivative between 1 and
+#: 2 -- and Gauss-Legendre needs a smooth integrand.
+_T_PROBABILITY_SCALE_BELOW = 2.0
+
 #: Gauss-Legendre nodes for the trivariate conditioning integral. Tuned
 #: empirically: 60 beats 300 on *both* accuracy and speed, because the
 #: integrand is smooth enough that extra nodes only accumulate roundoff.
@@ -408,30 +414,71 @@ def mvt_cdf(
         # [0, 1.006] would step straight over it and the answer would be wrong
         # by several percent. Bracketing by quantiles keeps the nodes where the
         # mass is at every df.
-        s_lo = float(np.sqrt(chi2.ppf(1e-15, df) / df))
-        s_hi = float(np.sqrt(chi2.ppf(1.0 - 1e-15, df) / df))
-        nodes, weights = np.polynomial.legendre.leggauss(_T_RADIAL_NODES)
-        s_nodes = 0.5 * (s_hi - s_lo) * nodes + 0.5 * (s_hi + s_lo)
-        s_weights = 0.5 * (s_hi - s_lo) * weights
+        if df < _T_PROBABILITY_SCALE_BELOW:
+            # The density of S carries a factor s^{df-1}. Below one degree of
+            # freedom that *diverges* at the origin, and between one and two it
+            # has an infinite derivative there. Both defeat Gauss-Legendre: at
+            # df = 0.5 the rule below lost 0.44% of the total mass, so every
+            # t-copula CDF came out short by that constant and the margin
+            # identity C(u, 1) = u failed by 4e-3.
+            #
+            # Substituting the probability scale removes the offending factor
+            # outright. With s(q) the chi quantile function,
+            # ``int f_S(s) g(s) ds = int_0^1 g(s(q)) dq``: no density survives,
+            # the integrand is bounded in [0, 1], and the total mass is exactly
+            # 1 by construction. That takes df = 0.5 to 1e-15.
+            #
+            # It is *not* the better route higher up -- above df = 2 the
+            # substitution stretches a steep but perfectly smooth transition
+            # across the whole interval and gives 5e-7 where the density form
+            # gives 1e-14 -- hence the switch rather than a wholesale
+            # replacement.
+            #
+            # Accuracy on this branch settles around 1e-7 once the limits
+            # themselves are extreme, which heavy tails make them: a t copula
+            # with df = 0.5 puts its 2% quantile near -1200, and Phi(x s) is
+            # then a near-step in s. Very small df stays hard either way -- at
+            # df = 0.02 the quantile function is so steep that even this route
+            # holds only ~4e-4. R declines the question entirely: `pmvt` accepts
+            # integer degrees of freedom only.
+            nodes, weights = np.polynomial.legendre.leggauss(2 * _T_RADIAL_NODES)
+            q = 0.5 * (nodes + 1.0)
+            s_nodes = np.sqrt(chi2.ppf(q, df) / df)
+            s_weights = 0.5 * weights
+        else:
+            nodes, weights = np.polynomial.legendre.leggauss(_T_RADIAL_NODES)
+            # At or above one degree of freedom the density is bounded and the
+            # direct form is the more accurate of the two (1e-14 against 1e-7),
+            # because the probability scale stretches a steep-but-smooth
+            # transition across the whole interval.
+            #
+            # Integrate over the *quantile range* of S, not [0, s_max]. As df
+            # grows the density concentrates around 1 with width ~1/sqrt(2 df):
+            # at df = 1e6 that spike is 7e-4 wide, so a grid spanning [0, 1.006]
+            # would step straight over it and the answer would be wrong by
+            # several percent.
+            s_lo = float(np.sqrt(chi2.ppf(1e-15, df) / df))
+            s_hi = float(np.sqrt(chi2.ppf(1.0 - 1e-15, df) / df))
+            s_nodes = 0.5 * (s_hi - s_lo) * nodes + 0.5 * (s_hi + s_lo)
 
-        # Density of S = sqrt(W/df), W ~ chi2_df:
-        #   f_S(s) = 2 (df/2)^{df/2} / Gamma(df/2) * s^{df-1} exp(-df s^2 / 2)
-        half = df / 2.0
-        dens = np.exp(
-            np.log(2.0)
-            + half * np.log(half)
-            - gammaln(half)
-            + (df - 1.0) * np.log(s_nodes)
-            - half * s_nodes**2
-        )
+            # Density of S = sqrt(W/df), W ~ chi2_df:
+            #   f_S(s) = 2 (df/2)^{df/2} / Gamma(df/2) * s^{df-1} exp(-df s^2/2)
+            half = df / 2.0
+            s_weights = (0.5 * (s_hi - s_lo) * weights) * np.exp(
+                np.log(2.0)
+                + half * np.log(half)
+                - gammaln(half)
+                + (df - 1.0) * np.log(s_nodes)
+                - half * s_nodes**2
+            )
 
         out = np.zeros(x.shape[0])
-        for weight, scale, f in zip(s_weights, s_nodes, dens, strict=True):
-            if weight * f == 0.0:
+        for weight, scale in zip(s_weights, s_nodes, strict=True):
+            if weight == 0.0:
                 continue
             # mvn_cdf is exact for d <= 3 (Owen's T, then the trivariate
             # conditioning integral), so the whole t probability inherits that.
-            out += weight * f * mvn_cdf(x * scale, r)
+            out += weight * mvn_cdf(x * scale, r)
         return out
 
     n = int(n_points) if n_points else 2**_QMC_LOG2_POINTS

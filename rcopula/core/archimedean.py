@@ -48,7 +48,7 @@ from scipy.special import digamma, zeta
 from rcopula.core.base import Copula, TailDependence
 from rcopula.special.combinatorics import eulerian_all, stirling1_all, stirling2_all
 from rcopula.special.debye import debye1, debye2
-from rcopula.special.logexp import log1mexp, signed_logsumexp
+from rcopula.special.logexp import log1mexp, log1pexp, signed_logsumexp
 from rcopula.special.stable import rlog_series, rsibuya, rstable_positive
 
 #: Gauss-Legendre nodes per axis for the generic Spearman-rho quadrature.
@@ -138,6 +138,44 @@ class ArchimedeanGenerator(ABC):
         """
         return theta == 0.0
 
+    # -- optional log-space paths, for strong dependence ----------------
+    #
+    # At large ``theta`` the intermediate quantities leave double precision:
+    # Clayton's ``psi^{-1}(u) = u^{-theta} - 1`` is ``inf`` for ``u = 0.02`` and
+    # ``theta = 1000``, and its frailty ``Gamma(1/theta, 1)`` underflows to
+    # exactly zero. Both are removable by never forming the large quantity --
+    # only its logarithm. Generators that can do that override these; the
+    # defaults reproduce the direct route exactly.
+
+    def rvs_log_frailty(
+        self, size: int, theta: float, rng: np.random.Generator
+    ) -> NDArray[np.float64]:
+        """:math:`\\log V_0`. Default: the log of :meth:`rvs_frailty`."""
+        with np.errstate(divide="ignore"):
+            return np.log(self.rvs_frailty(size, theta, rng))
+
+    def psi_from_log_t(self, log_t: NDArray[np.float64], theta: float) -> NDArray[np.float64]:
+        """:math:`\\psi(e^{\\log t})`. Default: exponentiate, then call ``psi``."""
+        with np.errstate(over="ignore"):
+            return self.psi(np.exp(log_t), theta)
+
+    def log_cdf(self, u: NDArray[np.float64], theta: float, dim: int) -> NDArray[np.float64] | None:
+        """``log C(u)`` by a family-specific stable route, or ``None``.
+
+        ``None`` means "no specialised form", and the caller falls back to
+        ``psi(sum of psi^{-1})``.
+        """
+        return None
+
+    def log_pdf(self, u: NDArray[np.float64], theta: float, dim: int) -> NDArray[np.float64] | None:
+        """``log c(u)`` by a family-specific stable route, or ``None``.
+
+        ``None`` falls back to the generic
+        ``log|psi^(d)| - sum log|psi'|``, which needs ``psi^{-1}`` evaluated
+        explicitly and therefore inherits its overflow.
+        """
+        return None
+
     def rho(self, theta: float) -> float:
         r"""Population Spearman's rho.
 
@@ -164,7 +202,10 @@ class ArchimedeanGenerator(ABC):
         with np.errstate(over="ignore", invalid="ignore"):
             c = cop.cdf(np.column_stack([uu.ravel(), vv.ravel()])).reshape(uu.shape)
         integral = float(np.einsum("i,j,ij->", w, w, np.nan_to_num(c)))
-        return 12.0 * integral - 3.0
+        # Quadrature of a near-comonotone copula can overshoot the bound by a
+        # few ulps, and a rho outside [-1, 1] is worse than one that is merely
+        # imprecise.
+        return float(np.clip(12.0 * integral - 3.0, -1.0, 1.0))
 
     def _bracket(
         self, func: Callable[[float], float], target: float, dim: int
@@ -298,6 +339,91 @@ class _ClaytonGenerator(ArchimedeanGenerator):
     def rvs_frailty(self, size, theta, rng):
         return rng.gamma(1.0 / theta, 1.0, size)
 
+    def rvs_log_frailty(self, size, theta, rng):
+        r"""``log V`` for ``V ~ Gamma(1/theta, 1)``, without underflow.
+
+        For large ``theta`` the shape ``a = 1/theta`` is tiny and the draw is
+        astronomically small -- at ``theta = 1000`` NumPy returns exactly zero
+        for about half of them, which sent ``t = E/V`` to infinity and half the
+        sample to ``u = 0``.
+
+        The boosting identity :math:`G\,U^{1/a} \sim \mathrm{Gamma}(a, 1)` for
+        :math:`G \sim \mathrm{Gamma}(a+1, 1)` fixes it exactly: in logs it reads
+        :math:`\log V = \log G + \theta \log U`, and the second term is simply a
+        large negative number rather than an underflow.
+        """
+        a = 1.0 / theta
+        boosted = rng.gamma(a + 1.0, 1.0, size)
+        with np.errstate(divide="ignore"):
+            return np.log(boosted) + theta * np.log(rng.uniform(size=size))
+
+    def psi_from_log_t(self, log_t, theta):
+        """``(1 + t)^{-1/theta}`` from ``log t``, via ``log1pexp``."""
+        return np.asarray(np.exp(-log1pexp(log_t) / theta))
+
+    def log_cdf(self, u, theta, dim):
+        r"""``log C = -(1/theta) log(sum_j u_j^{-theta} - (d-1))``, shifted.
+
+        Only for ``theta > 0``, where every :math:`u_j^{-\theta} \ge 1` and the
+        sum can overflow -- at ``theta = 1000`` a coordinate of 0.02 alone gives
+        ``inf``, and the CDF's margins came out wrong by 0.475. Factoring out
+        the largest exponent leaves a bracket bounded below by :math:`e^{-m}`,
+        so nothing cancels either.
+
+        Returns ``None`` on the negative branch, where all the terms are at most
+        1, nothing overflows, and the direct form additionally has to represent
+        the region where ``C`` is exactly zero.
+        """
+        if theta <= 0.0:
+            return None
+        # A zero coordinate forces C = 0. Callers are supposed to have handled
+        # that already, but guarding costs nothing and log(0) would poison the
+        # whole row.
+        zero = np.any(u <= 0.0, axis=1)
+        x = -theta * np.log(np.where(u > 0.0, u, 1.0))  # >= 0
+        return np.asarray(np.where(zero, -np.inf, -self._log1p_t(x, dim) / theta))
+
+    @staticmethod
+    def _log1p_t(x: NDArray[np.float64], dim: int) -> NDArray[np.float64]:
+        r"""``log(sum_j u_j^{-theta} - (d-1))`` from ``x_j = -theta log u_j``.
+
+        Factoring out the largest exponent keeps the sum in range however large
+        theta is, and leaves a bracket bounded below by :math:`e^{-m}` (each
+        :math:`x_j \ge 0`, so the sum is at least ``d``), so nothing cancels.
+        """
+        m = x.max(axis=1)
+        bracket = np.sum(np.exp(x - m[:, None]), axis=1) - (dim - 1) * np.exp(-m)
+        return np.asarray(m + np.log(bracket))
+
+    def log_pdf(self, u, theta, dim):
+        r"""The Clayton density in logs.
+
+        .. math::
+            \log c = \sum_{k=0}^{d-1}\log\!\left(\tfrac1\theta + k\right)
+                + d\log\theta
+                - \left(\tfrac1\theta + d\right)\log(1 + t)
+                + \left(\tfrac1\theta + 1\right)\sum_j x_j
+
+        with :math:`x_j = -\theta\log u_j` and :math:`1 + t` as in
+        :meth:`log_cdf`. The generic route reaches the same number by way of
+        :math:`\psi^{-1}(u) = u^{-\theta} - 1`, which is ``inf`` for
+        ``u = 0.05`` once ``theta`` passes about 300 -- and ``inf - inf`` is
+        ``nan``. Nothing here ever forms that quantity.
+
+        Only for ``theta > 0``: the negative branch has a support boundary that
+        the direct form already represents correctly, and does not overflow.
+        """
+        if theta <= 0.0:
+            return None
+        k = np.arange(dim)
+        x = -theta * np.log(u)
+        return np.asarray(
+            float(np.sum(np.log(1.0 / theta + k)))
+            + dim * np.log(theta)
+            - (1.0 / theta + dim) * self._log1p_t(x, dim)
+            + (1.0 / theta + 1.0) * x.sum(axis=1)
+        )
+
 
 class _GumbelGenerator(ArchimedeanGenerator):
     r"""Gumbel-Hougaard: :math:`\psi(t) = \exp(-t^{1/\theta})`.
@@ -373,23 +499,59 @@ class _FrankGenerator(ArchimedeanGenerator):
         return (-np.inf, np.inf) if dim == 2 else (0.0, np.inf)
 
     def psi(self, t, theta):
-        h = -np.expm1(-theta)  # 1 - exp(-theta)
-        return -np.log1p(-h * np.exp(-t)) / theta
+        r"""``-log(1 - h e^{-t}) / theta``, evaluated through ``logaddexp``.
+
+        Writing :math:`1 - h e^{-t} = (1 - e^{-t}) + e^{-\theta - t}` makes it a
+        sum of two non-negative terms, so its logarithm is a ``logaddexp`` and
+        neither cancels nor overflows.
+
+        The naive form dies for ``theta`` beyond about 35: there ``h`` rounds to
+        exactly 1, and for small ``t`` the product ``h e^{-t}`` rounds to exactly
+        1 as well, so ``1 - h e^{-t}`` evaluates to **zero** and ``psi`` returns
+        infinity for perfectly ordinary arguments. At ``theta = 50``, which is
+        only ``tau = 0.92``, the generator stopped inverting itself for every
+        ``u`` above about 0.6, breaking the margins of the CDF by 0.22.
+        Forming the sum directly instead would then overflow for
+        ``theta < -709``; taking the logarithm first avoids both.
+        """
+        t = np.asarray(t, dtype=np.float64)
+        with np.errstate(divide="ignore"):
+            log_omz = np.logaddexp(np.log(-np.expm1(-t)), -theta - t)
+        return -log_omz / theta
 
     def ipsi(self, u, theta):
-        r"""``-log( (1 - e^{-theta u}) / (1 - e^{-theta}) )``, computed stably.
+        r"""``log( expm1(-theta) / expm1(-theta u) )``, computed stably.
 
-        The naive quotient loses precision as ``u -> 1``: both numerator and
-        denominator approach ``1``, so their ratio approaches ``1`` and the
-        subsequent ``log`` cancels catastrophically. At ``theta = 20`` that costs
-        about eight digits.
+        Both ``expm1`` terms carry the sign of ``-theta``, so their ratio is
+        positive whichever way ``theta`` points. Writing that ratio as
+        :math:`1 + s` with
 
-        Rewriting the ratio as ``1 + r`` with
-        ``r = e^{-theta} * expm1(theta(1-u)) / expm1(-theta)`` and using
-        ``log1p`` keeps the small quantity small throughout.
+        .. math::
+            s = \frac{e^{-\theta u}\,\mathrm{expm1}(-\theta(1-u))}
+                     {\mathrm{expm1}(-\theta u)}
+
+        and evaluating :math:`\log(1 + s)` through :func:`~rcopula.special.logexp.log1pexp`
+        of :math:`\log s` keeps every regime accurate:
+
+        * as ``u -> 1`` the answer is small and ``log1p`` protects it -- the
+          naive quotient loses about eight digits at ``theta = 20``;
+        * for ``theta < 0`` the same quotient saturates to exactly ``-1``, so the
+          previous ``-log1p(r)`` form returned ``+inf`` for **every** negative
+          ``theta`` below about -40, taking the CDF's margins with it;
+        * ``log1pexp`` returns its argument when large, so nothing overflows
+          however extreme ``theta`` gets.
+
+        ``theta = 0`` is the independence limit, where the ratio is 0/0; the
+        copula short-circuits there before reaching this method.
         """
-        r = np.exp(-theta) * np.expm1(theta * (1.0 - u)) / np.expm1(-theta)
-        return -np.log1p(r)
+        u = np.asarray(u, dtype=np.float64)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_s = (
+                -theta * u
+                + np.log(np.abs(np.expm1(-theta * (1.0 - u))))
+                - np.log(np.abs(np.expm1(-theta * u)))
+            )
+        return np.asarray(log1pexp(log_s))
 
     @staticmethod
     def _z_and_1mz(
@@ -436,7 +598,7 @@ class _FrankGenerator(ArchimedeanGenerator):
         needs.
         """
         z, omz = self._z_and_1mz(t, theta)
-        return np.log(np.abs(_polylog_neg_int(z, d - 1, omz))) - np.log(abs(theta))
+        return _log_polylog_neg_int(z, d - 1, omz) - np.log(abs(theta))
 
     def tau(self, theta):
         if theta == 0.0:
@@ -469,7 +631,9 @@ class _FrankGenerator(ArchimedeanGenerator):
         return float(brentq(lambda th: self.rho(th) - rho, lo, hi, xtol=1e-14, rtol=8.9e-16))
 
     def rvs_frailty(self, size, theta, rng):
-        return rlog_series(size, -np.expm1(-theta), rng)
+        # log(1 - p) is exactly -theta; pass it, because 1 - e^{-theta}
+        # saturates to 1 past theta ~ 37 and log1p(-p) would be -inf.
+        return rlog_series(size, -np.expm1(-theta), rng, log1mp=-theta)
 
 
 class _JoeGenerator(ArchimedeanGenerator):
@@ -625,7 +789,7 @@ class _AMHGenerator(ArchimedeanGenerator):
         # For theta < 0 both (1-theta) e^{-t} and Li_{-d}(z)/z can carry signs
         # that cancel. Take the absolute value of the *product*, not of each
         # factor: logging a negative polylog gives nan.
-        return np.log1p(-theta) - t + np.log(np.abs(_polylog_neg_int_over_z(z, d)))
+        return np.log1p(-theta) - t + _log_polylog_neg_int_over_z(z, d)
 
     def tau(self, theta):
         r""":math:`\tau = 1 - 2[(1-\theta)^2 \log(1-\theta) + \theta] / (3\theta^2)`."""
@@ -716,6 +880,45 @@ def _polylog_neg_int(
     return num / omz ** (n + 1)
 
 
+def _log_polylog_neg_int(
+    z: NDArray[np.float64], n: int, one_minus_z: NDArray[np.float64] | None = None
+) -> NDArray[np.float64]:
+    r"""``log |Li_{-n}(z)|``, without forming ``Li_{-n}(z)`` first.
+
+    The Eulerian closed form divides a bounded numerator (its coefficients sum
+    to ``n!``) by ``(1 - z)^{n+1}``. When ``z`` is within rounding of 1 that
+    denominator is subnormal and the quotient overflows: the Frank copula at
+    ``theta = 700`` produced ``inf`` for a quarter of the unit square, and its
+    density with it. Taking the logarithm of each part separately keeps
+    everything in range -- the numerator's log is ordinary, the denominator's is
+    just ``(n+1) log(1-z)``.
+    """
+    omz = (1.0 - z) if one_minus_z is None else one_minus_z
+    # A subnormal numerator or denominator means the density is zero there,
+    # which is a legitimate answer rather than a warning.
+    with np.errstate(divide="ignore"):
+        if n == 0:
+            return np.log(np.abs(z)) - np.log(omz)
+        a = eulerian_all(n)  # A(n, k), k = 0..n-1
+        k = np.arange(n)
+        num = np.sum(a * z[..., None] ** (n - k), axis=-1)
+        return np.log(np.abs(num)) - (n + 1) * np.log(omz)
+
+
+def _log_polylog_neg_int_over_z(
+    z: NDArray[np.float64], n: int, one_minus_z: NDArray[np.float64] | None = None
+) -> NDArray[np.float64]:
+    """``log |Li_{-n}(z) / z|``; see :func:`_polylog_neg_int_over_z`."""
+    omz = (1.0 - z) if one_minus_z is None else one_minus_z
+    with np.errstate(divide="ignore"):
+        if n == 0:
+            return -np.log(omz)
+        a = eulerian_all(n)
+        k = np.arange(n)
+        num = np.sum(a * z[..., None] ** (n - k - 1), axis=-1)
+        return np.log(np.abs(num)) - (n + 1) * np.log(omz)
+
+
 def _polylog_neg_int_over_z(
     z: NDArray[np.float64], n: int, one_minus_z: NDArray[np.float64] | None = None
 ) -> NDArray[np.float64]:
@@ -782,6 +985,9 @@ class ArchimedeanCopula(Copula):
         # admissible interval, so an optimiser reaches it.
         if g.is_independent(theta):
             return np.zeros(u.shape[0])
+        log_p = g.log_pdf(u, theta, d)
+        if log_p is not None:
+            return log_p
         t_j = g.ipsi(u, theta)
         t = t_j.sum(axis=1)
         return g.log_abs_dpsi_d(t, theta, d) - g.log_abs_dpsi(t_j, theta).sum(axis=1)
@@ -791,6 +997,9 @@ class ArchimedeanCopula(Copula):
         g = self.generator
         if g.is_independent(theta):
             return np.asarray(u.prod(axis=1))
+        log_c = g.log_cdf(u, theta, self._dim)
+        if log_c is not None:
+            return np.asarray(np.exp(log_c))
         return g.psi(g.ipsi(u, theta).sum(axis=1), theta)
 
     def _rvs(self, size, params, rng):
@@ -800,10 +1009,17 @@ class ArchimedeanCopula(Copula):
             return rng.uniform(size=(size, self._dim))
         if not g.has_frailty(theta):
             return self._rvs_conditional(size, theta, rng)
-        # Marshall-Olkin (1988): U_j = psi(E_j / V), with V the frailty.
-        v = g.rvs_frailty(size, theta, rng)[:, None]
-        e = rng.exponential(1.0, size=(size, self._dim))
-        return g.psi(e / v, theta)
+        # Marshall-Olkin (1988): U_j = psi(E_j / V), with V the frailty. Done in
+        # logs, because at strong dependence V underflows and E/V overflows
+        # while log(E) - log(V) stays perfectly ordinary.
+        log_v = g.rvs_log_frailty(size, theta, rng)[:, None]
+        with np.errstate(divide="ignore"):
+            log_e = np.log(rng.exponential(1.0, size=(size, self._dim)))
+        out = g.psi_from_log_t(log_e - log_v, theta)
+        # Backstop: near-comonotone parameters put draws within one ulp of the
+        # boundary, and a copula observation must lie strictly inside the cube
+        # or every downstream log density is -inf.
+        return np.clip(out, np.nextafter(0.0, 1.0), np.nextafter(1.0, 0.0))
 
     def _rvs_conditional(
         self, size: int, theta: float, rng: np.random.Generator

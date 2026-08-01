@@ -26,6 +26,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import brentq
 
 from rcopula.core.base import Copula, TailDependence
+from rcopula.core.measures import tau_by_partials
 
 __all__ = [
     "FGMCopula",
@@ -316,20 +317,20 @@ class PlackettCopula(Copula):
         return (c - (1.0 - 2.0 * w) * d) / (2.0 * b)
 
     def tau(self) -> float:
-        """Kendall's tau by quadrature -- Plackett admits no closed form.
+        r"""Kendall's tau by quadrature -- Plackett admits no closed form.
 
-        Uses :math:`\\tau = 4\\int\\!\\!\\int C\\,c\\;du\\,dv - 1`.
+        Uses :math:`\tau = 1 - 4\int\!\!\int \partial_1 C\,\partial_2 C\,du\,dv`
+        rather than the equivalent :math:`4\int\!\!\int C\,c\,du\,dv - 1`. The
+        two agree to eight digits at ordinary parameters, but the density form
+        collapses under strong dependence: the density concentrates onto the
+        diagonal faster than any quadrature can follow, and a 100-node
+        Gauss-Legendre rule returned **14.6** at ``theta = 1e6`` -- not merely
+        inaccurate but outside the range Kendall's tau can occupy. The integrand
+        used here is a product of conditional distribution functions, bounded in
+        ``[0, 1]``, and lands within 0.002 of the empirical value there.
         """
         self._require_specified()
-        # 100 nodes is already converged to 12 digits (checked against adaptive
-        # quadrature at n = 100, 200, 400, 800 and 1600).
-        nodes, weights = np.polynomial.legendre.leggauss(100)
-        x = 0.5 * (nodes + 1.0)
-        wt = 0.5 * weights
-        uu, vv = np.meshgrid(x, x, indexing="ij")
-        grid = np.column_stack([uu.ravel(), vv.ravel()])
-        integrand = (self.cdf(grid) * self.pdf(grid)).reshape(uu.shape)
-        return float(4.0 * np.einsum("i,j,ij->", wt, wt, integrand) - 1.0)
+        return tau_by_partials(self)
 
     def rho(self) -> float:
         r""":math:`\rho = \frac{\theta+1}{\theta-1} - \frac{2\theta\log\theta}{(\theta-1)^2}`."""
@@ -526,10 +527,17 @@ class MarshallOlkinCopula(Copula):
         x, y = u[:, 0], u[:, 1]
         # Absolutely continuous part only; the singular mass carried on
         # u**a1 == v**a2 is not representable as a density.
+        #
+        # Which branch of the min is active decides which variable the density
+        # depends on. Dividing the two candidates by uv turns
+        # ``u^{1-a1} v <= u v^{1-a2}`` into ``u^{-a1} <= v^{-a2}``, i.e. into
+        # ``u^{a1} >= v^{a2}``. So on ``u^{a1} > v^{a2}`` the active branch is
+        # ``C = u^{1-a1} v``, whose mixed derivative is ``(1-a1) u^{-a1}`` --
+        # a function of *u*, not of v.
         with np.errstate(divide="ignore", invalid="ignore"):
-            left = np.log1p(-a2) - a2 * np.log(y)
-            right = np.log1p(-a1) - a1 * np.log(x)
-            return np.where(x**a1 > y**a2, left, right)
+            in_u = np.log1p(-a1) - a1 * np.log(x)
+            in_v = np.log1p(-a2) - a2 * np.log(y)
+            return np.where(x**a1 > y**a2, in_u, in_v)
 
     def _rvs(self, size, params, rng):
         a1, a2 = float(params[0]), float(params[1])

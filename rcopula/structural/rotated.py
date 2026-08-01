@@ -213,8 +213,26 @@ class RotatedCopula(Copula):
                 point[:, ~self._flip] = u[:, ~self._flip]
                 for j in subset:
                     point[:, j] = 1.0 - u[:, j]
-                total += (-1.0) ** size * self.base._cdf(point, params)
+                total += (-1.0) ** size * self._base_cdf(point, params)
         return total
+
+    def _base_cdf(
+        self, point: NDArray[np.float64], params: NDArray[np.float64]
+    ) -> NDArray[np.float64]:
+        """``base._cdf`` with the zero-coordinate guard :meth:`Copula.cdf` applies.
+
+        Reflection turns ``u_j = 1`` into ``0``, and ``_cdf`` implementations are
+        entitled to assume they never see that -- the public :meth:`Copula.cdf`
+        short-circuits it before they are called. Skipping those rows here keeps
+        that contract intact; without it Clayton's log-space CDF meets
+        ``log(0)`` and returns ``nan``, which showed up as the *rotated* copula
+        losing its uniform margins.
+        """
+        out = np.zeros(point.shape[0])
+        inside = ~np.any(point <= 0.0, axis=1)
+        if inside.any():
+            out[inside] = self.base._cdf(point[inside], params)
+        return out
 
     def _rvs(
         self, size: int, params: NDArray[np.float64], rng: np.random.Generator

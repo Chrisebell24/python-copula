@@ -150,14 +150,35 @@ class ExtremeValueCopula(Copula):
         s = -log_uv
         t = np.log(y) / log_uv
 
-        a = self.A(t)
-        da = self.dA(t)
-        d2a = self.d2A(t)
-
-        cdf = np.exp(log_uv * a)
-        bracket = (a - t * da) * (a + (1.0 - t) * da) + t * (1.0 - t) * d2a / s
+        first, second = self._factors(t)
+        # The bracket is a density up to positive factors, so it cannot be
+        # negative; deep in a corner it is a sum of terms at the precision floor
+        # and rounding can make it so. Clipping gives log(0) = -inf, i.e. a
+        # density of exactly zero, which is the correct limit there -- where
+        # letting log() see a negative number gave nan.
+        bracket = np.maximum(first * second + t * (1.0 - t) * self.d2A(t) / s, 0.0)
         with np.errstate(divide="ignore", invalid="ignore"):
-            return np.log(cdf) - np.log(x) - np.log(y) + np.log(bracket)
+            return log_uv * self.A(t) - np.log(x) - np.log(y) + np.log(bracket)
+
+    def _factors(self, t: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        r"""The two conditional factors :math:`A - tA'` and :math:`A + (1-t)A'`.
+
+        Both are non-negative for *every* Pickands function, because the
+        conditional distributions they scale are. That follows from the two
+        defining bounds :math:`\max(t, 1-t) \le A \le 1` and
+        :math:`-1 \le A' \le 1`: for instance
+        :math:`A + (1-t)A' \ge (1-t) + (1-t)(-1) = 0`, with equality exactly at
+        the boundary.
+
+        Written as stated they are differences of two quantities of order 1 that
+        agree in the corner, so rounding can push them slightly negative -- which
+        turned the log-density into ``nan``. Clipping at zero is the correct
+        limit there, since the true value is provably non-negative and the
+        density genuinely vanishes. Families with a cancellation-free closed
+        form override this.
+        """
+        a, da = self.A(t), self.dA(t)
+        return np.maximum(a - t * da, 0.0), np.maximum(a + (1.0 - t) * da, 0.0)
 
     def _cond_cdf(self, v: NDArray[np.float64], u: NDArray[np.float64]) -> NDArray[np.float64]:
         r""":math:`\partial C/\partial u`, the conditional distribution of ``V`` given ``U``."""
@@ -266,51 +287,94 @@ class GalambosCopula(ExtremeValueCopula):
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> GalambosCopula:
         return GalambosCopula(float(np.atleast_1d(params)[0]), free=free)
 
-    def _clip(self, w: ArrayLike) -> NDArray[np.float64]:
-        """Clip ``t`` away from the endpoints by a theta-dependent amount.
+    #: Endpoint guard. Everything below is evaluated in logs, so this only has
+    #: to keep ``log t`` finite -- unlike the previous direct powers, which
+    #: overflowed once ``theta * log10(1/t)`` passed ~308 and needed a
+    #: theta-dependent bound.
+    _EDGE = 1e-300
 
-        Galambos evaluates ``t ** (-theta - 2)``, which overflows once
-        ``theta * log10(1/t)`` passes ~308, so a fixed clip is safe only for
-        modest ``theta``. Scaling the bound with ``theta`` keeps the powers
-        finite while staying far enough into the tail to contribute nothing.
-        """
-        bound = min(1e-12, 10.0 ** (-100.0 / max(self.theta, 1e-8)))
-        return np.clip(np.asarray(w, dtype=np.float64), bound, 1.0 - bound)
+    def _clip(self, w: ArrayLike) -> NDArray[np.float64]:
+        """Keep ``t`` strictly inside ``(0, 1)`` so its logarithm is finite."""
+        return np.clip(np.asarray(w, dtype=np.float64), self._EDGE, 1.0 - 1e-16)
+
+    def _log_g(self, t: NDArray[np.float64]) -> NDArray[np.float64]:
+        r""":math:`\log\bigl(t^{-\theta} + (1-t)^{-\theta}\bigr)`, by ``logaddexp``."""
+        th = self.theta
+        return np.logaddexp(-th * np.log(t), -th * np.log1p(-t))
 
     def A(self, w):
+        r""":math:`1 - g^{-1/\theta}`, written as ``-expm1`` so it never cancels."""
         t = self._clip(w)
-        th = self.theta
-        return 1.0 - (t**-th + (1.0 - t) ** -th) ** (-1.0 / th)
+        return -np.expm1(-self._log_g(t) / self.theta)
 
     def dA(self, w):
-        t = self._clip(w)
-        th = self.theta
-        s = 1.0 - t
-        g = t**-th + s**-th
-        dg = -th * (t ** (-th - 1) - s ** (-th - 1))
-        return (1.0 / th) * g ** (-1.0 / th - 1.0) * dg
+        r""":math:`A'(t) = -g^{-1/\theta - 1}\,(t^{-\theta-1} - (1-t)^{-\theta-1})`.
 
-    def d2A(self, w):
-        """Second derivative, in the direct form.
-
-        A ratio-based reformulation looks more stable but is worse: near the
-        endpoints the two terms below agree to seven digits and cancel, which
-        the direct expression happens to handle gracefully (the shared
-        ``g ** (-1/theta - 2)`` factor is what suppresses them).
+        The difference is formed in logs: the two powers span hundreds of orders
+        of magnitude for large ``theta``, and their signed difference is
+        ``sign * e^{max} * (1 - e^{-|gap|})``, which ``expm1`` evaluates exactly
+        even when the gap is tiny (at ``t = 1/2`` it is zero, and so is ``A'``).
         """
         t = self._clip(w)
         th = self.theta
-        s = 1.0 - t
-        g = t**-th + s**-th
-        dg = -th * (t ** (-th - 1) - s ** (-th - 1))
-        d2g = th * (th + 1.0) * (t ** (-th - 2) + s ** (-th - 2))
-        with np.errstate(over="ignore", invalid="ignore"):
-            out = (1.0 / th) * (
-                (-1.0 / th - 1.0) * g ** (-1.0 / th - 2.0) * dg**2 + g ** (-1.0 / th - 1.0) * d2g
-            )
-        # Deep in the tail every term overflows to inf and the difference is
-        # nan; the true curvature there is negligible, so report zero.
-        return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
+        log_t, log_s = np.log(t), np.log1p(-t)
+        p, q = -(th + 1.0) * log_t, -(th + 1.0) * log_s
+        gap = np.abs(p - q)
+        with np.errstate(divide="ignore"):
+            log_diff = np.maximum(p, q) + np.log(-np.expm1(-gap))
+        magnitude = np.exp(log_diff - (1.0 / th + 1.0) * self._log_g(t))
+        return np.where(p >= q, -magnitude, magnitude)
+
+    def d2A(self, w):
+        r""":math:`A''(t) = (1 + \theta)\,\bigl(t(1-t)\bigr)^{-\theta-2}\,g^{-1/\theta-2}`.
+
+        The direct second derivative is a difference of two enormous terms, and
+        at ``theta = 30`` it came out **negative** -- impossible, since ``A`` is
+        convex by definition, and it drove the copula density negative for half
+        the unit square. Expanding that difference collapses it: with
+        :math:`a = t^{-\theta}`, :math:`b = (1-t)^{-\theta}` the bracket is
+
+        .. math::
+            g\bigl(t^{-\theta-2} + (1-t)^{-\theta-2}\bigr) - \bigl(t^{-\theta-1}
+                - (1-t)^{-\theta-1}\bigr)^2
+            = ab\left(\tfrac{1}{t} + \tfrac{1}{1-t}\right)^2
+            = \bigl(t(1-t)\bigr)^{-\theta-2},
+
+        using :math:`t + (1-t) = 1`. What was a cancelling difference is a
+        single positive term, so the result is non-negative by construction and
+        overflow-free in logs.
+        """
+        t = self._clip(w)
+        th = self.theta
+        log_ts = np.log(t) + np.log1p(-t)
+        log_out = np.log1p(th) - (th + 2.0) * log_ts - (1.0 / th + 2.0) * self._log_g(t)
+        with np.errstate(over="ignore"):
+            return np.asarray(np.exp(log_out))
+
+    def _factors(self, t):
+        r"""Exact, cancellation-free conditional factors.
+
+        Substituting :math:`A = 1 - g^{-1/\theta}` and
+        :math:`A' = -g^{-1/\theta-1}(t^{-\theta-1} - (1-t)^{-\theta-1})` into
+        :math:`A + (1-t)A'` and using :math:`1 + (1-t)/t = 1/t` collapses it to
+        a single term:
+
+        .. math::
+            A + (1-t)A' = 1 - t^{-(\theta+1)} g^{-(1/\theta+1)},
+
+        and symmetrically for the other factor. Both are then ``-expm1`` of a
+        quantity computed entirely in logs, so nothing cancels and neither can
+        come out negative.
+        """
+        t = self._clip(t)
+        th = self.theta
+        scale = (1.0 / th + 1.0) * self._log_g(t)
+        with np.errstate(over="ignore"):
+            first = -np.expm1(-(th + 1.0) * np.log1p(-t) - scale)
+            second = -np.expm1(-(th + 1.0) * np.log(t) - scale)
+        # The exponent is <= 0 exactly, but only to within rounding; a positive
+        # last bit turns -expm1 slightly negative.
+        return np.maximum(first, 0.0), np.maximum(second, 0.0)
 
     @classmethod
     def _tau_bracket(cls) -> tuple[float, float]:

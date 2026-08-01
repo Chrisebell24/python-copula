@@ -41,6 +41,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.special import gammaln
 
+from rcopula.special.logexp import log1mexp
+
 __all__ = ["rlog_series", "rsibuya", "rstable_positive", "sinc"]
 
 
@@ -117,7 +119,9 @@ def rstable_positive(size: int, alpha: float, rng: np.random.Generator) -> NDArr
     )
 
 
-def rlog_series(size: int, p: float, rng: np.random.Generator) -> NDArray[np.float64]:
+def rlog_series(
+    size: int, p: float, rng: np.random.Generator, log1mp: float | None = None
+) -> NDArray[np.float64]:
     r"""Draw from the logarithmic series distribution with parameter ``p``.
 
     :math:`P(V = k) = -p^k / (k \log(1 - p))` for :math:`k = 1, 2, \dots`.
@@ -125,6 +129,22 @@ def rlog_series(size: int, p: float, rng: np.random.Generator) -> NDArray[np.flo
 
     Implements Kemp's (1981) "LK" algorithm: a chop-down search from the mode
     for small ``p``, and an inversion-based shortcut otherwise.
+
+    Parameters
+    ----------
+    size : int
+        Number of draws.
+    p : float
+        Series parameter in ``(0, 1]``.
+    rng : Generator
+        Source of randomness.
+    log1mp : float, optional
+        A separately computed :math:`\log(1 - p)`. Supply it whenever ``p`` was
+        formed as ``1 - e^{-\theta}``: past ``theta`` around 37 that expression
+        rounds to exactly 1, so ``log1p(-p)`` becomes ``-inf`` and the sampler
+        fails outright -- even though the quantity it actually needs is just
+        ``-theta``, known exactly. The Frank copula reaches that at
+        ``tau = 0.92``, well inside the range people fit.
 
     Examples
     --------
@@ -137,11 +157,32 @@ def rlog_series(size: int, p: float, rng: np.random.Generator) -> NDArray[np.flo
     >>> expected = -p / ((1 - p) * np.log1p(-p))
     >>> bool(abs(v.mean() - expected) / expected < 0.02)
     True
-    """
-    if not 0.0 < p < 1.0:
-        raise ValueError(f"p must lie in (0, 1), got {p}")
 
-    log1mp = np.log1p(-p)
+    Passing ``log1mp`` keeps it working where ``p`` itself has saturated:
+
+    >>> theta = 60.0
+    >>> p = -np.expm1(-theta)
+    >>> bool(p == 1.0)
+    True
+    >>> v = rlog_series(1000, p, rng, log1mp=-theta)
+    >>> bool(np.all(v >= 1))
+    True
+    """
+    if log1mp is None:
+        # p == 1 makes this -inf, which the check below reports; computing it
+        # should not also raise a warning on the way there.
+        with np.errstate(divide="ignore"):
+            log1mp = float(np.log1p(-p))
+    else:
+        log1mp = float(log1mp)
+    if not 0.0 < p <= 1.0:
+        raise ValueError(f"p must lie in (0, 1], got {p}")
+    if not np.isfinite(log1mp) or log1mp >= 0.0:
+        raise ValueError(
+            f"log(1 - p) must be finite and negative, got {log1mp}; "
+            "pass log1mp explicitly when p has rounded to 1"
+        )
+
     out = np.empty(size, dtype=np.float64)
 
     u = rng.uniform(size=size)
@@ -154,12 +195,18 @@ def rlog_series(size: int, p: float, rng: np.random.Generator) -> NDArray[np.flo
     if idx.size:
         v = rng.uniform(size=idx.size)
         q = -np.expm1(v * log1mp)
+        # log(q) must come from log1mexp, not from log(q). Once
+        # ``v * log1mp < -37`` the quantity ``q = 1 - e^{v log1mp}`` rounds to
+        # exactly 1, so ``log(q)`` is exactly 0 and the inversion below divides
+        # by zero, returning inf. For the Frank copula at theta = 50 that hit a
+        # quarter of all draws and sent them to the boundary of the unit square;
+        # at theta = 100, nearly two thirds. log1mexp keeps the small negative
+        # value the inversion actually needs.
+        log_q = log1mexp(-v * log1mp)
         u2 = u[idx]
-        out[idx] = np.where(
-            u2 < q * q,
-            np.floor(1.0 + np.log(u2) / np.log(q)),
-            np.where(u2 > q, 1.0, 2.0),
-        )
+        with np.errstate(divide="ignore", invalid="ignore"):
+            inverted = np.floor(1.0 + np.log(u2) / log_q)
+        out[idx] = np.where(u2 < q * q, inverted, np.where(u2 > q, 1.0, 2.0))
     return out
 
 
