@@ -462,16 +462,31 @@ def var_itau(
     measure : {"tau", "rho"}
         Which dependence measure was inverted.
     """
-    n = u.shape[0]
-    if u.shape[1] != 2:
+    n, d = u.shape
+    if d < 2:
         return None
 
     if measure == "tau":
-        var_stat = 16.0 * float(np.var(kendall_influence(u), ddof=1)) / n
+        scale, influence = 16.0, kendall_influence
     elif measure == "rho":
-        var_stat = float(np.var(spearman_influence(u), ddof=1)) / n
+        scale, influence = 1.0, spearman_influence
     else:  # pragma: no cover - guarded by the caller
         raise ValueError(f"measure must be 'tau' or 'rho', got {measure!r}")
 
+    if d == 2:
+        contributions = influence(u)
+    else:
+        # A one-parameter family in d > 2 is fitted by inverting the *average*
+        # of the d(d-1)/2 pairwise statistics. Averaging is linear, so the
+        # influence function of the average is the average of the pairwise
+        # influence functions -- and crucially it keeps the correlation between
+        # overlapping pairs, which share a coordinate and are therefore far from
+        # independent. Treating them as independent would understate the
+        # variance; ignoring the case entirely, as this did before, reported no
+        # standard error at all above two dimensions.
+        pairs = [(i, j) for i in range(d) for j in range(i + 1, d)]
+        contributions = np.mean([influence(u[:, list(p)]) for p in pairs], axis=0)
+
+    var_stat = scale * float(np.var(contributions, ddof=1)) / n
     value = dtheta_dmeasure**2 * var_stat
     return None if not np.isfinite(value) or value < 0 else np.array([[value]])

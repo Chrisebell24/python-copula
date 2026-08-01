@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 import numpy as np
 import pytest
 from scipy import stats
@@ -236,3 +238,67 @@ class TestFrechetBounds:
 
     def test_upper_bound_works_in_any_dimension(self) -> None:
         assert float(rc.FrechetUpperCopula(7).cdf([[0.4] * 7])[0]) == pytest.approx(0.4)
+
+
+class TestPlackettTauInversion:
+    """``from_tau`` was missing, so ``fit(..., method="itau")`` raised.
+
+    Plackett's tau has no closed form in either direction, which is why it was
+    left out; now that :meth:`tau` is reliable across the family's whole range
+    it can simply be inverted numerically.
+    """
+
+    @pytest.mark.parametrize("tau", [-0.9, -0.5, -0.1, 0.1, 0.5, 0.9, 0.95])
+    def test_it_round_trips(self, tau: float) -> None:
+        assert rc.PlackettCopula.from_tau(tau).tau() == pytest.approx(tau, abs=1e-6)
+
+    def test_independence_is_exact(self) -> None:
+        assert rc.PlackettCopula.from_tau(0.0).theta == 1.0
+
+    def test_it_is_monotone(self) -> None:
+        thetas = [rc.PlackettCopula.from_tau(t).theta for t in (-0.5, -0.1, 0.1, 0.5)]
+        assert all(a < b for a, b in pairwise(thetas))
+
+    def test_it_rejects_unreachable_targets(self) -> None:
+        for bad in (-1.0, 1.0, 1.5):
+            with pytest.raises(ValueError, match="tau must lie"):
+                rc.PlackettCopula.from_tau(bad)
+
+    def test_fitting_by_inversion_now_works(self) -> None:
+        u = rc.PlackettCopula(5.0).rvs(3000, random_state=0)
+        res = rc.fit(rc.PlackettCopula(), u, method="itau")
+        assert res.params[0] == pytest.approx(5.0, rel=0.2)
+        assert res.bse is not None
+
+
+class TestExtremeValueDefaultConstruction:
+    """Every other family can be named without inventing a parameter value.
+
+    ``ClaytonCopula()`` means "this family, to be estimated" -- NaN parameters
+    that ``fit`` fills in. The extreme-value families required a positional
+    argument, so ``fit(GalambosCopula(), u)`` raised ``TypeError`` and the
+    natural idiom did not work for them alone.
+    """
+
+    @pytest.mark.parametrize(
+        "ctor", [rc.GalambosCopula, rc.HuslerReissCopula, rc.TawnCopula, rc.TEVCopula]
+    )
+    def test_it_constructs_with_no_arguments(self, ctor: type) -> None:
+        cop = ctor()
+        assert np.isnan(cop.params[0])
+        assert cop.dim == 2
+
+    @pytest.mark.parametrize(
+        "ctor", [rc.GalambosCopula, rc.HuslerReissCopula, rc.TawnCopula, rc.TEVCopula]
+    )
+    def test_it_refuses_to_evaluate_until_specified(self, ctor: type) -> None:
+        with pytest.raises(ValueError, match="unspecified parameters"):
+            ctor().cdf([[0.5, 0.5]])
+
+    @pytest.mark.parametrize(
+        ("ctor", "truth"),
+        [(rc.GalambosCopula, 1.5), (rc.HuslerReissCopula, 1.5), (rc.TawnCopula, 0.7)],
+    )
+    def test_fitting_the_bare_family_recovers_the_parameter(self, ctor: type, truth: float) -> None:
+        u = ctor(truth).rvs(2000, random_state=0)
+        assert rc.fit(ctor(), u, method="mpl").params[0] == pytest.approx(truth, rel=0.15)

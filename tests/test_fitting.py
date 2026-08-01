@@ -364,3 +364,55 @@ class TestParameterFreeFit:
     def test_summary_is_printable_with_no_parameters(self) -> None:
         u = rc.ClaytonCopula(2.0).rvs(200, random_state=0)
         assert "Independence" in rc.fit(rc.IndependenceCopula(2), u).summary()
+
+
+class TestInversionStandardErrorsAboveTwoDimensions:
+    """``itau``/``irho`` reported no standard error at all for ``d > 2``.
+
+    A one-parameter family in higher dimensions is fitted by inverting the
+    *average* of the ``d(d-1)/2`` pairwise statistics. Averaging is linear, so
+    the influence function of the average is the average of the pairwise
+    influence functions -- and keeping them as functions of the same
+    observations preserves the correlation between pairs that share a
+    coordinate, which is substantial and would be lost by treating the pairwise
+    statistics as independent.
+    """
+
+    @pytest.mark.parametrize(
+        ("ctor", "truth"),
+        [(rc.ClaytonCopula, 2.0), (rc.GumbelCopula, 2.5), (rc.GaussianCopula, 0.6)],
+    )
+    @pytest.mark.parametrize("dim", [3, 4])
+    @pytest.mark.parametrize("method", ["itau", "irho"])
+    def test_a_standard_error_is_reported(
+        self, ctor: type, truth: float, dim: int, method: str
+    ) -> None:
+        u = ctor(truth, dim=dim).rvs(500, random_state=0)
+        res = rc.fit(ctor(dim=dim), u, method=method)
+        assert res.bse is not None
+        assert res.bse[0] > 0.0
+        assert np.all(np.isfinite(res.conf_int()))
+
+    def test_it_is_calibrated_against_the_sampling_distribution(self) -> None:
+        """The only check that matters: does it predict the actual spread?"""
+        truth, dim = 2.0, 4
+        estimates, errors = [], []
+        for seed in range(60):
+            u = rc.ClaytonCopula(truth, dim=dim).rvs(600, random_state=seed)
+            res = rc.fit(rc.ClaytonCopula(dim=dim), u, method="itau")
+            estimates.append(res.params[0])
+            errors.append(res.bse[0])
+        ratio = float(np.mean(errors)) / float(np.std(estimates, ddof=1))
+        assert 0.85 < ratio < 1.20, f"mean SE / empirical SD = {ratio:.3f}"
+
+    def test_higher_dimensions_estimate_more_precisely(self) -> None:
+        """More pairs, more information -- so the standard error must shrink."""
+        errors = [
+            rc.fit(
+                rc.ClaytonCopula(dim=d),
+                rc.ClaytonCopula(2.0, dim=d).rvs(800, random_state=0),
+                method="itau",
+            ).bse[0]
+            for d in (2, 3, 5)
+        ]
+        assert errors[0] > errors[1] > errors[2]

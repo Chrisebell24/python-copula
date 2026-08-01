@@ -91,7 +91,14 @@ class ExtremeValueCopula(Copula):
     makes the density exact rather than finite-differenced.
     """
 
-    def __init__(self, params: ArrayLike, dim: int = 2, *, free: ArrayLike | None = None) -> None:
+    def __init__(
+        self, params: ArrayLike = np.nan, dim: int = 2, *, free: ArrayLike | None = None
+    ) -> None:
+        # NaN means "this family, to be estimated" -- the same convention as
+        # ClaytonCopula() and GaussianCopula(), and what makes
+        # ``fit(GalambosCopula(), u)`` the natural idiom. Without a default
+        # these families were the only ones that could not be named without
+        # also inventing a parameter value.
         if int(dim) != 2:
             raise ValueError(
                 f"{type(self).__name__} is bivariate only, got dim={int(dim)}. "

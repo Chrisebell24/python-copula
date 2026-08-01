@@ -348,6 +348,37 @@ class PlackettCopula(Copula):
         return TailDependence(lower=0.0, upper=0.0)
 
     @classmethod
+    def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> PlackettCopula:
+        """Calibrate to a target Kendall's tau, by numerical inversion.
+
+        Plackett's tau has no closed form in either direction, so this inverts
+        :meth:`tau` on a logarithmic scale -- where the map is smooth and
+        monotone over the family's whole range, from the countermonotone limit
+        at ``theta -> 0`` to the comonotone one at ``theta -> inf``.
+
+        Examples
+        --------
+        >>> from rcopula import PlackettCopula
+        >>> bool(abs(PlackettCopula.from_tau(-0.4).tau() + 0.4) < 1e-6)
+        True
+        >>> bool(abs(PlackettCopula.from_tau(0.7).tau() - 0.7) < 1e-6)
+        True
+        """
+        if not -1.0 < tau < 1.0:
+            raise ValueError(f"tau must lie in (-1, 1), got {tau}")
+        if tau == 0.0:
+            return cls(1.0, dim, **kwargs)
+        lo, hi = -30.0, 30.0
+        root = brentq(
+            lambda log_theta: cls(float(np.exp(log_theta))).tau() - tau,
+            lo,
+            hi,
+            xtol=1e-12,
+            rtol=8.9e-16,
+        )
+        return cls(float(np.exp(root)), dim, **kwargs)
+
+    @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> PlackettCopula:
         """Calibrate to a target Spearman's rho by inverting the closed form."""
         if not -1.0 < rho < 1.0:

@@ -218,7 +218,7 @@ def _fit_by_inversion(
         params = fitted.params
 
         cov = None
-        if estimate_variance and d == 2 and params.size == 1:
+        if estimate_variance and params.size == 1:
             # Delta method needs g'(stat); differentiate the inverse map.
             h = 1e-5
             try:
