@@ -163,6 +163,7 @@ can paste them across.
 | `rotCopula(cop, flip)` | `rc.RotatedCopula(cop, flip)` / `rc.survival(cop)` |
 | `khoudrajiCopula(c1, c2, shapes)` | `rc.KhoudrajiCopula(c1, c2, shapes)` |
 | `mixCopula(list(c1, c2), w)` | `rc.MixtureCopula([c1, c2], w)` |
+| `margCopula(cop, keep)` | `rc.marginal_copula(cop, [0, 3])` |
 | `onacopula("G", C(1.5, , list(C(4, 1:3))))` | `rc.NestedArchimedean(rc.GumbelCopula(1.5), ...)` |
 | `enacopula(u, cop, method = "etau")` | `rc.fit_nested(structure, u)` |
 | *(VineCopula::RVineStructureSelect)* | `rc.fit_vine(u, structure="D")` |

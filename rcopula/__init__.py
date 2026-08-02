@@ -86,6 +86,7 @@ from rcopula.structural import (
     NestedArchimedean,
     RotatedCopula,
     fit_nested,
+    marginal_copula,
     survival,
 )
 from rcopula.transforms import (
@@ -172,6 +173,7 @@ __all__ = [
     "kendall_return_period",
     "kendall_rvs",
     "loglik_copula",
+    "marginal_copula",
     "p2P",
     "plots",
     "portfolio",

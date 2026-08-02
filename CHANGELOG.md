@@ -34,6 +34,10 @@ Everything below is in `main` and not yet published to PyPI.
   copula (Cambou–Hofert–Lemieux 2017), plus antithetic pairing and Latin
   hypercube designs, and `variance_ratio` to measure what each actually bought
   rather than assuming the theoretical rate.
+- **Lower-dimensional margins** (`rcopula.marginal_copula`, R's `margCopula`).
+  R supports the elliptical and Archimedean classes only; the structural
+  constructions come too, and a nested Archimedean's bivariate margin is read
+  straight off the tree as its lowest common ancestor's generator.
 - **Dependogram** (`rcopula.dependogram`, `rcopula.plots.dependogram_plot`).
   Independence decomposed over every subset of the coordinates via the Mobius
   transform, so it locates the dependence rather than only detecting it.

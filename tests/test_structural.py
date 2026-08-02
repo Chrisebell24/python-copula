@@ -606,3 +606,167 @@ class TestMixturePlumbing:
             MixtureCopula([rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0)], [-0.5, 1.5])
         with pytest.raises(ValueError, match="weights for"):
             MixtureCopula([rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0)], [0.2, 0.3, 0.5])
+
+
+class TestMarginalCopula:
+    """Lower-dimensional margins.
+
+    The defining property is that the margin's CDF equals the parent's with the
+    dropped coordinates set to one. Everything else -- which class comes back,
+    what happens to a correlation structure -- follows from getting that right,
+    so it is checked for every supported family rather than argued about.
+    """
+
+    CASES: ClassVar[list] = [
+        (rc.ClaytonCopula(2.0, dim=5), [1, 4]),
+        (rc.GumbelCopula(2.5, dim=4), [0, 2, 3]),
+        (rc.FrankCopula(6.0, dim=4), [1, 2]),
+        (rc.JoeCopula(2.0, dim=3), [0, 2]),
+        (
+            rc.GaussianCopula(
+                [0.72, 0.63, 0.54, 0.45, 0.56, 0.48, 0.40, 0.42, 0.35, 0.30],
+                dim=5,
+                dispstr="un",
+            ),
+            [0, 3],
+        ),
+        (rc.GaussianCopula(0.6, dim=4, dispstr="ex"), [1, 2, 3]),
+        (rc.GaussianCopula(0.8, dim=4, dispstr="ar1"), [0, 2, 3]),
+        (rc.StudentCopula(0.5, df=5.0, dim=4, dispstr="ex"), [0, 1]),
+        (rc.RotatedCopula(rc.ClaytonCopula(2.0, dim=3), [True, False, True]), [0, 2]),
+        (
+            rc.MixtureCopula(
+                [rc.ClaytonCopula(3.0, dim=3), rc.GumbelCopula(2.0, dim=3)], weights=[0.4, 0.6]
+            ),
+            [0, 1],
+        ),
+        (rc.IndependenceCopula(4), [0, 2]),
+    ]
+
+    @pytest.mark.parametrize(("copula", "indices"), CASES, ids=lambda v: str(v)[:28])
+    def test_the_cdf_matches_the_parent_with_the_rest_at_one(
+        self, copula: rc.Copula, indices: list[int]
+    ) -> None:
+        margin = rc.marginal_copula(copula, indices)
+        points = np.random.default_rng(0).uniform(0.05, 0.95, size=(200, len(indices)))
+        full = np.ones((200, copula.dim))
+        full[:, indices] = points
+        # 1e-6 rather than machine precision only because the *parent's* CDF
+        # goes through Genz-Bretz above three dimensions.
+        assert np.max(np.abs(np.asarray(margin.cdf(points)) - np.asarray(copula.cdf(full)))) < 1e-6
+
+    @pytest.mark.parametrize(("copula", "indices"), CASES, ids=lambda v: str(v)[:28])
+    def test_the_dimension_is_what_was_asked_for(
+        self, copula: rc.Copula, indices: list[int]
+    ) -> None:
+        assert rc.marginal_copula(copula, indices).dim == len(indices)
+
+    def test_the_concrete_class_survives(self) -> None:
+        # Returning a bare ArchimedeanCopula would still be mathematically
+        # right and would break isinstance checks and the serialization
+        # registry, which keys on the class name.
+        margin = rc.marginal_copula(rc.ClaytonCopula(2.0, dim=5), [1, 4])
+        assert type(margin) is rc.ClaytonCopula
+        assert isinstance(margin, rc.ClaytonCopula)
+
+    def test_an_archimedean_margin_keeps_its_parameter(self) -> None:
+        parent = rc.GumbelCopula(2.5, dim=5)
+        margin = rc.marginal_copula(parent, [0, 2, 4])
+        assert float(margin.params[0]) == 2.5
+        assert margin.tau() == pytest.approx(parent.tau())
+
+    def test_an_unstructured_margin_is_the_sub_matrix(self) -> None:
+        parent = rc.GaussianCopula(
+            [0.72, 0.63, 0.54, 0.45, 0.56, 0.48, 0.40, 0.42, 0.35, 0.30], dim=5, dispstr="un"
+        )
+        chosen = [0, 2, 4]
+        margin = rc.marginal_copula(parent, chosen)
+        np.testing.assert_allclose(
+            margin.sigma(), np.asarray(parent.sigma())[np.ix_(chosen, chosen)]
+        )
+
+    def test_a_gapped_ar1_margin_is_unstructured(self) -> None:
+        # Dropping a coordinate from an AR(1) chain leaves a gap, so the result
+        # is not AR(1) and must not claim to be.
+        parent = rc.GaussianCopula(0.8, dim=4, dispstr="ar1")
+        margin = rc.marginal_copula(parent, [0, 2, 3])
+        assert margin.dispstr == "un"
+        np.testing.assert_allclose(
+            margin.sigma(), np.asarray(parent.sigma())[np.ix_([0, 2, 3], [0, 2, 3])]
+        )
+
+    def test_a_student_margin_keeps_its_degrees_of_freedom(self) -> None:
+        margin = rc.marginal_copula(rc.StudentCopula(0.5, df=3.5, dim=4, dispstr="ex"), [0, 2])
+        assert isinstance(margin, rc.StudentCopula)
+        assert float(margin.df) == 3.5
+
+    def test_order_matters_for_an_asymmetric_copula(self) -> None:
+        parent = rc.RotatedCopula(rc.ClaytonCopula(3.0, dim=3), [True, False, False])
+        forward = rc.marginal_copula(parent, [0, 1])
+        reversed_ = rc.marginal_copula(parent, [1, 0])
+        point = np.array([[0.3, 0.8]])
+        assert not np.allclose(forward.cdf(point), reversed_.cdf(point))
+
+    def test_asking_for_everything_returns_the_same_object(self) -> None:
+        parent = rc.ClaytonCopula(2.0, dim=3)
+        assert rc.marginal_copula(parent, [0, 1, 2]) is parent
+
+    def test_rejects_too_few_coordinates(self) -> None:
+        with pytest.raises(ValueError, match="at least 2"):
+            rc.marginal_copula(rc.ClaytonCopula(2.0, dim=3), [1])
+
+    def test_rejects_repeated_coordinates(self) -> None:
+        with pytest.raises(ValueError, match="distinct"):
+            rc.marginal_copula(rc.ClaytonCopula(2.0, dim=3), [1, 1])
+
+    def test_rejects_out_of_range_coordinates(self) -> None:
+        with pytest.raises(ValueError, match=r"\[0, 3\)"):
+            rc.marginal_copula(rc.ClaytonCopula(2.0, dim=3), [0, 5])
+
+    def test_the_empirical_copula_says_what_to_do_instead(self) -> None:
+        data = rc.GaussianCopula(0.5, dim=3, dispstr="ex").rvs(50, random_state=0)
+        with pytest.raises(NotImplementedError, match=r"data\[:, indices\]"):
+            rc.marginal_copula(rc.EmpiricalCopula(data), [0, 1])
+
+    @staticmethod
+    def _tree() -> rc.NestedArchimedean:
+        return rc.NestedArchimedean(
+            rc.ClaytonCopula(1.0),
+            components=[0],
+            children=[rc.NestedArchimedean(rc.ClaytonCopula(4.0), components=[1, 2, 3])],
+        )
+
+    @pytest.mark.parametrize(("i", "j"), [(0, 1), (0, 3), (1, 2), (2, 3)])
+    def test_a_nested_margin_is_the_lowest_common_ancestor(self, i: int, j: int) -> None:
+        # Two variables meet at exactly one node, and that node's generator is
+        # their bivariate copula -- the same fact tau_matrix rests on, so the
+        # two must agree exactly rather than approximately.
+        tree = self._tree()
+        margin = rc.marginal_copula(tree, [i, j])
+        assert margin.tau() == pytest.approx(float(tree.tau_matrix()[i, j]), abs=1e-12)
+
+    @pytest.mark.parametrize(("i", "j"), [(0, 1), (1, 2)])
+    def test_a_nested_margin_reproduces_the_tree_cdf(self, i: int, j: int) -> None:
+        tree = self._tree()
+        margin = rc.marginal_copula(tree, [i, j])
+        points = np.random.default_rng(0).uniform(0.05, 0.95, size=(300, 2))
+        full = np.ones((300, 4))
+        full[:, [i, j]] = points
+        assert np.max(np.abs(np.asarray(margin.cdf(points)) - np.asarray(tree.cdf(full)))) < 1e-12
+
+    def test_a_nested_margin_of_three_says_what_it_would_take(self) -> None:
+        with pytest.raises(NotImplementedError, match="induced sub-tree"):
+            rc.marginal_copula(self._tree(), [0, 1, 2])
+
+    def test_an_unsupported_family_is_refused_clearly(self) -> None:
+        vine = rc.fit_vine(
+            rc.GaussianCopula(0.5, dim=4, dispstr="ex").rvs(200, random_state=0), structure="C"
+        )
+        with pytest.raises(NotImplementedError, match="not available"):
+            rc.marginal_copula(vine, [0, 1])
+
+    def test_a_bivariate_only_family_has_no_margin_to_take(self) -> None:
+        # The range check catches this first, which is the right error: there
+        # is no third coordinate to drop.
+        with pytest.raises(ValueError, match=r"\[0, 2\)"):
+            rc.marginal_copula(rc.PlackettCopula(4.0), [0, 1, 2])
