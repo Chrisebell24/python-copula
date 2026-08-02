@@ -1284,6 +1284,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rcopula.statarb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        statarb
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="statarb">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.multivariate_spearman" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        multivariate_spearman
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.diagonal_distance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        diagonal_distance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.tail_concentration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tail_concentration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.select_pairs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_pairs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.select_partners" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_partners
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rcopula.garch" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2670,6 +2742,78 @@
     <span class="md-ellipsis">
       
         efficient_frontier
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.statarb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        statarb
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="statarb">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.multivariate_spearman" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        multivariate_spearman
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.diagonal_distance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        diagonal_distance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.tail_concentration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tail_concentration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.select_pairs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_pairs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.statarb.select_partners" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_partners
       
     </span>
   </a>
@@ -6833,6 +6977,759 @@ Infeasible targets are dropped rather than raising.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">mu</span><span class="p">,</span> <span class="n">cvar</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">efficient_frontier</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">cvar</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="o">-</span><span class="mf">1e-9</span><span class="p">))</span>     <span class="c1"># more return costs more risk</span>
 <span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.statarb" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.statarb</span>
+
+
+<a href="#rcopula.statarb" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Choosing what to trade: pair and partner selection for statistical arbitrage.</p>
+<p>:mod:<code>rcopula.portfolio</code> trades a pair once you have one. This picks it. Out of
+500 names there are 124,750 pairs and 2.6 billion quadruples, so the selection
+rule is not a preliminary to the strategy -- for a copula strategy it largely
+<em>is</em> the strategy, and different rules surface genuinely different candidates.</p>
+<p><strong>Pairs.</strong> Six rules, of which the last two are the copula-specific ones:</p>
+<p>===================  =========================================================
+<code>distance</code>         Sum of squared deviations between normalised cumulative
+                     returns. The classic (Gatev et al.), and it selects for
+                     <em>level</em> agreement, which is not what a copula uses.
+<code>pearson</code>          Linear correlation. Included to be argued with: it is not
+                     invariant to the marginal transforms a copula discards.
+<code>spearman</code>         Rank correlation. Cheap, and close to <code>kendall</code>.
+<code>kendall</code>          Rank correlation, concordance-based.
+<code>tail</code>             Lower-tail dependence, estimated nonparametrically. Picks
+                     pairs that crash together, which is where a copula
+                     strategy makes and loses its money.
+<code>qq</code>               Mean distance from the diagonal of the QQ plot. Sensitive
+                     to disagreement anywhere in the distribution, not just the
+                     middle.
+===================  =========================================================</p>
+<p><strong>Partners.</strong> For a vine or a 4-dimensional copula you need a <em>quadruple</em>: a
+target and three partners. Exhaustive search over all triples of the remaining
+names is :math:<code>O(n^3)</code>, so the four approaches below all reduce the candidate
+set first, exactly as Stübinger, Mangold and Krauss do.</p>
+<p>===================  =========================================================
+<code>traditional</code>      Largest sum of pairwise Spearman correlations.
+<code>extended</code>         Largest <strong>multivariate</strong> Spearman's rho -- three
+                     generalisations of the bivariate coefficient, averaged
+                     (Schmid and Schmidt 2007). Unlike the traditional sum,
+                     this is a genuine :math:<code>d</code>-dimensional measure rather
+                     than a pile of bivariate ones.
+<code>geometric</code>        Smallest total distance from the hyper-diagonal of the
+                     unit hypercube. Purely geometric, no distributional
+                     assumption at all.
+<code>extremal</code>         Strongest joint-tail concentration. Targets what Mangold's
+                     chi-squared test targets -- see the note under
+                     :func:<code>select_partners</code> about what this is and is not.
+===================  =========================================================</p>
+<p>Everything here works on <strong>ranks</strong>, which is the point: a copula does not see
+the margins, so neither should the rule that chooses its inputs.</p>
+<p>============================  ================================================
+:func:<code>select_pairs</code>          Rank every pair by one of six criteria.
+:func:<code>select_partners</code>       Find the best quadruple for a target.
+:func:<code>multivariate_spearman</code> Schmid and Schmidt's d-dimensional rho.
+:func:<code>diagonal_distance</code>     Mean distance from the hyper-diagonal.
+:func:<code>tail_concentration</code>    Joint-tail co-occurrence, relative to chance.
+============================  ================================================</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">select_pairs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">factor</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">returns</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+<span class="gp">... </span>    <span class="s2">&quot;AAA&quot;</span><span class="p">:</span> <span class="n">factor</span> <span class="o">+</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">500</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;BBB&quot;</span><span class="p">:</span> <span class="n">factor</span> <span class="o">+</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">500</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;CCC&quot;</span><span class="p">:</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">500</span><span class="p">),</span>
+<span class="gp">... </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">select_pairs</span><span class="p">(</span><span class="n">returns</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;kendall&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][[</span><span class="s2">&quot;first&quot;</span><span class="p">,</span> <span class="s2">&quot;second&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="go">[&#39;AAA&#39;, &#39;BBB&#39;]</span>
+</code></pre></div>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Gatev, E., Goetzmann, W. N. and Rouwenhorst, K. G. (2006). Pairs trading:
+    performance of a relative-value arbitrage rule.
+    <em>Review of Financial Studies</em> 19(3), 797-827.
+    The distance rule.
+Stübinger, J., Mangold, B. and Krauss, C. (2018). Statistical arbitrage with
+    vine copulas. <em>Quantitative Finance</em> 18(11), 1831-1849.
+    The four partner-selection approaches.
+Schmid, F. and Schmidt, R. (2007). Multivariate extensions of Spearman's rho
+    and related statistics. <em>Statistics and Probability Letters</em> 77(4),
+    407-416.  The three multivariate rho formulas.
+Liew, R. Q. and Wu, Y. (2013). Pairs trading: a copula approach.
+    <em>J. Derivatives and Hedge Funds</em> 19(1), 12-30.
+Krauss, C. (2017). Statistical arbitrage pairs trading strategies: review and
+    outlook. <em>J. Economic Surveys</em> 31(2), 513-545.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.statarb.multivariate_spearman" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">multivariate_spearman</span>
+
+
+<a href="#rcopula.statarb.multivariate_spearman" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">multivariate_spearman</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Schmid and Schmidt's multivariate Spearman's rho.</p>
+<p>Three separate generalisations of the bivariate coefficient, averaged. Each
+reduces to ordinary Spearman's rho when :math:<code>d = 2</code>, and each measures
+something slightly different in higher dimensions -- the first two the
+concentration towards a corner, the third the average pairwise
+concordance -- so the mean is more robust than any one of them.</p>
+<p>.. math::</p>
+<pre><code>\rho_1 &amp;= h(d)\Bigl\{-1 + \tfrac{2^d}{n}
+          \textstyle\sum_j \prod_i (1 - U_{ij})\Bigr\} \\
+\rho_2 &amp;= h(d)\Bigl\{-1 + \tfrac{2^d}{n}
+          \textstyle\sum_j \prod_i U_{ij}\Bigr\} \\
+\rho_3 &amp;= -3 + \tfrac{12}{n\binom{d}{2}}
+          \textstyle\sum_{k&lt;l}\sum_j (1-U_{kj})(1-U_{lj})
+</code></pre>
+<p>with :math:<code>h(d) = (d+1)/(2^d - d - 1)</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pseudo-observations, or raw data (ranks are taken).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>It agrees with the bivariate coefficient in two dimensions:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">multivariate_spearman</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.7</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">20000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">multivariate_spearman</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">-</span> <span class="n">rc</span><span class="o">.</span><span class="n">cor_spearman</span><span class="p">(</span><span class="n">u</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>It is zero under independence and one under comonotonicity, in any
+dimension:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">independent</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">20000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">multivariate_spearman</span><span class="p">(</span><span class="n">independent</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">comonotone</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">20000</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">multivariate_spearman</span><span class="p">(</span><span class="n">comonotone</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.99</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.statarb.diagonal_distance" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">diagonal_distance</span>
+
+
+<a href="#rcopula.statarb.diagonal_distance" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">diagonal_distance</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Mean Euclidean distance from the hyper-diagonal of the unit hypercube.</p>
+<p>Perfectly concordant observations lie exactly on the line from
+:math:<code>(0,\dots,0)</code> to :math:<code>(1,\dots,1)</code>; independent ones scatter away
+from it. <strong>Small means strongly related</strong>, which is the opposite convention
+to every other measure here -- :func:<code>select_partners</code> handles the sign.</p>
+<p>The appeal is that it assumes nothing: no distribution, no copula family,
+not even that the dependence is monotone in the usual sense.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">diagonal_distance</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">comonotone</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">5000</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">diagonal_distance</span><span class="p">(</span><span class="n">comonotone</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mf">1e-12</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">independent</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">5000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">diagonal_distance</span><span class="p">(</span><span class="n">independent</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.3</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.statarb.tail_concentration" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tail_concentration</span>
+
+
+<a href="#rcopula.statarb.tail_concentration" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tail_concentration</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">quantile</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>How much more often the coordinates are jointly extreme than by chance.</p>
+<p>Counts observations in the lower and upper corners of the unit hypercube and
+divides by what independence would put there. One means no more joint
+extremes than chance; larger means the names crash and spike together. This
+is the quantity a copula strategy lives or dies on, and no correlation
+measures it.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>quantile</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Corner size. By default it is <strong>chosen from the data</strong>, which matters
+more than it sounds -- see the note below.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Both corners combined, relative to independence.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>A fixed corner cannot work beyond two dimensions. The corner holds
+:math:<code>q^d</code> of the mass, so at the conventional :math:<code>q = 0.05</code> a
+200,000-row sample expects 500 observations in it at :math:<code>d = 2</code>, 25 at
+:math:<code>d = 3</code>, and <strong>1.3</strong> at :math:<code>d = 4</code> -- at which point the statistic
+is counting noise and scatters between 0.4 and 1.2 under independence.</p>
+<p>The default therefore solves :math:<code>q = (c/n)^{1/d}</code> for a target count
+:math:<code>c</code>, so the corner always holds enough observations to mean something.</p>
+<p><strong>What that costs, stated plainly.</strong> A wide corner stops measuring the tail.
+At :math:<code>d = 2</code> and 200,000 observations, Clayton and Gaussian at the same
+Kendall's tau give 2.15 against 2.13 at :math:<code>q = 0.3</code> -- indistinguishable
+-- and only separate at :math:<code>q \le 0.02</code>, where the ratio reaches 1.2 and
+then 1.4. But :math:<code>q = 0.02</code> at :math:<code>d = 4</code> needs 250 million
+observations to keep 40 in the corner. Even a million rows only supports
+:math:<code>q = 0.08</code>.</p>
+<p>So in four dimensions at any realistic sample size this ranks by joint
+co-movement in general, <strong>not</strong> by tail dependence specifically, and it
+cannot tell a heavy-tailed copula from a Gaussian one. That is a property of
+the data, not of the implementation: the observations required to resolve a
+four-dimensional tail simply are not there. Use it in two dimensions with an
+explicit small <code>quantile</code> when the tail is the question.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">tail_concentration</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">independent</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">40000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">tail_concentration</span><span class="p">(</span><span class="n">independent</span><span class="p">)</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.25</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dependent</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">4.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">40000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">tail_concentration</span><span class="p">(</span><span class="n">dependent</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.statarb.select_pairs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">select_pairs</span>
+
+
+<a href="#rcopula.statarb.select_pairs" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">select_pairs</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">PairMethod</span> <span class="o">=</span> <span class="s1">&#39;kendall&#39;</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">top</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Rank every pair of columns by one selection criterion.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>(<span title="DataFrame">DataFrame</span> or <span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="k">k</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Returns, one column per instrument. Column names are carried through.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code>(&#39;distance&#39;, &#39;pearson&#39;, &#39;spearman&#39;, &#39;kendall&#39;, &#39;tail&#39;, &#39;qq&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>See the module docstring.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;distance&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>top</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Keep only this many rows.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>names</code>
+            </td>
+            <td>
+                  <code>list of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column names, when <code>data</code> is a plain array.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Columns <code>first</code>, <code>second</code>, <code>score</code>, <code>rank</code>, sorted best first.
+<code>score</code> is oriented so that larger is always better, whichever
+criterion was used -- the distance and QQ rules are negated for this
+reason, so their scores are non-positive.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Cost is :math:<code>O(k^2)</code> pairs, each :math:<code>O(n\log n)</code> for <code>kendall</code> and
+:math:<code>O(n)</code> otherwise. Five hundred names is 124,750 pairs and takes a
+couple of minutes on <code>kendall</code>; screen with <code>spearman</code> first if that
+matters, since the two rank nearly the same candidates.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">select_pairs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">shared</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">400</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+<span class="gp">... </span>    <span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="n">shared</span> <span class="o">+</span> <span class="mf">0.2</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">400</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="n">shared</span> <span class="o">+</span> <span class="mf">0.2</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">400</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">400</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;D&quot;</span><span class="p">:</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">400</span><span class="p">),</span>
+<span class="gp">... </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ranked</span> <span class="o">=</span> <span class="n">select_pairs</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;spearman&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">ranked</span><span class="p">)</span>
+<span class="go">6</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ranked</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;first&quot;</span><span class="p">],</span> <span class="n">ranked</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;second&quot;</span><span class="p">]</span>
+<span class="go">(&#39;A&#39;, &#39;B&#39;)</span>
+</code></pre></div>
+    <p>The criteria disagree, which is the reason to have more than one:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">by_tail</span> <span class="o">=</span> <span class="n">select_pairs</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;tail&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">by_tail</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.statarb.select_partners" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">select_partners</span>
+
+
+<a href="#rcopula.statarb.select_partners" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">select_partners</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">PartnerMethod</span> <span class="o">=</span> <span class="s1">&#39;extended&#39;</span><span class="p">,</span> <span class="n">n_partners</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n_candidates</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Find the partners that best complete a quadruple around <code>target</code>.</p>
+<p>A vine or a :math:<code>d</code>-dimensional copula strategy needs a group, not a pair.
+Searching every triple of 499 remaining names is 20 million combinations per
+target, so this pre-screens to the <code>n_candidates</code> most correlated names and
+searches exhaustively within those -- which is what Stübinger, Mangold and
+Krauss do, and what makes the problem finite.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>(<span title="DataFrame">DataFrame</span> or <span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="k">k</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>target</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> or <span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column name, or index.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code>(&#39;traditional&#39;, &#39;extended&#39;, &#39;geometric&#39;, &#39;extremal&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>&#34;traditional&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_partners</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Partners to choose. Three gives the quadruple the literature uses.</p>
+              </div>
+            </td>
+            <td>
+                  <code>3</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_candidates</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-screening width. Larger is more thorough and grows as
+:math:<code>\binom{n_{\text{candidates}}}{n_{\text{partners}}}</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>50</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>names</code>
+            </td>
+            <td>
+                  <code>list of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>"target"</code>, <code>"partners"</code>, <code>"score"</code>, <code>"method"</code>, and
+<code>"considered"</code> -- how many combinations were actually evaluated, so
+the pre-screening is visible rather than implicit.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>On <code>extremal</code>, two caveats, both worth reading before relying on it.</p>
+<p>Stübinger et al. use Mangold's (2015) chi-squared test against independence
+within a specific parametric copula family. This uses joint-tail
+concentration instead -- the same <em>property</em>, a different statistic, arrived
+at without that paper. It is not a reimplementation of Mangold's test and
+produces no p-value.</p>
+<p>More importantly, in four dimensions it is not really an <em>extremal</em> rule at
+all. A four-dimensional corner deep enough to isolate the tail is empty at
+any realistic sample size -- see :func:<code>tail_concentration</code> -- so the corner
+widens until it holds data, and a wide corner measures joint co-movement in
+general. Expect it to behave like a more robust <code>traditional</code>, and do not
+expect it to find tail dependence that the other rules miss.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">select_partners</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">factor</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">600</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">frame</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+<span class="gp">... </span>    <span class="s2">&quot;TGT&quot;</span><span class="p">:</span> <span class="n">factor</span> <span class="o">+</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">600</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;P1&quot;</span><span class="p">:</span> <span class="n">factor</span> <span class="o">+</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">600</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;P2&quot;</span><span class="p">:</span> <span class="n">factor</span> <span class="o">+</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">600</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;P3&quot;</span><span class="p">:</span> <span class="n">factor</span> <span class="o">+</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">600</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;N1&quot;</span><span class="p">:</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">600</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;N2&quot;</span><span class="p">:</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="mi">600</span><span class="p">),</span>
+<span class="gp">... </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">found</span> <span class="o">=</span> <span class="n">select_partners</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="s2">&quot;TGT&quot;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;extended&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">found</span><span class="p">[</span><span class="s2">&quot;partners&quot;</span><span class="p">])</span>
+<span class="go">[&#39;P1&#39;, &#39;P2&#39;, &#39;P3&#39;]</span>
 </code></pre></div>
 
 
