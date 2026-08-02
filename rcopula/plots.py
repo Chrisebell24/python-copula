@@ -43,7 +43,7 @@ Fisher, N. I. and Switzer, P. (2001). Graphical assessment of dependence: is a
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -53,9 +53,15 @@ from rcopula.core.extreme_value import ExtremeValueCopula
 from rcopula.dependence import cor_kendall, pseudo_obs
 from rcopula.kendall import kendall_empirical
 
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+
+    from rcopula.htest.api import DependogramResult
+
 __all__ = [
     "contour",
     "dependence_heatmap",
+    "dependogram_plot",
     "kendall_plot",
     "nested_tree",
     "pickands_plot",
@@ -664,4 +670,86 @@ def dependence_heatmap(
     ax.set_xticks(range(d), labels)
     ax.set_yticks(range(d), labels)
     ax.set_title(label)
+    return ax
+
+
+def dependogram_plot(
+    result: DependogramResult,
+    *,
+    level: float = 0.05,
+    ax: Axes | None = None,
+) -> Axes:
+    r"""Plot a :func:`~rcopula.htest.dependogram`.
+
+    One bar per subset, tallest first, with the subsets that reject independence
+    marked. The point of the picture over the table is that it shows *where* the
+    dependence lives at a glance: three variables can be pairwise independent
+    and jointly dependent, and the bar for the triple stands alone.
+
+    Parameters
+    ----------
+    result : DependogramResult
+        From :func:`~rcopula.htest.dependogram`.
+    level : float
+        Significance level for the marking.
+    ax : Axes, optional
+
+    Returns
+    -------
+    Axes
+
+    Examples
+    --------
+    >>> import matplotlib
+    >>> matplotlib.use("Agg")
+    >>> import numpy as np
+    >>> from rcopula.htest import dependogram
+    >>> from rcopula.plots import dependogram_plot
+    >>> rng = np.random.default_rng(0)
+    >>> x, y = rng.uniform(size=(2, 200))
+    >>> data = np.column_stack([x, y, (x + y) % 1.0])
+    >>> ax = dependogram_plot(dependogram(data, n_rep=100, random_state=1))
+    >>> ax.get_ylabel()
+    'Cramer-von Mises statistic'
+    """
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(max(6.0, 0.6 * len(result.subsets)), 4.0))
+
+    order = np.argsort(result.statistics)[::-1]
+    labels = ["{" + ",".join(str(j) for j in result.subsets[k]) + "}" for k in order]
+    heights = result.statistics[order]
+    reject = result.pvalues[order] < level
+
+    positions = np.arange(len(order))
+    ax.bar(
+        positions[~reject], heights[~reject], color="0.75", edgecolor="0.4", label="not rejected"
+    )
+    if reject.any():
+        ax.bar(
+            positions[reject],
+            heights[reject],
+            color="#c0392b",
+            edgecolor="0.2",
+            label=f"p < {level:g}",
+        )
+    for position, height, p in zip(positions, heights, result.pvalues[order], strict=True):
+        ax.annotate(
+            f"{p:.3f}",
+            (position, height),
+            textcoords="offset points",
+            xytext=(0, 3),
+            ha="center",
+            fontsize=7,
+            color="0.3",
+        )
+
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+    ax.set_xlabel("subset of coordinates")
+    ax.set_ylabel("Cramer-von Mises statistic")
+    ax.set_title(f"Dependogram ({result.n_rep} permutations)")
+    ax.legend(frameon=False, fontsize=8)
+    ax.margins(y=0.15)
     return ax

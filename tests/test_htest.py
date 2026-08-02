@@ -187,3 +187,154 @@ def test_empirical_level_is_close_to_nominal(fn, generator) -> None:
     pvalues = [fn(generator(rng), n_rep=200, random_state=rng).pvalue for _ in range(60)]
     rate = float(np.mean(np.array(pvalues) <= 0.10))
     assert rate < 0.30
+
+
+class TestDependogram:
+    """Independence, decomposed subset by subset.
+
+    The property that justifies the whole apparatus is that it *locates* the
+    dependence rather than merely detecting it. So the central test uses a
+    construction where a global test must reject and every pair must not:
+    ``Z = (X + Y) mod 1`` is exactly independent of ``X`` and of ``Y``
+    separately, and determined by them together.
+    """
+
+    @staticmethod
+    def _pairwise_independent(n: int = 400, seed: int = 0) -> np.ndarray:
+        rng = np.random.default_rng(seed)
+        x, y = rng.uniform(size=(2, n))
+        return np.column_stack([x, y, (x + y) % 1.0])
+
+    def test_it_finds_only_the_triple(self) -> None:
+        from rcopula.htest import dependogram
+
+        result = dependogram(self._pairwise_independent(), n_rep=200, random_state=1)
+        assert result.significant() == [(0, 1, 2)]
+        assert result.global_pvalue < 0.05
+
+    def test_the_pairs_really_are_independent(self) -> None:
+        # Guards the test above: if the pairs were dependent, finding only the
+        # triple would be a failure rather than the point.
+        data = self._pairwise_independent(2000)
+        for i, j in ((0, 1), (0, 2), (1, 2)):
+            assert abs(float(rc.cor_kendall(data)[i, j])) < 0.05
+
+    def test_independent_data_does_not_reject_globally(self) -> None:
+        from rcopula.htest import dependogram
+
+        # Deliberately *not* asserting that no individual subset rejects: with
+        # four subsets tested at 5% the chance of at least one is 18%, so that
+        # assertion would be a flake generator rather than a test. The global
+        # p-value is the one that accounts for the multiplicity.
+        for seed in (0, 3, 7):
+            data = np.random.default_rng(seed).uniform(size=(300, 3))
+            assert dependogram(data, n_rep=200, random_state=seed).global_pvalue > 0.05
+
+    @pytest.mark.slow
+    def test_both_levels_are_calibrated(self) -> None:
+        """The claim the multiplicity correction rests on.
+
+        A per-subset p-value should reject 5% of the time under independence,
+        and so should the global one -- the correction has to remove the
+        multiplicity without becoming conservative, which a Bonferroni bound
+        would not.
+        """
+        from rcopula.htest import dependogram
+
+        rejected_subsets = subsets_tested = rejected_global = 0
+        trials = 40
+        for seed in range(trials):
+            data = np.random.default_rng(seed).uniform(size=(200, 3))
+            result = dependogram(data, n_rep=200, random_state=seed + 100)
+            rejected_subsets += int(np.sum(result.pvalues < 0.05))
+            subsets_tested += len(result.subsets)
+            rejected_global += int(result.global_pvalue < 0.05)
+        # Binomial standard error at p = 0.05 is 1.7% for 160 subsets and 3.4%
+        # for 40 datasets, so these bands are about three of them.
+        assert 0.01 <= rejected_subsets / subsets_tested <= 0.11
+        assert rejected_global / trials <= 0.20
+
+    def test_it_finds_a_dependent_pair_and_leaves_the_third_alone(self) -> None:
+        from rcopula.htest import dependogram
+
+        rng = np.random.default_rng(0)
+        pair = rc.ClaytonCopula(4.0).rvs(400, random_state=0)
+        data = np.column_stack([pair, rng.uniform(size=400)])
+        result = dependogram(data, n_rep=200, random_state=1)
+        assert (0, 1) in result.significant()
+        assert (0, 2) not in result.significant()
+        assert (1, 2) not in result.significant()
+
+    def test_every_subset_of_size_two_or_more_is_present(self) -> None:
+        from rcopula.htest import dependogram
+
+        data = np.random.default_rng(0).uniform(size=(150, 4))
+        result = dependogram(data, n_rep=50, random_state=1)
+        # 2^d - d - 1 = 11 for d = 4.
+        assert len(result.subsets) == 11
+        assert all(len(s) >= 2 for s in result.subsets)
+        assert result.statistics.shape == result.pvalues.shape == (11,)
+
+    def test_pvalues_are_strictly_inside_the_unit_interval(self) -> None:
+        from rcopula.htest import dependogram
+
+        data = rc.ClaytonCopula(3.0, dim=3).rvs(200, random_state=0)
+        result = dependogram(data, n_rep=100, random_state=1)
+        # Pesarin's estimator can never return exactly 0 or 1, which matters
+        # when the p-values are combined or transformed downstream.
+        assert np.all(result.pvalues > 0.0)
+        assert np.all(result.pvalues < 1.0)
+        assert 0.0 < result.global_pvalue < 1.0
+
+    def test_summary_marks_the_significant_subsets(self) -> None:
+        from rcopula.htest import dependogram
+
+        result = dependogram(self._pairwise_independent(), n_rep=200, random_state=1)
+        text = result.summary()
+        assert "{0,1,2}" in text
+        assert "*" in text
+        assert "global p-value" in text
+
+    def test_rejects_a_single_column(self) -> None:
+        from rcopula.htest import dependogram
+
+        with pytest.raises(ValueError, match="at least 2 columns"):
+            dependogram(np.random.default_rng(0).uniform(size=(50, 1)), n_rep=10)
+
+    def test_the_mobius_factorisation_matches_the_literal_sum(self) -> None:
+        """The identity the implementation rests on.
+
+        The Mobius transform is defined as an alternating sum over the 2^|A|
+        subsets of A; the code evaluates a single product instead, because the
+        sum is exactly that product expanded. If that ever stopped being true
+        the statistic would be silently wrong, so it is checked directly.
+        """
+        import itertools as it
+
+        from rcopula.htest.api import _mobius_matrices
+
+        rng = np.random.default_rng(0)
+        u = rng.uniform(size=(40, 3))
+        subset = (0, 1, 2)
+
+        literal = np.empty(u.shape[0])
+        for i in range(u.shape[0]):
+            total = 0.0
+            for size in range(len(subset) + 1):
+                for part in it.combinations(subset, size):
+                    empirical = (
+                        float(np.mean(np.all(u[:, list(part)] <= u[i, list(part)], axis=1)))
+                        if part
+                        else 1.0
+                    )
+                    rest = [j for j in subset if j not in part]
+                    total += (
+                        (-1) ** (len(subset) - len(part))
+                        * empirical
+                        * float(np.prod([u[i, j] for j in rest]))
+                    )
+            literal[i] = total
+
+        matrices = _mobius_matrices(u)
+        product = matrices[0] * matrices[1] * matrices[2]
+        np.testing.assert_allclose(np.mean(product, axis=0), literal, atol=1e-14)

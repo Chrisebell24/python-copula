@@ -61,7 +61,15 @@ from rcopula.dependence import beta_n, cor_kendall, cor_spearman, pseudo_obs
 from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, JointFitResult, fit, fit_joint, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test
-from rcopula.htest import TestResult, ev_test, exch_test, indep_test, rad_sym_test
+from rcopula.htest import (
+    DependogramResult,
+    TestResult,
+    dependogram,
+    ev_test,
+    exch_test,
+    indep_test,
+    rad_sym_test,
+)
 from rcopula.kendall import (
     kendall_cdf,
     kendall_empirical,
@@ -99,6 +107,7 @@ __all__ = [
     "Copula",
     "CopulaDistribution",
     "CopulaFitResult",
+    "DependogramResult",
     "EllipticalCopula",
     "EmpiricalCopula",
     "ExtremeValueCopula",
@@ -139,6 +148,7 @@ __all__ = [
     "credit",
     "cross_validate",
     "datasets",
+    "dependogram",
     "derivatives",
     "discrete",
     "dynamic",

@@ -44,6 +44,8 @@ Kojadinovic, I. (2014). Some copula inference procedures adapted to the
 
 from __future__ import annotations
 
+import itertools
+from dataclasses import dataclass
 from typing import NamedTuple
 
 import numpy as np
@@ -52,7 +54,15 @@ from numpy.typing import ArrayLike, NDArray
 from rcopula.dependence import pseudo_obs
 from rcopula.gof.statistics import empirical_copula_at
 
-__all__ = ["TestResult", "ev_test", "exch_test", "indep_test", "rad_sym_test"]
+__all__ = [
+    "DependogramResult",
+    "TestResult",
+    "dependogram",
+    "ev_test",
+    "exch_test",
+    "indep_test",
+    "rad_sym_test",
+]
 
 
 class TestResult(NamedTuple):
@@ -356,3 +366,202 @@ def ev_test(
         replicates[b] = _ev_statistic(sample)
 
     return TestResult(observed, _pesarin(replicates, observed), "extreme-value dependence", n_rep)
+
+
+# ======================================================================
+# Independence, subset by subset
+# ======================================================================
+
+
+@dataclass(frozen=True)
+class DependogramResult:
+    """Independence tested on every subset of the coordinates.
+
+    Attributes
+    ----------
+    subsets : list of tuple
+        Every subset of size two or more, in the order the statistics are
+        given -- :math:`2^d - d - 1` of them.
+    statistics : ndarray
+        The Cramer-von Mises statistic for each subset.
+    pvalues : ndarray
+        Permutation p-values, one per subset.
+    global_pvalue : float
+        A single test combining all subsets, by the minimum p-value with a
+        Bonferroni-style correction through the permutation distribution -- so
+        it is exact rather than conservative.
+    n_rep : int
+    """
+
+    subsets: list[tuple[int, ...]]
+    statistics: NDArray[np.float64]
+    pvalues: NDArray[np.float64]
+    global_pvalue: float
+    n_rep: int
+
+    def significant(self, level: float = 0.05) -> list[tuple[int, ...]]:
+        """Subsets whose p-value falls below ``level``."""
+        return [s for s, p in zip(self.subsets, self.pvalues, strict=True) if p < level]
+
+    def summary(self, level: float = 0.05) -> str:
+        """A printable report, most significant subset first."""
+        order = np.argsort(self.pvalues)
+        lines = [
+            f"Dependogram, {self.n_rep} permutations",
+            "=" * 68,
+            f"  {'subset':<20}{'statistic':>14}{'p-value':>12}",
+        ]
+        for k in order:
+            mark = " *" if self.pvalues[k] < level else ""
+            label = "{" + ",".join(str(j) for j in self.subsets[k]) + "}"
+            lines.append(f"  {label:<20}{self.statistics[k]:>14.6f}{self.pvalues[k]:>12.4f}{mark}")
+        lines += ["", f"  global p-value       {self.global_pvalue:.4f}"]
+        return "\n".join(lines)
+
+
+def _mobius_matrices(u: NDArray[np.float64]) -> NDArray[np.float64]:
+    r"""``D[j, k, i] = 1{u_kj <= u_ij} - u_ij``, one matrix per coordinate.
+
+    The Mobius transform of the empirical copula over a subset :math:`A`,
+
+    .. math::
+        M_A(\mathbf u) = \sum_{B \subseteq A} (-1)^{|A \setminus B|}
+                         C_n(\mathbf u_B) \prod_{j \in A \setminus B} u_j,
+
+    factorises: the alternating sum over subsets is exactly the expansion of a
+    product, so evaluated at the data points it collapses to
+
+    .. math::
+        M_A(\mathbf U_i) = \frac1n \sum_k \prod_{j \in A}
+            \bigl(\mathbf 1\{U_{kj} \le U_{ij}\} - U_{ij}\bigr).
+
+    That turns :math:`2^{|A|}` empirical-copula evaluations into one product of
+    precomputed matrices, which is what makes testing all :math:`2^d - d - 1`
+    subsets affordable.
+    """
+    return np.stack(
+        [
+            (u[:, j][:, None] <= u[:, j][None, :]).astype(float) - u[:, j][None, :]
+            for j in range(u.shape[1])
+        ]
+    )
+
+
+def _subset_statistics(
+    matrices: NDArray[np.float64], subsets: list[tuple[int, ...]]
+) -> NDArray[np.float64]:
+    out = np.empty(len(subsets))
+    for position, subset in enumerate(subsets):
+        product = matrices[subset[0]].copy()
+        for j in subset[1:]:
+            product *= matrices[j]
+        out[position] = float(np.mean(np.mean(product, axis=0) ** 2))
+    return out
+
+
+def dependogram(
+    data: ArrayLike,
+    n_rep: int = 500,
+    random_state: np.random.Generator | int | None = None,
+    ties_method: str = "average",
+) -> DependogramResult:
+    r"""Test independence on every subset of the coordinates (R's ``dependogram``).
+
+    :func:`indep_test` answers "are these independent?" with one number. This
+    answers "and *which* of them are not?", by decomposing the empirical copula
+    process into one component per subset (Genest and Remillard 2004). The
+    components are asymptotically independent under the null, which is what
+    makes reading them separately legitimate.
+
+    It routinely finds structure a global test cannot report: three variables
+    can be pairwise independent and jointly dependent, and only the
+    three-element subset shows it.
+
+    Parameters
+    ----------
+    data : array_like, shape (n, d)
+    n_rep : int
+        Permutations. The null is generated by permuting each column
+        independently, which is exact rather than asymptotic.
+    random_state : None, int or Generator
+    ties_method : str
+        Passed to :func:`~rcopula.pseudo_obs`.
+
+    Returns
+    -------
+    DependogramResult
+
+    Notes
+    -----
+    Cost is :math:`O(n^2 2^d)` per permutation, because each subset needs an
+    :math:`n \times n` matrix product. That is fine to a few hundred
+    observations in a handful of dimensions and prohibitive beyond; subsample
+    rather than wait.
+
+    **Ties cost power.** The statistic is built from the empirical copula, and
+    heavily tied margins make that coarse. The same pairwise-independent
+    construction below is detected easily with continuous margins and not at all
+    when the coordinates take two values each -- so for count or binary data,
+    read a non-significant subset as uninformative rather than as evidence of
+    independence.
+
+    Examples
+    --------
+    Pairwise independent and jointly dependent -- the case a global test can
+    detect but not locate. With :math:`Z = (X + Y) \bmod 1` every pair is
+    exactly independent, while the triple is deterministic:
+
+    >>> import numpy as np
+    >>> from rcopula.htest import dependogram
+    >>> rng = np.random.default_rng(0)
+    >>> x, y = rng.uniform(size=(2, 400))
+    >>> data = np.column_stack([x, y, (x + y) % 1.0])
+    >>> result = dependogram(data, n_rep=200, random_state=1)
+    >>> result.significant()
+    [(0, 1, 2)]
+
+    Genuinely independent data leaves every subset alone:
+
+    >>> quiet = dependogram(rng.uniform(size=(300, 3)), n_rep=200, random_state=1)
+    >>> quiet.significant()
+    []
+    """
+    u = np.asarray(pseudo_obs(np.asarray(data, dtype=np.float64), ties_method=ties_method))
+    n, d = u.shape
+    if d < 2:
+        raise ValueError(f"a dependogram needs at least 2 columns, got {d}")
+    rng = _rng(random_state)
+
+    subsets = [tuple(s) for size in range(2, d + 1) for s in itertools.combinations(range(d), size)]
+    matrices = _mobius_matrices(u)
+    observed = _subset_statistics(matrices, subsets)
+
+    replicates = np.empty((n_rep, len(subsets)))
+    for b in range(n_rep):
+        # Permuting a column permutes its matrix by the same permutation in
+        # both axes, so the matrices are reindexed rather than rebuilt.
+        permuted = np.empty_like(matrices)
+        for j in range(d):
+            order = rng.permutation(n)
+            permuted[j] = matrices[j][np.ix_(order, order)]
+        replicates[b] = _subset_statistics(permuted, subsets)
+
+    pvalues = np.array([_pesarin(replicates[:, k], observed[k]) for k in range(len(subsets))])
+    # The global test uses the smallest p-value, calibrated against the smallest
+    # p-value each permutation would have produced -- which accounts for the
+    # multiplicity exactly instead of assuming independence between subsets.
+    replicate_min = np.array(
+        [
+            min(_pesarin(replicates[:, k], replicates[b, k]) for k in range(len(subsets)))
+            for b in range(n_rep)
+        ]
+    )
+    global_pvalue = float((0.5 + np.sum(replicate_min <= pvalues.min())) / (n_rep + 1))
+
+    return DependogramResult(
+        subsets=subsets,
+        statistics=observed,
+        pvalues=pvalues,
+        global_pvalue=global_pvalue,
+        n_rep=n_rep,
+    )

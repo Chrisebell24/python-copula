@@ -34,6 +34,9 @@ Everything below is in `main` and not yet published to PyPI.
   copula (Cambou–Hofert–Lemieux 2017), plus antithetic pairing and Latin
   hypercube designs, and `variance_ratio` to measure what each actually bought
   rather than assuming the theoretical rate.
+- **Dependogram** (`rcopula.dependogram`, `rcopula.plots.dependogram_plot`).
+  Independence decomposed over every subset of the coordinates via the Mobius
+  transform, so it locates the dependence rather than only detecting it.
 - **Joint fitting of margins and copula** (`rcopula.fit_joint`, R's `fitMvdc`),
   by inference functions for margins or full maximum likelihood.
 - **Automatic family selection** (`rcopula.select_copula`), **vines**

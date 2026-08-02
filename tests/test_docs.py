@@ -106,7 +106,7 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "to_json",
             ],
         ),
-        ("api/gof", ["gof_test", "exch_test", "rad_sym_test"]),
+        ("api/gof", ["gof_test", "exch_test", "rad_sym_test", "dependogram"]),
         (
             "api/transforms",
             [
@@ -120,7 +120,7 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "variance_ratio",
             ],
         ),
-        ("api/plots", ["tail_concentration", "kendall_plot", "pickands_plot"]),
+        ("api/plots", ["tail_concentration", "kendall_plot", "pickands_plot", "dependogram_plot"]),
         (
             "api/applications",
             [
