@@ -1,0 +1,85 @@
+rcopula — NOTICE
+================
+
+Relationship to the R `copula` package
+--------------------------------------
+
+`rcopula` reproduces the *functionality* of the R package `copula` (Marius Hofert,
+Ivan Kojadinovic, Martin Maechler, Jun Yan), which is licensed under GPL (>= 3).
+
+`rcopula` is licensed under the MIT License and is **not** a derivative work of
+the R package. Specifically:
+
+1. **No R source code was translated into this project.** Every algorithm is
+   implemented from its originating published paper. Each module docstring cites
+   the reference it was implemented from.
+
+2. **The R package is used only as a behavioural test oracle.** The scripts under
+   `tools/rgolden/` are original work written for this project; they merely *call*
+   the R package to record its numeric outputs into `tests/golden/`. Comparing
+   outputs is a black-box conformance test, not copying.
+
+3. **Names, signatures and numerical results are not copyrightable.** Matching an
+   API and matching the values a published algorithm produces does not create a
+   derivative work.
+
+Anyone contributing to `rcopula` must follow the clean-room rule documented in
+`CONTRIBUTING.md`.
+
+Primary references implemented
+------------------------------
+
+- Nelsen, R. B. (2006). *An Introduction to Copulas*, 2nd ed. Springer.
+- Joe, H. (2014). *Dependence Modeling with Copulas*. Chapman & Hall/CRC.
+- Hofert, M., Kojadinovic, I., Maechler, M., Yan, J. (2018).
+  *Elements of Copula Modeling with R*. Springer.
+- Genest, C., Ghoudi, K., Rivest, L.-P. (1995). A semiparametric estimation
+  procedure of dependence parameters in multivariate families of distributions.
+  *Biometrika* 82(3), 543–552.  [maximum pseudo-likelihood + its asymptotic variance]
+- Genest, C., Rémillard, B., Beaudoin, D. (2009). Goodness-of-fit tests for
+  copulas: A review and a power study. *Insurance: Mathematics and Economics*
+  44(2), 199–213.  [Sn, SnB, SnC; parametric bootstrap]
+- Genest, C., Huang, W., Dufour, J.-M. (2013). A regularized goodness-of-fit test
+  for copulas. *Journal de la Société Française de Statistique* 154(1), 64–77.  [Rn]
+- Kojadinovic, I. (2017). Some copula inference procedures adapted to the presence
+  of ties. *Computational Statistics & Data Analysis* 112, 24–41.  [ties handling]
+- Hofert, M. (2011). Efficiently sampling nested Archimedean copulas.
+  *Computational Statistics & Data Analysis* 55(1), 57–70.
+  [exponentially tilted stable double-rejection sampling]
+- Hofert, M. (2008). Sampling Archimedean copulas. *Computational Statistics &
+  Data Analysis* 52(12), 5163–5174.
+- Marshall, A. W., Olkin, I. (1988). Families of multivariate distributions.
+  *JASA* 83(403), 834–841.  [frailty / mixture sampling algorithm]
+- McNeil, A. J., Nešlehová, J. (2009). Multivariate Archimedean copulas,
+  d-monotone functions and l1-norm symmetric distributions.
+  *Annals of Statistics* 37(5B), 3059–3097.  [radial part]
+- Segers, J., Sibuya, M., Tsukahara, H. (2017). The empirical beta copula.
+  *Journal of Multivariate Analysis* 155, 35–51.
+- Gudendorf, G., Segers, J. (2011). Nonparametric estimation of multivariate
+  extreme-value copulas. *Journal of Statistical Planning and Inference* 141(9),
+  3073–3085.  [Pickands, CFG, Hall–Tajvidi estimators]
+- Grønneberg, S., Hjort, N. L. (2014). The copula information criteria.
+  *Scandinavian Journal of Statistics* 41(2), 436–459.  [cross-validation]
+- Genz, A., Bretz, F. (2009). *Computation of Multivariate Normal and t
+  Probabilities*. Springer Lecture Notes in Statistics 195.
+- Chambers, J. M., Mallows, C. L., Stuck, B. W. (1976). A method for simulating
+  stable random variables. *JASA* 71(354), 340–344.
+- Devroye, L. (2009). Random variate generation for exponentially and polynomially
+  tilted stable distributions. *ACM TOMACS* 19(4), 1–20.
+- Kemp, A. W. (1981). Efficient generation of logarithmically distributed
+  pseudo-random variables. *Applied Statistics* 30(3), 249–253.
+- Khoudraji, A. (1995). *Contributions à l'étude des copules et à la modélisation
+  des valeurs extrêmes bivariées*. PhD thesis, Université Laval.
+- Mashal, R., Zeevi, A. (2002). Beyond correlation: Extreme co-movements between
+  financial assets. Columbia University working paper.  [itau.mpl for t copulas]
+- Dissmann, J., Brechmann, E. C., Czado, C., Kurowicka, D. (2013). Selecting and
+  estimating regular vine copulae and application to financial returns.
+  *Computational Statistics & Data Analysis* 59, 52–69.
+
+Bundled datasets
+----------------
+
+Datasets under `rcopula/datasets/` are redistributed for reproducibility of the
+worked examples. Each carries its original source citation in
+`rcopula/datasets/SOURCES.md`. They originate from published academic work and
+are included under the same terms as their original publication.
