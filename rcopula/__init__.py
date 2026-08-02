@@ -59,7 +59,7 @@ from rcopula.core.other import (
 )
 from rcopula.dependence import beta_n, cor_kendall, cor_spearman, pseudo_obs
 from rcopula.distribution import CopulaDistribution, Margin
-from rcopula.fit import CopulaFitResult, fit, loglik_copula
+from rcopula.fit import CopulaFitResult, JointFitResult, fit, fit_joint, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test
 from rcopula.htest import TestResult, ev_test, exch_test, indep_test, rad_sym_test
 from rcopula.kendall import (
@@ -113,6 +113,7 @@ __all__ = [
     "HuslerReissCopula",
     "IndependenceCopula",
     "JoeCopula",
+    "JointFitResult",
     "KhoudrajiCopula",
     "Margin",
     "MarshallOlkinCopula",
@@ -144,6 +145,7 @@ __all__ = [
     "ev_test",
     "exch_test",
     "fit",
+    "fit_joint",
     "fit_nested",
     "fit_vine",
     "garch",

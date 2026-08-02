@@ -156,6 +156,7 @@ can paste them across.
 | `fitCopula(cop, u, method = "mpl")` | `rc.fit(cop, u, method="mpl")` |
 | `pobs(x)` | `rc.pseudo_obs(x)` |
 | `mvdc(cop, margins, paramMargins)` | `rc.CopulaDistribution(cop, margins=[...])` |
+| `fitMvdc(x, mvdc, start)` | `rc.fit_joint(mv, x)` — margins and copula together |
 | `cCopula(u, cop)` | `rc.rosenblatt(cop, u)` |
 | `gofCopula(cop, x, simulation = "mult")` | `rc.gof_test(cop, x, simulation="mult")` |
 | `rotCopula(cop, flip)` | `rc.RotatedCopula(cop, flip)` / `rc.survival(cop)` |

@@ -33,6 +33,7 @@ preserved so code ports across with the strings intact.
 | R | `rcopula` |
 |---|---|
 | `fitCopula(cop, u, method = "mpl")` | `rc.fit(cop, u, method="mpl")` |
+| `fitMvdc(x, mvdc, start)` | `rc.fit_joint(mv, x, method="ifm")` |
 | `coef(fit)` / `vcov(fit)` / `logLik(fit)` | `res.params` / `res.cov_params` / `res.loglik` |
 | `xvCopula(cop, x, k = 10)` | `rc.cross_validate(cop, x, k=10)` |
 | `loglikCopula(par, u, cop)` | `rc.loglik_copula(par, u, cop)` |

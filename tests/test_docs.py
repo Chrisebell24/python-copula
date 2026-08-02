@@ -102,6 +102,7 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "select_copula",
                 "cross_validate",
                 "bootstrap_measure",
+                "fit_joint",
                 "to_json",
             ],
         ),
