@@ -77,6 +77,15 @@ equivalent for.
   GHCN-Daily) and three static UCI tables (abalone, red wine quality, NASA
   aerofoil self-noise) whose SHA-256 is verified on every fetch.
 
+### Documentation
+
+A [vine copula tutorial](docs/vines.md) that reproduces Aas, Czado, Frigessi and
+Bakken (2009) rather than asserting agreement with it: their equation (11) and
+the canonical-vine factorisation of section 2.3, typed out by hand and compared
+against `VineCopula.logpdf` (2e-15), the h-function definition against a finite
+difference, and their count of 12 D-vines and 12 C-vines in four dimensions
+reproduced by enumeration.
+
 ### Examples
 
 Twenty-one scripts, each of which runs and asserts its own claims. New in this

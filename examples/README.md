@@ -53,6 +53,7 @@ sit in a comment block beside the Python so the two can be compared directly.
 | | |
 |---|---|
 | [15](15_vine_copulas.py) | Pair-copula constructions: a different family on every edge |
+| [26](26_vine_tutorial.py) | Vine copulas checked against Aas et al. (2009), equation by equation |
 | [16](16_diagnostic_plots.py) | The nine plots, and what each one is for |
 | [22](22_archimedean_internals.py) | Generators, frailty samplers, and 100 dimensions |
 | [23](23_nested_archimedean.py) | Trees: dependence that varies by branch |

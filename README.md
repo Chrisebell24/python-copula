@@ -125,7 +125,7 @@ data file is ever committed.
 
 ## Examples
 
-Twenty-five scripts in [`examples/`](examples/), each of which **runs and asserts
+Twenty-six scripts in [`examples/`](examples/), each of which **runs and asserts
 its own claims** — so they cannot drift out of date without failing:
 
 ```bash
@@ -188,6 +188,11 @@ can paste them across.
 | `rLatinHypercube` | `rc.sampling.latin_hypercube_rvs(cop, n)` |
 | *(qrng vignette)* | `rc.sampling.quasi_rvs(cop, n)` — Sobol/Halton through the copula |
 | `htrafo(u, cop)` | `rc.htrafo(cop, u)` |
+
+There is a [vine copula tutorial](https://chrisebell24.github.io/python-copula/vines/)
+that reproduces Aas et al. (2009) equation by equation — the D-vine and C-vine
+factorisations agree with the printed formulas to 2e-15, and the paper's count of
+"12 D-vines and 12 C-vines" in four dimensions is reproduced by enumeration.
 
 The full translation table, an API reference, and the notes on where R is the
 less accurate side are in the [documentation](https://chrisebell24.github.io/python-copula/)

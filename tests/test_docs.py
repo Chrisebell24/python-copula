@@ -55,6 +55,7 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
         "index.html",
         "concepts/index.html",
         "choosing/index.html",
+        "vines/index.html",
         "r-translation/index.html",
         "parity/index.html",
         "examples/index.html",

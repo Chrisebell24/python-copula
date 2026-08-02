@@ -51,6 +51,7 @@ nav:
   - Home: index.md
   - What copulas are for: concepts.md
   - Choosing a family: choosing.md
+  - Vine copulas: vines.md
   - Coming from R: r-translation.md
   - How parity is verified: parity.md
   - Examples: examples.md
