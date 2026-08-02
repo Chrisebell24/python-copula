@@ -56,6 +56,7 @@ preserved so code ports across with the strings intact.
 | `khoudrajiCopula(c1, c2, shapes)` | `rc.KhoudrajiCopula(c1, c2, shapes)` |
 | `mixCopula(list(c1, c2), w)` | `rc.MixtureCopula([c1, c2], w)` |
 | `margCopula(cop, keep)` | `rc.marginal_copula(cop, indices)` |
+| `fitLambda(x, method = ...)` | `rc.fit_lambda(x)` |
 | `onacopula("G", C(1.5, , list(C(4, 1:3))))` | `rc.NestedArchimedean(rc.GumbelCopula(1.5), children=[...])` |
 | `enacopula(u, cop, method = "etau")` | `rc.fit_nested(structure, u)` |
 

@@ -474,3 +474,184 @@ class TestHtrafo:
         copula = rc.ClaytonCopula(8.0, dim=6)
         y = htrafo(copula, copula.rvs(2000, random_state=0))
         assert np.all((y >= 0.0) & (y <= 1.0))
+
+
+class TestFitLambda:
+    """Nonparametric tail dependence.
+
+    The estimator is accurate where there is genuine tail dependence and
+    *systematically positive* where there is none, because the Gaussian
+    copula's coefficient converges to zero only logarithmically. Both halves
+    are tested: the first is the point of the function, the second is the trap
+    it exists to make visible.
+    """
+
+    @pytest.mark.parametrize(
+        "copula",
+        [
+            rc.ClaytonCopula.from_tau(0.5),
+            rc.GumbelCopula.from_tau(0.5),
+            rc.StudentCopula.from_tau(0.5, df=3.0),
+        ],
+        ids=lambda c: type(c).__name__,
+    )
+    def test_it_recovers_a_nonzero_coefficient(self, copula: rc.Copula) -> None:
+        from rcopula.dependence import fit_lambda
+
+        estimate = fit_lambda(copula.rvs(20_000, random_state=0))
+        truth = copula.lambda_()
+        for observed, expected in (
+            (estimate.lower, truth.lower),
+            (estimate.upper, truth.upper),
+        ):
+            if expected > 0.0:
+                assert abs(observed - expected) < 0.1
+
+    @pytest.mark.parametrize(
+        "copula",
+        [
+            rc.ClaytonCopula.from_tau(0.5),
+            rc.GumbelCopula.from_tau(0.5),
+            rc.FrankCopula.from_tau(0.5),
+            rc.GaussianCopula.from_tau(0.5),
+        ],
+        ids=lambda c: type(c).__name__,
+    )
+    def test_a_zero_coefficient_comes_back_small_but_not_zero(self, copula: rc.Copula) -> None:
+        # This is the finite-threshold bias, not an error: at any usable k the
+        # corner still holds more points than an asymptotically independent
+        # copula eventually would. Roughly 0.1 to 0.25 here. Reporting it as a
+        # clean zero would require a threshold no finite sample supports, which
+        # is exactly why `path` exists.
+        from rcopula.dependence import fit_lambda
+
+        estimate = fit_lambda(copula.rvs(20_000, random_state=0))
+        truth = copula.lambda_()
+        for observed, expected in (
+            (estimate.lower, truth.lower),
+            (estimate.upper, truth.upper),
+        ):
+            if expected == 0.0:
+                assert 0.0 <= observed < 0.3
+
+    def test_it_distinguishes_the_two_tails(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        clayton = fit_lambda(rc.ClaytonCopula.from_tau(0.5).rvs(20_000, random_state=0))
+        gumbel = fit_lambda(rc.GumbelCopula.from_tau(0.5).rvs(20_000, random_state=0))
+        assert clayton.lower > 3 * clayton.upper
+        assert gumbel.upper > 3 * gumbel.lower
+
+    def test_the_gaussian_estimate_is_positive_and_should_be_distrusted(self) -> None:
+        # True lambda is exactly zero. Anyone reading a single threshold
+        # estimate as an answer would conclude otherwise, which is why the path
+        # is returned and the docstring says to look at it.
+        from rcopula.dependence import fit_lambda
+
+        estimate = fit_lambda(rc.GaussianCopula.from_tau(0.5).rvs(20_000, random_state=0))
+        assert rc.GaussianCopula.from_tau(0.5).lambda_().upper == 0.0
+        assert estimate.upper > 0.1
+
+    def test_the_path_is_what_separates_them(self) -> None:
+        # A real coefficient gives a plateau; the Gaussian's slides towards zero
+        # as the threshold is pushed out, so the slope against log k is the
+        # discriminator that the point estimate is not.
+        from rcopula.dependence import fit_lambda
+
+        def slope(u: np.ndarray) -> float:
+            path = fit_lambda(u).path
+            keep = path[:, 0] >= 50
+            return float(np.polyfit(np.log(path[keep, 0]), path[keep, 2], 1)[0])
+
+        heavy = slope(rc.StudentCopula.from_tau(0.5, df=3.0).rvs(40_000, random_state=0))
+        light = slope(rc.GaussianCopula.from_tau(0.5).rvs(40_000, random_state=0))
+        assert heavy < 0.5 * light
+
+    def test_independence_gives_nothing_in_either_tail(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        estimate = fit_lambda(rc.IndependenceCopula(2).rvs(20_000, random_state=0))
+        assert estimate.lower < 0.1
+        assert estimate.upper < 0.1
+
+    def test_the_standard_error_shrinks_with_the_threshold(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        data = rc.ClaytonCopula.from_tau(0.5).rvs(20_000, random_state=0)
+        assert fit_lambda(data, k=2000).lower_se < fit_lambda(data, k=100).lower_se
+
+    def test_the_log_method_also_works(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        data = rc.GumbelCopula.from_tau(0.5).rvs(20_000, random_state=0)
+        estimate = fit_lambda(data, method="log")
+        assert estimate.method == "log"
+        assert abs(estimate.upper - rc.GumbelCopula.from_tau(0.5).lambda_().upper) < 0.1
+
+    @pytest.mark.parametrize(
+        "copula",
+        [rc.ClaytonCopula.from_tau(0.5), rc.GumbelCopula.from_tau(0.5)],
+        ids=lambda c: type(c).__name__,
+    )
+    def test_the_two_estimators_agree(self, copula: rc.Copula) -> None:
+        # They are different formulas for the same quantity, so a disagreement
+        # means one of them is wrong. An earlier version of the log estimator
+        # returned the two tails swapped, and this is what catches that.
+        from rcopula.dependence import fit_lambda
+
+        data = copula.rvs(20_000, random_state=0)
+        counting = fit_lambda(data, method="schmidt-stadtmuller")
+        logarithmic = fit_lambda(data, method="log")
+        assert abs(counting.lower - logarithmic.lower) < 0.02
+        assert abs(counting.upper - logarithmic.upper) < 0.02
+
+    @pytest.mark.parametrize("method", ["schmidt-stadtmuller", "log"])
+    def test_the_boundary_cases_are_exact(self, method: str) -> None:
+        # Comonotone is 1 in both tails and independence is 0 in both, with no
+        # threshold effect either way -- so these are the two places an
+        # estimator has no excuse.
+        from rcopula.dependence import fit_lambda
+
+        comonotone = fit_lambda(rc.FrechetUpperCopula(2).rvs(20_000, random_state=0), method=method)
+        assert comonotone.lower == pytest.approx(1.0, abs=1e-12)
+        assert comonotone.upper == pytest.approx(1.0, abs=1e-12)
+
+        independent = fit_lambda(
+            rc.IndependenceCopula(2).rvs(20_000, random_state=0), method=method
+        )
+        assert independent.lower == pytest.approx(0.0, abs=1e-12)
+        assert independent.upper == pytest.approx(0.0, abs=1e-12)
+
+    def test_estimates_stay_in_the_unit_interval(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        for copula in (rc.ClaytonCopula(20.0), rc.IndependenceCopula(2), rc.GumbelCopula(12.0)):
+            estimate = fit_lambda(copula.rvs(5000, random_state=0), k=40)
+            assert 0.0 <= estimate.lower <= 1.0
+            assert 0.0 <= estimate.upper <= 1.0
+            assert np.all((estimate.path[:, 1:] >= 0.0) & (estimate.path[:, 1:] <= 1.0))
+
+    def test_summary_warns_about_the_threshold(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        text = fit_lambda(rc.ClaytonCopula(2.0).rvs(2000, random_state=0)).summary()
+        assert "threshold estimates" in text
+        assert "95% lower" in text
+
+    def test_rejects_a_non_bivariate_input(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        with pytest.raises(ValueError, match="bivariate"):
+            fit_lambda(rc.ClaytonCopula(2.0, dim=3).rvs(200, random_state=0))
+
+    def test_rejects_an_impossible_threshold(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        with pytest.raises(ValueError, match="1 <= k < n"):
+            fit_lambda(rc.ClaytonCopula(2.0).rvs(200, random_state=0), k=500)
+
+    def test_rejects_an_unknown_method(self) -> None:
+        from rcopula.dependence import fit_lambda
+
+        with pytest.raises(ValueError, match="schmidt-stadtmuller"):
+            fit_lambda(rc.ClaytonCopula(2.0).rvs(200, random_state=0), method="hill")

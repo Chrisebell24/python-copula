@@ -57,7 +57,14 @@ from rcopula.core.other import (
     MarshallOlkinCopula,
     PlackettCopula,
 )
-from rcopula.dependence import beta_n, cor_kendall, cor_spearman, pseudo_obs
+from rcopula.dependence import (
+    TailEstimate,
+    beta_n,
+    cor_kendall,
+    cor_spearman,
+    fit_lambda,
+    pseudo_obs,
+)
 from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, JointFitResult, fit, fit_joint, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test
@@ -136,6 +143,7 @@ __all__ = [
     "StudentCopula",
     "TEVCopula",
     "TailDependence",
+    "TailEstimate",
     "TawnCopula",
     "TestResult",
     "VineCopula",
@@ -157,6 +165,7 @@ __all__ = [
     "exch_test",
     "fit",
     "fit_joint",
+    "fit_lambda",
     "fit_nested",
     "fit_vine",
     "garch",

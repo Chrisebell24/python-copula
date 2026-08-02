@@ -34,6 +34,10 @@ Everything below is in `main` and not yet published to PyPI.
   copula (Cambou–Hofert–Lemieux 2017), plus antithetic pairing and Latin
   hypercube designs, and `variance_ratio` to measure what each actually bought
   rather than assuming the theoretical rate.
+- **Nonparametric tail dependence** (`rcopula.fit_lambda`, R's `fitLambda`).
+  Two estimators with standard errors, and the whole threshold path, because
+  there is no threshold-free estimator of a tail coefficient and reading one
+  number off a plateau is the only defensible way to use it.
 - **Lower-dimensional margins** (`rcopula.marginal_copula`, R's `margCopula`).
   R supports the elliptical and Archimedean classes only; the structural
   constructions come too, and a nested Archimedean's bivariate margin is read
