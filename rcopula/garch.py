@@ -67,6 +67,7 @@ Barone-Adesi, G., Giannopoulos, K. and Vosper, L. (1999). VaR without
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -333,17 +334,28 @@ def fit_garch(
         start.append(8.0)
         bounds.append((_MIN_DF, _MAX_DF))
 
-    opt = optimize.minimize(
-        _neg_loglik,
-        np.array(start),
-        args=(y, dist, 1.0),
-        method="SLSQP",
-        bounds=bounds,
-        constraints=[
-            {"type": "ineq", "fun": lambda t: _MAX_PERSISTENCE - t[2] - t[3]},
-        ],
-        options={"maxiter": 500, "ftol": 1e-10},
-    )
+    with warnings.catch_warnings():
+        # SLSQP evaluates trial points outside the box during its line search
+        # and clips them, which older SciPy announces and newer SciPy does not.
+        # It describes the optimiser working normally, so it is silenced -- but
+        # by exact message, so a genuine RuntimeWarning from the likelihood
+        # itself still surfaces rather than being swallowed with it.
+        warnings.filterwarnings(
+            "ignore",
+            message="Values in x were outside bounds",
+            category=RuntimeWarning,
+        )
+        opt = optimize.minimize(
+            _neg_loglik,
+            np.array(start),
+            args=(y, dist, 1.0),
+            method="SLSQP",
+            bounds=bounds,
+            constraints=[
+                {"type": "ineq", "fun": lambda t: _MAX_PERSISTENCE - t[2] - t[3]},
+            ],
+            options={"maxiter": 500, "ftol": 1e-10},
+        )
     theta = opt.x
     mu, omega, alpha, beta = (float(v) for v in theta[:4])
     df = float(theta[4]) if dist == "t" else None
