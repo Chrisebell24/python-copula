@@ -22,6 +22,7 @@ from rcopula import (
     plots,
     portfolio,
     risk,
+    sampling,
     serialize,
 )
 from rcopula.core.archimedean import (
@@ -83,6 +84,7 @@ from rcopula.transforms import (
     conditional_cdf,
     conditional_ppf,
     htrafo,
+    inverse_rosenblatt,
     radial_simplex,
     rosenblatt,
 )
@@ -150,6 +152,7 @@ __all__ = [
     "htrafo",
     "indep_test",
     "insurance",
+    "inverse_rosenblatt",
     "kendall_cdf",
     "kendall_empirical",
     "kendall_pdf",
@@ -166,6 +169,7 @@ __all__ = [
     "return_period_level",
     "risk",
     "rosenblatt",
+    "sampling",
     "select_copula",
     "serialize",
     "survival",

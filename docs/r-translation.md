@@ -69,6 +69,9 @@ preserved so code ports across with the strings intact.
 | `retstable(n, V0, h, alpha)` | `rcopula.special.stable.retstable(...)` |
 | `htrafo(u, cop)` | `rc.htrafo(cop, u)` |
 | *(no equivalent)* | `rc.radial_simplex(cop, u)` — the McNeil-Neslehova split |
+| inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |
+| `rAntitheticVariates(n, d)` | `rc.sampling.antithetic_rvs(cop, n)` |
+| `rLatinHypercube(n, d)` | `rc.sampling.latin_hypercube_rvs(cop, n)` |
 
 ## Things R has no equivalent for
 
@@ -87,6 +90,8 @@ Not translations -- there is nothing on the left-hand side to translate.
 | ...for a fitted parameter | `rc.bootstrap.bootstrap_fit(x, cop)` |
 | Save a model to a readable file | `rc.serialize.to_json(cop)` / `from_json(text)` |
 | Vines (R/C/D) | `rc.fit_vine(u, structure="D")` |
+| Sobol/Halton draws from a copula | `rc.sampling.quasi_rvs(cop, n)` |
+| Measure what variance reduction bought | `rc.sampling.variance_ratio(cop, payoff, n)` |
 
 ## Differences worth knowing
 

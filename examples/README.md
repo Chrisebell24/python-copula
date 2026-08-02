@@ -52,3 +52,4 @@ sit in a comment block beside the Python so the two can be compared directly.
 |---|---|
 | [15](15_vine_copulas.py) | Pair-copula constructions: a different family on every edge |
 | [16](16_diagnostic_plots.py) | The nine plots, and what each one is for |
+| [21](21_quasi_random_sampling.py) | Getting the same answer with fewer draws — and when it fails |

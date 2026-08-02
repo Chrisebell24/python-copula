@@ -39,7 +39,14 @@ from rcopula.core.archimedean import ArchimedeanCopula
 from rcopula.core.base import Copula
 from rcopula.core.elliptical import GaussianCopula, StudentCopula
 
-__all__ = ["conditional_cdf", "conditional_ppf", "htrafo", "radial_simplex", "rosenblatt"]
+__all__ = [
+    "conditional_cdf",
+    "conditional_ppf",
+    "htrafo",
+    "inverse_rosenblatt",
+    "radial_simplex",
+    "rosenblatt",
+]
 
 #: Step for the numerical fallback. Copula CDFs are smooth in the conditioning
 #: argument, so a modest step is both accurate and safe near the boundary.
@@ -279,6 +286,106 @@ def rosenblatt(copula: Copula, u: ArrayLike) -> NDArray[np.float64]:
         f"the Rosenblatt transform for {copula.name} copulas is implemented for "
         "dim=2 only; Archimedean and elliptical families support any dimension"
     )
+
+
+#: Bisection steps for the generic inverse Rosenblatt transform. Each halves
+#: the bracket, so 60 takes a unit interval below 1e-18 -- past double
+#: precision, and therefore as exact as the forward transform it inverts.
+_BISECTION_STEPS = 60
+
+
+def inverse_rosenblatt(copula: Copula, z: ArrayLike) -> NDArray[np.float64]:
+    r"""Inverse Rosenblatt transform: independent uniforms to copula draws.
+
+    The other direction of :func:`rosenblatt`, and the reason it matters is
+    sampling. ``rvs`` draws its own randomness; this takes randomness you supply,
+    which is what lets a **quasi-random** point set be pushed through a copula --
+    see :mod:`rcopula.sampling`. It is also how conditional simulation works:
+    fix the first coordinates, vary the rest.
+
+    Parameters
+    ----------
+    copula : Copula
+    z : array_like, shape (n, d)
+        Independent uniforms.
+
+    Returns
+    -------
+    ndarray, shape (n, d)
+        Draws from ``copula``.
+
+    Notes
+    -----
+    Elliptical copulas invert analytically. Everything else is inverted by
+    bisection **against :func:`rosenblatt` itself**, so the two are exact
+    inverses by construction rather than by two derivations agreeing -- which is
+    the failure mode this arrangement removes. The conditional CDF is monotone
+    in its own argument, so bisection cannot fail; 60 steps takes the bracket
+    below double precision.
+
+    Examples
+    --------
+    Round trip, in both directions:
+
+    >>> import numpy as np, rcopula as rc
+    >>> from rcopula.transforms import inverse_rosenblatt, rosenblatt
+    >>> cop = rc.ClaytonCopula(3.0, dim=3)
+    >>> u = cop.rvs(500, random_state=0)
+    >>> bool(np.max(np.abs(inverse_rosenblatt(cop, rosenblatt(cop, u)) - u)) < 1e-9)
+    True
+
+    Independent uniforms in, correctly dependent draws out:
+
+    >>> rng = np.random.default_rng(0)
+    >>> z = rng.uniform(size=(20000, 2))
+    >>> u = inverse_rosenblatt(rc.GumbelCopula(2.0), z)
+    >>> bool(abs(rc.cor_kendall(u)[0, 1] - 0.5) < 0.02)
+    True
+    """
+    arr = np.clip(np.atleast_2d(np.asarray(z, dtype=np.float64)), 1e-12, 1.0 - 1e-12)
+    d = arr.shape[1]
+    if d != copula.dim:
+        raise ValueError(f"z has {d} columns but the copula has dim={copula.dim}")
+
+    if isinstance(copula, GaussianCopula | StudentCopula):
+        is_t = isinstance(copula, StudentCopula)
+        nu = copula.df if isinstance(copula, StudentCopula) else 0.0
+        sigma = copula.sigma()
+        x = np.empty_like(arr)
+        x[:, 0] = student_t.ppf(arr[:, 0], nu) if is_t else ndtri(arr[:, 0])
+        for k in range(1, d):
+            s11 = sigma[:k, :k]
+            s12 = sigma[:k, k]
+            solved = np.linalg.solve(s11, s12)
+            mean = x[:, :k] @ solved
+            var = float(sigma[k, k] - s12 @ solved)
+            if is_t:
+                quad = np.einsum("ij,ij->i", x[:, :k], np.linalg.solve(s11, x[:, :k].T).T)
+                scale = np.sqrt(var * (nu + quad) / (nu + k))
+                x[:, k] = mean + scale * student_t.ppf(arr[:, k], nu + k)
+            else:
+                x[:, k] = mean + np.sqrt(var) * ndtri(arr[:, k])
+        return np.clip(student_t.cdf(x, nu) if is_t else ndtr(x), 1e-12, 1.0 - 1e-12)
+
+    # Filled with a valid interior point rather than np.empty: the k-th output
+    # of rosenblatt depends only on coordinates 0..k, so the columns past k
+    # cannot change the answer -- but they are still evaluated, and uninitialised
+    # memory there produces warnings and, at 0 or 1, non-finite generator values.
+    out = np.full_like(arr, 0.5)
+    out[:, 0] = arr[:, 0]
+    for k in range(1, d):
+        low = np.full(arr.shape[0], 1e-12)
+        high = np.full(arr.shape[0], 1.0 - 1e-12)
+        probe = out.copy()
+        for _ in range(_BISECTION_STEPS):
+            middle = 0.5 * (low + high)
+            probe[:, k] = middle
+            value = rosenblatt(copula, probe)[:, k]
+            below = value < arr[:, k]
+            low = np.where(below, middle, low)
+            high = np.where(below, high, middle)
+        out[:, k] = 0.5 * (low + high)
+    return out
 
 
 # --------------------------------------------------------------------------

@@ -108,7 +108,16 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
         ("api/gof", ["gof_test", "exch_test", "rad_sym_test"]),
         (
             "api/transforms",
-            ["rosenblatt", "kendall_cdf", "kendall_return_period", "htrafo", "radial_simplex"],
+            [
+                "rosenblatt",
+                "inverse_rosenblatt",
+                "kendall_cdf",
+                "kendall_return_period",
+                "htrafo",
+                "radial_simplex",
+                "quasi_rvs",
+                "variance_ratio",
+            ],
         ),
         ("api/plots", ["tail_concentration", "kendall_plot", "pickands_plot"]),
         (

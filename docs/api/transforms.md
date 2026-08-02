@@ -3,3 +3,4 @@
 ::: rcopula.transforms
 ::: rcopula.kendall
 ::: rcopula.core.measures
+::: rcopula.sampling

@@ -29,6 +29,11 @@ Everything below is in `main` and not yet published to PyPI.
 - **`htrafo` and `radial_simplex`** (`rcopula.transforms`). The Hering–Hofert
   transform needs no high-order generator derivatives, so it works at *d* = 100
   where the Rosenblatt transform degrades.
+- **Quasi-random and variance-reduced sampling** (`rcopula.sampling`), on top of
+  a new `inverse_rosenblatt`. Sobol and Halton point sets pushed through the
+  copula (Cambou–Hofert–Lemieux 2017), plus antithetic pairing and Latin
+  hypercube designs, and `variance_ratio` to measure what each actually bought
+  rather than assuming the theoretical rate.
 - **Automatic family selection** (`rcopula.select_copula`), **vines**
   (`rcopula.vine`), **nested Archimedean copulas** and the **exponentially tilted
   stable sampler** they need (`rcopula.special.stable.retstable`) — none of which
@@ -54,9 +59,10 @@ Everything below is in `main` and not yet published to PyPI.
 
 ### Examples
 
-Twenty scripts, each of which runs and asserts its own claims. New in this
+Twenty-one scripts, each of which runs and asserts its own claims. New in this
 cycle: vines, the nine diagnostic plots, science and engineering domains,
-statistics and machine learning, time-varying dependence, and count data.
+statistics and machine learning, time-varying dependence, count data, and
+quasi-random sampling.
 
 ## 0.1.0 — unreleased
 

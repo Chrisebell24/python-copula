@@ -125,7 +125,7 @@ data file is ever committed.
 
 ## Examples
 
-Twenty scripts in [`examples/`](examples/), each of which **runs and asserts
+Twenty-one scripts in [`examples/`](examples/), each of which **runs and asserts
 its own claims** — so they cannot drift out of date without failing:
 
 ```bash
@@ -139,7 +139,7 @@ spread options, pairs trading, copula-GARCH, operational risk); hydrology,
 climate compound extremes, structural reliability and survival analysis; the
 statistics and machine-learning uses (mutual information, robust covariance,
 synthetic data, conditional independence); vines; the nine diagnostic plots;
-time-varying dependence; and count data.
+time-varying dependence; count data; and quasi-random sampling.
 
 ## Coming from R?
 
@@ -176,6 +176,10 @@ can paste them across.
 | *(no equivalent)* | `rc.discrete.fit_discrete(x, cop, margins)` — exact likelihood for counts |
 | *(no equivalent)* | `rc.bootstrap.bootstrap_measure(u, "tau")` — BCa intervals, `n_jobs=` |
 | *(no equivalent)* | `rc.serialize.to_json(cop)` — a model file you can read and diff |
+| `rtrafo` / inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |
+| `rAntitheticVariates` | `rc.sampling.antithetic_rvs(cop, n)` |
+| `rLatinHypercube` | `rc.sampling.latin_hypercube_rvs(cop, n)` |
+| *(qrng vignette)* | `rc.sampling.quasi_rvs(cop, n)` — Sobol/Halton through the copula |
 | `htrafo(u, cop)` | `rc.htrafo(cop, u)` |
 
 The full translation table, an API reference, and the notes on where R is the
