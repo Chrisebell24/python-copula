@@ -39,6 +39,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike, NDArray
 from scipy import optimize, stats
+from scipy.stats import qmc
 
 from rcopula.core.base import Copula
 from rcopula.core.elliptical import EllipticalCopula, P2p, StudentCopula, p2P
@@ -273,7 +274,11 @@ def _optimise(
 
     def negative_loglik(x: NDArray[np.float64]) -> float:
         value = loglik_copula(unpack(x), u, copula)
-        # Optimisers dislike -inf; a large finite penalty steers them back.
+        # Optimisers dislike -inf, so infeasible parameters get a large finite
+        # penalty. It is deliberately flat: a sloped one carries a gradient of
+        # order 1e10, which wrecks a quasi-Newton line search far more
+        # thoroughly than the plateau it was meant to fix. The plateau is
+        # handled below instead, by not trusting a single optimiser.
         return 1e10 if not np.isfinite(value) else -value
 
     # Nudge the bounds inward: most families are undefined at their endpoints.
@@ -289,26 +294,77 @@ def _optimise(
     )
 
     method = optim_method or ("L-BFGS-B" if x0.size > 1 else "Nelder-Mead")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        if method == "Nelder-Mead":
-            res = optimize.minimize(
+
+    def run(which: str, guess: NDArray[np.float64]) -> optimize.OptimizeResult:
+        if which == "Nelder-Mead":
+            return optimize.minimize(
                 negative_loglik,
-                x0,
+                guess,
                 method="Nelder-Mead",
                 bounds=span,
                 options={"xatol": 1e-10, "fatol": 1e-10, "maxiter": 5000},
             )
-        else:
-            res = optimize.minimize(
-                negative_loglik,
-                x0,
-                method=method,
-                bounds=span,
-                options={"maxiter": 5000},
-            )
+        return optimize.minimize(
+            negative_loglik, guess, method=which, bounds=span, options={"maxiter": 5000}
+        )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = run(method, x0)
+        if optim_method is None and method != "Nelder-Mead":
+            # Two ways a multi-parameter fit ends somewhere that is not the
+            # maximum, both seen in practice:
+            #
+            #   * the quasi-Newton method steps onto the infeasible plateau,
+            #     where the finite-difference gradient is exactly zero, and
+            #     converges on the spot. This is what returned theta = 77
+            #     instead of 3 for a Khoudraji fit on Linux and Windows while
+            #     passing on macOS -- the platforms' BLAS simply took different
+            #     paths into the same trap.
+            #   * the starting value sits in a basin whose only local maximum is
+            #     degenerate, and every optimiser walks obediently into it.
+            #
+            # A spread of trial starts detects both for the price of a few
+            # likelihood evaluations: the first scores the 1e10 penalty, the
+            # second scores about zero, and in each case a point chosen with no
+            # search at all beats the converged answer -- which is the signal.
+            # Re-running is then rare, so the common case pays only the
+            # evaluations.
+            lower = np.array([s[0] for s in span])
+            upper = np.array([s[1] for s in span])
+            spread = np.clip(_candidate_starts(copula, free), lower, upper)
+            best = min(spread, key=negative_loglik)
+            if negative_loglik(best) < float(res.fun):
+                attempt = run("Nelder-Mead", best)
+                if float(attempt.fun) < float(res.fun):
+                    res = attempt
     res.x_full = unpack(res.x)
     return res
+
+
+def _candidate_starts(copula: Copula, free: NDArray[np.bool_]) -> NDArray[np.float64]:
+    """A spread of alternative starting values over the parameters' working box.
+
+    Two details matter. The declared bounds are useless here -- half the
+    families are unbounded above, and a point a tenth of the way to infinity is
+    not a starting value -- so an infinite side becomes ten units past the
+    finite one, which covers the range these families are actually used in.
+
+    And the points must vary the parameters *independently*. Moving them all
+    together along a diagonal is what a naive spread does, and it cannot find a
+    Khoudraji copula whose right answer pairs a small theta with middling
+    shapes: the diagonal offers small-with-small and large-with-large and
+    nothing else. A scrambled Sobol set covers the box instead, and is
+    deterministic at a fixed seed.
+    """
+    box = []
+    for lo, hi in np.asarray(copula.param_bounds)[free]:
+        low = float(lo) if np.isfinite(lo) else (float(hi) - 10.0)
+        high = float(hi) if np.isfinite(hi) else (low + 10.0)
+        box.append((low, high))
+    span = np.asarray(box, dtype=np.float64)
+    points = qmc.Sobol(d=span.shape[0], scramble=True, seed=0).random(16)
+    return span[:, 0] + points * (span[:, 1] - span[:, 0])
 
 
 def _starting_value(copula: Copula, u: NDArray[np.float64]) -> NDArray[np.float64]:

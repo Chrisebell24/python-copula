@@ -416,3 +416,76 @@ class TestInversionStandardErrorsAboveTwoDimensions:
             for d in (2, 3, 5)
         ]
         assert errors[0] > errors[1] > errors[2]
+
+
+class TestOptimiserRobustness:
+    """The fit must not depend on which platform's BLAS it runs on.
+
+    A Khoudraji fit returned theta = 77 instead of 3 on Linux and Windows while
+    passing on macOS. The cause was not randomness: the quasi-Newton method
+    steps onto the infeasible plateau, where the finite-difference gradient of a
+    flat penalty is exactly zero, and converges there. Different BLAS, different
+    path, same trap.
+
+    These pin both failure modes -- the plateau, and a starting basin whose only
+    local maximum is degenerate -- because a fix that only covers the one that
+    happened to be reported is not a fix.
+    """
+
+    @staticmethod
+    def _khoudraji_data() -> np.ndarray:
+        truth = rc.KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(3.0), [0.4, 0.95])
+        return truth.rvs(4000, random_state=0)
+
+    @staticmethod
+    def _template() -> rc.Copula:
+        return rc.KhoudrajiCopula(rc.IndependenceCopula(2), rc.GumbelCopula(), [0.5, 0.5])
+
+    def test_the_default_start_reaches_the_maximum(self) -> None:
+        result = rc.fit(self._template(), self._khoudraji_data(), method="mpl")
+        assert float(result.copula.copula2.theta) == pytest.approx(3.0, rel=0.2)
+        assert np.allclose(result.copula.shapes, [0.4, 0.95], atol=0.12)
+
+    def test_a_start_inside_the_infeasible_region_still_reaches_it(self) -> None:
+        # theta = 60 with small shapes puts the log-density at NaN, so the
+        # objective is the flat penalty and the gradient is zero.
+        result = rc.fit(
+            self._template(), self._khoudraji_data(), method="mpl", start=[60.0, 0.2, 0.3]
+        )
+        assert float(result.copula.copula2.theta) == pytest.approx(3.0, rel=0.2)
+
+    @pytest.mark.parametrize("start", [[1.2, 0.9, 0.1], [20.0, 0.05, 0.05], [2.0, 0.5, 0.5]])
+    def test_the_answer_does_not_depend_on_where_it_started(self, start: list[float]) -> None:
+        data = self._khoudraji_data()
+        reference = rc.fit(self._template(), data, method="mpl")
+        result = rc.fit(self._template(), data, method="mpl", start=start)
+        assert result.loglik == pytest.approx(reference.loglik, abs=0.01)
+
+    def test_the_guard_does_not_slow_ordinary_fits(self) -> None:
+        # It costs a fixed handful of likelihood evaluations and re-optimises
+        # only when a point picked without any search beats the converged
+        # answer -- which for a well-behaved family never happens.
+        import time
+
+        data = rc.StudentCopula(0.5, df=4.0).rvs(2000, random_state=0)
+        started = time.perf_counter()
+        result = rc.fit(rc.StudentCopula(0.0, df=8.0), data, method="mpl")
+        assert time.perf_counter() - started < 20.0
+        assert float(result.params[0]) == pytest.approx(0.5, abs=0.05)
+
+    @pytest.mark.parametrize(
+        ("template", "truth"),
+        [
+            (rc.ClaytonCopula(1.0), rc.ClaytonCopula(2.0)),
+            (rc.GumbelCopula(1.5), rc.GumbelCopula(2.5)),
+            (rc.FrankCopula(1.0), rc.FrankCopula(5.0)),
+            (rc.JoeCopula(1.5), rc.JoeCopula(2.5)),
+        ],
+        ids=lambda c: type(c).__name__,
+    )
+    def test_single_parameter_families_are_untouched(
+        self, template: rc.Copula, truth: rc.Copula
+    ) -> None:
+        # They use Nelder-Mead already, so the guard must not apply to them.
+        result = rc.fit(template, truth.rvs(2000, random_state=0), method="mpl")
+        assert float(result.params[0]) == pytest.approx(float(truth.params[0]), rel=0.15)
