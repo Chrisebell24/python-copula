@@ -106,7 +106,7 @@ from rcopula.transforms import (
 )
 from rcopula.vine import VineCopula, fit_vine
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0"
 
 __all__ = [
     "AMHCopula",

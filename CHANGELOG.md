@@ -3,9 +3,12 @@
 Dates are ISO. Pre-1.0 the API may change; breaking changes are listed first in
 each release.
 
-## Unreleased
+## 0.1.0
 
-Everything below is in `main` and not yet published to PyPI.
+The first release. All families, `CopulaDistribution`, all five fitting methods
+**with standard errors**, goodness-of-fit and hypothesis tests, the empirical
+copula and `pseudo_obs` — plus everything below, which R's `copula` has no
+equivalent for.
 
 ### Beyond R's `copula`
 
@@ -76,9 +79,3 @@ Twenty-one scripts, each of which runs and asserts its own claims. New in this
 cycle: vines, the nine diagnostic plots, science and engineering domains,
 statistics and machine learning, time-varying dependence, count data, and
 quasi-random sampling.
-
-## 0.1.0 — unreleased
-
-The first published release will cover all families, `CopulaDistribution`, all
-five fitting methods **with standard errors**, goodness-of-fit and hypothesis
-tests, the empirical copula and `pseudo_obs`.
