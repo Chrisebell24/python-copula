@@ -67,6 +67,26 @@ preserved so code ports across with the strings intact.
 | `Kn(u, x)` | `rc.kendall_empirical(x, u)` |
 | `contour(cop, dCopula)` / `persp(...)` | `rc.plots.contour(cop)` / `rc.plots.surface(cop)` |
 | `retstable(n, V0, h, alpha)` | `rcopula.special.stable.retstable(...)` |
+| `htrafo(u, cop)` | `rc.htrafo(cop, u)` |
+| *(no equivalent)* | `rc.radial_simplex(cop, u)` — the McNeil-Neslehova split |
+
+## Things R has no equivalent for
+
+Not translations -- there is nothing on the left-hand side to translate.
+
+| | `rcopula` |
+|---|---|
+| Rank every admissible family at once | `rc.select_copula(u, criterion="bic")` |
+| Dependence that moves over time | `rc.dynamic.fit_dynamic(u, cop, driver="patton")` |
+| ...score-driven instead | `rc.dynamic.fit_dynamic(u, cop, driver="gas")` |
+| A whole correlation matrix that moves | `rc.dynamic.fit_dcc(u)` |
+| Genuinely discrete margins | `rc.discrete.fit_discrete(x, cop, margins)` |
+| ...mixed with a continuous one | `rc.discrete.mixed_pdf(cop, x, margins, discrete)` |
+| The ceiling ties impose on tau | `rc.discrete.tau_upper_bound(margins)` |
+| Bootstrap intervals, in parallel | `rc.bootstrap.bootstrap_measure(u, "tau", n_jobs=4)` |
+| ...for a fitted parameter | `rc.bootstrap.bootstrap_fit(x, cop)` |
+| Save a model to a readable file | `rc.serialize.to_json(cop)` / `from_json(text)` |
+| Vines (R/C/D) | `rc.fit_vine(u, structure="D")` |
 
 ## Differences worth knowing
 
