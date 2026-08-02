@@ -50,6 +50,28 @@ GHCN_ROWS = "\n".join(
 )
 
 
+#: Three rows of each delimited source, enough to exercise the reader offline.
+ABALONE = (
+    b"M,0.455,0.365,0.095,0.514,0.2245,0.101,0.15,15\n"
+    b"F,0.53,0.42,0.135,0.677,0.2565,0.1415,0.21,9\n"
+    b"I,0.33,0.255,0.08,0.205,0.0895,0.0395,0.055,7\n"
+)
+
+WINE = (
+    b'"fixed acidity";"volatile acidity";"citric acid";"residual sugar";"chlorides";'
+    b'"free sulfur dioxide";"total sulfur dioxide";"density";"pH";"sulphates";'
+    b'"alcohol";"quality"\n'
+    b"7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5\n"
+    b"7.8;0.88;0;2.6;0.098;25;67;0.9968;3.2;0.68;9.8;5\n"
+)
+
+AIRFOIL = (
+    b"800\t0.0\t0.3048\t71.3\t0.00266337\t126.201\n"
+    b"1000\t0.0\t0.3048\t71.3\t0.00266337\t125.201\n"
+    b"1250\t0.0\t0.3048\t71.3\t0.00266337\t125.951\n"
+)
+
+
 @pytest.fixture
 def isolated_cache(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setenv("RCOPULA_DATA", str(tmp_path))
@@ -172,6 +194,43 @@ class TestParsing:
         assert frame["tmax"].tolist() == [21.0, 19.5, 23.0]
         assert frame["prcp"].tolist() == [0.0, 5.1, 0.0]
 
+    def test_abalone_has_no_header_to_discard(self, isolated_cache: Path) -> None:
+        (isolated_cache / "uci_abalone.raw").write_bytes(ABALONE)
+        frame = load("uci_abalone", download=False)
+        assert list(frame.columns) == list(available()["uci_abalone"].columns)
+        assert len(frame) == 3
+        assert frame["rings"].tolist() == [15, 9, 7]
+        assert frame["sex"].tolist() == ["M", "F", "I"]
+
+    def test_wine_is_semicolon_separated_and_its_header_is_replaced(
+        self, isolated_cache: Path
+    ) -> None:
+        # Upstream writes 'fixed acidity' with a space and 'pH' with a capital;
+        # the loader replaces the header so callers get stable snake_case.
+        (isolated_cache / "uci_wine_quality_red.raw").write_bytes(WINE)
+        frame = load("uci_wine_quality_red", download=False)
+        assert list(frame.columns) == list(available()["uci_wine_quality_red"].columns)
+        assert "fixed_acidity" in frame.columns
+        assert "ph" in frame.columns
+        assert len(frame) == 2
+        assert frame["alcohol"].tolist() == [9.4, 9.8]
+
+    def test_airfoil_is_whitespace_separated(self, isolated_cache: Path) -> None:
+        (isolated_cache / "uci_airfoil.raw").write_bytes(AIRFOIL)
+        frame = load("uci_airfoil", download=False)
+        assert list(frame.columns) == list(available()["uci_airfoil"].columns)
+        assert frame["frequency"].tolist() == [800, 1000, 1250]
+        assert frame["sound_pressure_level"].tolist() == [126.201, 125.201, 125.951]
+
+    def test_a_wrong_column_count_is_reported_rather_than_mislabelled(
+        self, isolated_cache: Path
+    ) -> None:
+        # Silently naming seven columns with nine names would corrupt every
+        # downstream result, so it raises instead.
+        (isolated_cache / "uci_abalone.raw").write_bytes(b"M,0.455,0.365\n")
+        with pytest.raises(OSError, match="expected 9 columns"):
+            load("uci_abalone", download=False)
+
     def test_a_truncated_download_is_reported(self, isolated_cache: Path) -> None:
         (isolated_cache / "nwis_peaks.raw").write_bytes(b"# only comments\n")
         with pytest.raises(OSError, match="no data rows"):
@@ -196,6 +255,20 @@ class TestParsing:
 @pytest.mark.network
 class TestAgainstTheRealSources:
     """Skipped unless asked for: ``pytest -m network``."""
+
+    @pytest.mark.parametrize("name", ["uci_abalone", "uci_wine_quality_red", "uci_airfoil"])
+    def test_the_pinned_sources_still_match_their_digests(
+        self, name: str, isolated_cache: Path
+    ) -> None:
+        """These three are byte-stable, so the digest is a real check.
+
+        If this fails, the upstream file changed and every result computed from
+        it stops being reproducible -- which is exactly what the digest is for.
+        """
+        frame = load(name)
+        assert list(frame.columns) == list(available()[name].columns)
+        assert len(frame) > 1000
+        assert "CC BY 4.0" in frame.attrs["licence"]
 
     def test_the_flood_series_downloads_and_parses(self, isolated_cache: Path) -> None:
         frame = load("nwis_peaks")

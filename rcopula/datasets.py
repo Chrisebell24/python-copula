@@ -26,7 +26,7 @@ Examples
 --------
 >>> from rcopula.datasets import available
 >>> sorted(available())
-['ghcn_temperature', 'nwis_peaks']
+['ghcn_temperature', 'nwis_peaks', 'uci_abalone', 'uci_airfoil', 'uci_wine_quality_red']
 >>> available()["nwis_peaks"].licence
 'public domain (work of the US Government)'
 """
@@ -121,6 +121,97 @@ _REGISTRY: dict[str, DatasetSpec] = {
             "Menne, M. J. et al. (2012). An overview of the Global Historical "
             "Climatology Network-Daily database. J. Atmos. Oceanic Technol. "
             "29, 897-910. Station USW00023174 (Los Angeles International Airport)."
+        ),
+    ),
+    "uci_abalone": DatasetSpec(
+        name="uci_abalone",
+        description=(
+            "Physical measurements of abalone: eight continuous columns with "
+            "strong, unequal, non-Gaussian dependence. The standard benchmark "
+            "for vine density estimation, and a good case for asymmetric "
+            "families -- the weights are near-comonotone while the shell "
+            "dimensions are not."
+        ),
+        url="https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.data",
+        licence="CC BY 4.0 (UCI Machine Learning Repository)",
+        sha256="de37cdcdcaaa50c309d514f248f7c2302a5f1f88c168905eba23fe2fbc78449f",
+        reader="csv",
+        columns=(
+            "sex",
+            "length",
+            "diameter",
+            "height",
+            "whole_weight",
+            "shucked_weight",
+            "viscera_weight",
+            "shell_weight",
+            "rings",
+        ),
+        citation=(
+            "Nash, W., Sellers, T., Talbot, S., Cawthorn, A. and Ford, W. (1994). "
+            "The Population Biology of Abalone in Tasmania. Sea Fisheries Division "
+            "Technical Report 48. UCI Machine Learning Repository."
+        ),
+    ),
+    "uci_wine_quality_red": DatasetSpec(
+        name="uci_wine_quality_red",
+        description=(
+            "Eleven physicochemical measurements on 1599 red wines, plus an "
+            "ordinal quality score. Continuous margins with a discrete response "
+            "attached, so it exercises rcopula.discrete as well as the vines."
+        ),
+        url=(
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/"
+            "wine-quality/winequality-red.csv"
+        ),
+        licence="CC BY 4.0 (UCI Machine Learning Repository)",
+        sha256="4a402cf041b025d4566d954c3b9ba8635a3a8a01e039005d97d6a710278cf05e",
+        reader="csv",
+        columns=(
+            "fixed_acidity",
+            "volatile_acidity",
+            "citric_acid",
+            "residual_sugar",
+            "chlorides",
+            "free_sulfur_dioxide",
+            "total_sulfur_dioxide",
+            "density",
+            "ph",
+            "sulphates",
+            "alcohol",
+            "quality",
+        ),
+        citation=(
+            "Cortez, P., Cerdeira, A., Almeida, F., Matos, T. and Reis, J. (2009). "
+            "Modeling wine preferences by data mining from physicochemical "
+            "properties. Decision Support Systems 47(4), 547-553."
+        ),
+    ),
+    "uci_airfoil": DatasetSpec(
+        name="uci_airfoil",
+        description=(
+            "NASA aerofoil self-noise: five design variables and a sound "
+            "pressure level. Six smooth continuous columns, small enough that a "
+            "d = 6 vine fits in a second."
+        ),
+        url=(
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/00291/airfoil_self_noise.dat"
+        ),
+        licence="CC BY 4.0 (UCI Machine Learning Repository)",
+        sha256="74c75fd71783f1e6b71f8a622b993dc592897a97cd689c5090a07147a1b097b3",
+        reader="csv",
+        columns=(
+            "frequency",
+            "angle_of_attack",
+            "chord_length",
+            "free_stream_velocity",
+            "displacement_thickness",
+            "sound_pressure_level",
+        ),
+        citation=(
+            "Brooks, T. F., Pope, D. S. and Marcolini, M. A. (1989). Airfoil "
+            "self-noise and prediction. NASA Reference Publication 1218. "
+            "UCI Machine Learning Repository."
         ),
     ),
 }
@@ -321,4 +412,35 @@ def _read_ghcn_csv(payload: bytes, spec: DatasetSpec, **_: Any) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-_READERS = {"usgs_rdb": _read_usgs_rdb, "ghcn_csv": _read_ghcn_csv}
+#: Delimiter and header row for each ``reader="csv"`` dataset. Kept beside the
+#: registry rather than sniffed: a sniffer that guesses wrong turns a
+#: reproducible example into a confusing one, and these files never change --
+#: their digests are pinned.
+_CSV_FORMAT: dict[str, tuple[str, int | None]] = {
+    "uci_abalone": (",", None),
+    "uci_wine_quality_red": (";", 0),
+    "uci_airfoil": (r"\s+", None),
+}
+
+
+def _read_csv(payload: bytes, spec: DatasetSpec, **_: Any) -> pd.DataFrame:
+    """A plain delimited table, with the column names taken from the spec.
+
+    Upstream headers are discarded in favour of ``spec.columns`` so that a
+    caller can rely on the names being snake_case and stable, whatever the
+    donor happened to type.
+    """
+    delimiter, header = _CSV_FORMAT[spec.name]
+    frame = pd.read_csv(
+        io.StringIO(payload.decode("utf-8", errors="replace")),
+        sep=delimiter,
+        header=header,
+        engine="python",
+    )
+    if frame.shape[1] != len(spec.columns):
+        raise OSError(f"{spec.name}: expected {len(spec.columns)} columns, got {frame.shape[1]}")
+    frame.columns = list(spec.columns)
+    return frame
+
+
+_READERS = {"usgs_rdb": _read_usgs_rdb, "ghcn_csv": _read_ghcn_csv, "csv": _read_csv}
