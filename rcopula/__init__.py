@@ -11,6 +11,7 @@ clean-room rule.
 from __future__ import annotations
 
 from rcopula import (
+    bootstrap,
     credit,
     datasets,
     derivatives,
@@ -21,6 +22,7 @@ from rcopula import (
     plots,
     portfolio,
     risk,
+    serialize,
 )
 from rcopula.core.archimedean import (
     AMHCopula,
@@ -126,6 +128,7 @@ __all__ = [
     "VineCopula",
     "__version__",
     "beta_n",
+    "bootstrap",
     "conditional_cdf",
     "conditional_ppf",
     "cor_kendall",
@@ -164,5 +167,6 @@ __all__ = [
     "risk",
     "rosenblatt",
     "select_copula",
+    "serialize",
     "survival",
 ]

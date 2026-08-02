@@ -94,7 +94,17 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "fit_nested",
             ],
         ),
-        ("api/inference", ["fit", "CopulaFitResult", "select_copula", "cross_validate"]),
+        (
+            "api/inference",
+            [
+                "fit",
+                "CopulaFitResult",
+                "select_copula",
+                "cross_validate",
+                "bootstrap_measure",
+                "to_json",
+            ],
+        ),
         ("api/gof", ["gof_test", "exch_test", "rad_sym_test"]),
         (
             "api/transforms",
