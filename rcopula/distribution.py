@@ -173,9 +173,22 @@ class CopulaDistribution:
         density is the copula log density plus the marginal log densities. Doing
         it in logs matters: in even moderate dimensions the product of marginal
         densities underflows long before the joint density is genuinely zero.
+
+        With a discrete margin the quantity is a mass rather than a density and
+        there is no log-domain form to stay in -- the inclusion-exclusion sum has
+        to be taken in the linear domain before the log -- so that case falls
+        back to ``log(pdf(x))`` and inherits its underflow behaviour.
         """
+        arr = self._validate_x(x)
+        if self.discrete.any():
+            with np.errstate(divide="ignore"):
+                return np.asarray(np.log(self.pdf(arr)))
+        u = self._to_uniform(arr)
         with np.errstate(divide="ignore"):
-            return np.log(self.pdf(x))
+            marginal = np.sum(
+                [np.log(m.pdf(arr[:, j])) for j, m in enumerate(self.margins)], axis=0
+            )
+        return np.asarray(self.copula.logpdf(u) + marginal)
 
     def pdf(self, x: ArrayLike) -> NDArray[np.float64]:
         r"""Joint density, or mass, or the mixture of the two.
