@@ -45,6 +45,7 @@ sit in a comment block beside the Python so the two can be compared directly.
 | [17](17_science_and_engineering.py) | Compound climate extremes, structural reliability, frailty and survival |
 | [18](18_machine_learning.py) | Mutual information, robust covariance, synthetic data, conditional independence |
 | [20](20_discrete_margins.py) | Counts and categories, and the copula that is only half identified |
+| [24](24_ties_and_rounding.py) | What rounding does to a copula, and how to notice |
 
 ## High dimensions and diagnostics
 
@@ -52,4 +53,6 @@ sit in a comment block beside the Python so the two can be compared directly.
 |---|---|
 | [15](15_vine_copulas.py) | Pair-copula constructions: a different family on every edge |
 | [16](16_diagnostic_plots.py) | The nine plots, and what each one is for |
+| [22](22_archimedean_internals.py) | Generators, frailty samplers, and 100 dimensions |
+| [23](23_nested_archimedean.py) | Trees: dependence that varies by branch |
 | [21](21_quasi_random_sampling.py) | Getting the same answer with fewer draws — and when it fails |

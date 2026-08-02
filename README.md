@@ -125,7 +125,7 @@ data file is ever committed.
 
 ## Examples
 
-Twenty-one scripts in [`examples/`](examples/), each of which **runs and asserts
+Twenty-four scripts in [`examples/`](examples/), each of which **runs and asserts
 its own claims** — so they cannot drift out of date without failing:
 
 ```bash
@@ -139,7 +139,8 @@ spread options, pairs trading, copula-GARCH, operational risk); hydrology,
 climate compound extremes, structural reliability and survival analysis; the
 statistics and machine-learning uses (mutual information, robust covariance,
 synthetic data, conditional independence); vines; the nine diagnostic plots;
-time-varying dependence; count data; and quasi-random sampling.
+time-varying dependence; count data; quasi-random sampling; Archimedean
+internals at d = 100; nested trees; and what rounding does to a rank statistic.
 
 ## Coming from R?
 
