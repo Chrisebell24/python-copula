@@ -125,7 +125,7 @@ data file is ever committed.
 
 ## Examples
 
-Twenty-four scripts in [`examples/`](examples/), each of which **runs and asserts
+Twenty-five scripts in [`examples/`](examples/), each of which **runs and asserts
 its own claims** — so they cannot drift out of date without failing:
 
 ```bash
@@ -181,6 +181,8 @@ can paste them across.
 | *(no equivalent)* | `rc.discrete.fit_discrete(x, cop, margins)` — exact likelihood for counts |
 | *(no equivalent)* | `rc.bootstrap.bootstrap_measure(u, "tau")` — BCa intervals, `n_jobs=` |
 | *(no equivalent)* | `rc.serialize.to_json(cop)` — a model file you can read and diff |
+| *(no equivalent)* | `rc.statarb.select_pairs(returns)` — rank every pair, six criteria |
+| *(no equivalent)* | `rc.statarb.select_partners(returns, "AAPL")` — vine quadruples |
 | `rtrafo` / inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |
 | `rAntitheticVariates` | `rc.sampling.antithetic_rvs(cop, n)` |
 | `rLatinHypercube` | `rc.sampling.latin_hypercube_rvs(cop, n)` |

@@ -32,6 +32,7 @@ sit in a comment block beside the Python so the two can be compared directly.
 | [08](08_cdo_tranches.py) | Tranche pricing, the correlation skew, and the 2008 failure mode |
 | [09](09_basket_options.py) | Basket and spread options that respect each underlying's own smile |
 | [10](10_pairs_trading.py) | Conditional copula probabilities as a trading signal |
+| [25](25_pairs_selection.py) | Choosing what to trade: six pair rules and four partner rules |
 | [11](11_copula_garch.py) | Volatility in time, dependence in the cross-section |
 | [12](12_operational_risk.py) | Loss-distribution approach and the Basel 99.9% capital number |
 | [19](19_time_varying_dependence.py) | Dependence that moves: Patton, GAS and DCC |

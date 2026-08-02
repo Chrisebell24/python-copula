@@ -569,7 +569,11 @@ def fit_vine(
     from rcopula.core.other import IndependenceCopula
     from rcopula.select import select_copula
 
-    u = pseudo_obs(data)
+    # pseudo_obs preserves a DataFrame, and everything below indexes positionally
+    # with `[:, cols]`, which a DataFrame refuses. Every other entry point in the
+    # package accepts a frame, so this one drops to an array rather than making
+    # the caller remember which is which.
+    u = np.asarray(pseudo_obs(data), dtype=float)
     d = u.shape[1]
     if d < 2:
         raise ValueError(f"a vine needs at least two variables, got {d}")

@@ -24,6 +24,7 @@ from rcopula import (
     risk,
     sampling,
     serialize,
+    statarb,
 )
 from rcopula.core.archimedean import (
     AMHCopula,
@@ -195,5 +196,6 @@ __all__ = [
     "sampling",
     "select_copula",
     "serialize",
+    "statarb",
     "survival",
 ]

@@ -32,6 +32,10 @@ equivalent for.
 - **`htrafo` and `radial_simplex`** (`rcopula.transforms`). The Hering–Hofert
   transform needs no high-order generator derivatives, so it works at *d* = 100
   where the Rosenblatt transform degrades.
+- **Pair and partner selection for statistical arbitrage** (`rcopula.statarb`).
+  Six criteria for pairs and the four vine partner-selection approaches of
+  Stübinger, Mangold and Krauss, including Schmid and Schmidt's multivariate
+  Spearman's rho.
 - **Quasi-random and variance-reduced sampling** (`rcopula.sampling`), on top of
   a new `inverse_rosenblatt`. Sobol and Halton point sets pushed through the
   copula (Cambou–Hofert–Lemieux 2017), plus antithetic pairing and Latin

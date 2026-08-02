@@ -7,6 +7,7 @@ libraries**. Each module states its modelling assumptions.
 ::: rcopula.credit
 ::: rcopula.derivatives
 ::: rcopula.portfolio
+::: rcopula.statarb
 ::: rcopula.garch
 ::: rcopula.dynamic
 ::: rcopula.discrete

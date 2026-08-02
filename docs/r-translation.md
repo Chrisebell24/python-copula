@@ -94,6 +94,8 @@ Not translations -- there is nothing on the left-hand side to translate.
 | ...for a fitted parameter | `rc.bootstrap.bootstrap_fit(x, cop)` |
 | Save a model to a readable file | `rc.serialize.to_json(cop)` / `from_json(text)` |
 | Vines (R/C/D) | `rc.fit_vine(u, structure="D")` |
+| Screen a universe for tradable pairs | `rc.statarb.select_pairs(returns, method=...)` |
+| Pick vine partners for a target | `rc.statarb.select_partners(returns, target)` |
 | Sobol/Halton draws from a copula | `rc.sampling.quasi_rvs(cop, n)` |
 | Measure what variance reduction bought | `rc.sampling.variance_ratio(cop, payoff, n)` |
 
