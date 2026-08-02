@@ -113,8 +113,8 @@ licences and SHA-256 digests, and fetches permissively-licensed sources on first
 use.
 
 ```python
-flood = rc.datasets.load("nwis_peaks")   # USGS, public domain
-wine = rc.datasets.load("uci_wine_quality_red")   # UCI, CC BY 4.0
+flood = rc.datasets.load("nwis_peaks")  # USGS, public domain
+wine = rc.datasets.load("uci_wine_quality_red")  # UCI, CC BY 4.0
 flood.attrs["citation"]
 ```
 
