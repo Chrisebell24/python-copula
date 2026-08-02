@@ -1,0 +1,4757 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Copula modelling in Python, verified against R's copula package">
+      
+      
+      
+      
+        <link rel="prev" href="../families/">
+      
+      
+        <link rel="next" href="../inference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Structural constructions - rcopula</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#structural-constructions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="rcopula" class="md-header__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            rcopula
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Structural constructions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="rcopula" class="md-nav__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    rcopula
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What copulas are for
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../choosing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a family
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../r-translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from R
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How parity is verified
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../families/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Copula families
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structural constructions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structural constructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rotated
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="rotated">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RotatedCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RotatedCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.flip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.degrees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        degrees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.is_survival" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_survival
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.lambda_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.calibrated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calibrated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.from_tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.from_rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.survival" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        survival
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        khoudraji
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="khoudraji">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KhoudrajiCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="KhoudrajiCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.is_exchangeable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_exchangeable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.is_extreme_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_extreme_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.pickands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pickands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.lambda_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.from_tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mixture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mixture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MixtureCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MixtureCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        weights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.lambda_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.beta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        beta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.from_tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.nested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nested
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="nested">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NestedArchimedean
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NestedArchimedean">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.theta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        depth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.leaves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        leaves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nodes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.with_thetas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_thetas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.lowest_common_ancestor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lowest_common_ancestor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.tau_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.lambda_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.fit_nested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit_nested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.marginal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="marginal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.marginal.marginal_copula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal_copula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.vine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="vine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VineCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VineCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.n_pairs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        n_pairs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.is_gaussian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_gaussian
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.loglik" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        loglik
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rosenblatt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.to_gaussian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_gaussian
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.fit_vine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit_vine
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gof/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Goodness of fit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transforms and Kendall
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../applications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Applications
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../special/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Special functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rotated
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="rotated">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RotatedCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RotatedCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.flip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.degrees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        degrees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.is_survival" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_survival
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.lambda_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.calibrated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calibrated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.from_tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.RotatedCopula.from_rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.rotated.survival" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        survival
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        khoudraji
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="khoudraji">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KhoudrajiCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="KhoudrajiCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.is_exchangeable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_exchangeable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.is_extreme_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_extreme_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.pickands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pickands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.lambda_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.khoudraji.KhoudrajiCopula.from_tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mixture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mixture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MixtureCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MixtureCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        weights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.rho" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.lambda_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.beta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        beta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.mixture.MixtureCopula.from_tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.nested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nested
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="nested">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NestedArchimedean
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NestedArchimedean">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.theta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        theta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        depth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.leaves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        leaves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nodes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.with_thetas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_thetas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.lowest_common_ancestor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lowest_common_ancestor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.tau_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.lambda_matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lambda_matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.NestedArchimedean.tau" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.nested.fit_nested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit_nested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.structural.marginal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="marginal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.structural.marginal.marginal_copula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        marginal_copula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.vine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="vine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VineCopula
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VineCopula">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.n_pairs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        n_pairs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.is_gaussian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_gaussian
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.loglik" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        loglik
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rosenblatt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.to_gaussian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_gaussian
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.fit_vine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit_vine
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="structural-constructions">Structural constructions<a class="headerlink" href="#structural-constructions" title="Permanent link">&para;</a></h1>
+<p>Copulas built from other copulas. Each result is a genuine copula carrying the
+base families' parameters, so <code>fit</code>, <code>select_copula</code> and the goodness-of-fit
+tests all work on them unchanged.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.structural.rotated" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.structural.rotated</span>
+
+
+<a href="#rcopula.structural.rotated" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Rotated and survival copulas.</p>
+<p>Every Archimedean family is <em>asymmetric</em> in a fixed direction: Clayton binds in
+the lower tail, Gumbel in the upper, and neither can be told to do the opposite.
+Reflecting one or more coordinates fixes that, and costs nothing -- the reflected
+object is still a copula, with the same number of parameters.</p>
+<p>Reflecting coordinate :math:<code>j</code> replaces :math:<code>U_j</code> by :math:<code>1 - U_j</code>. Two
+cases have names:</p>
+<ul>
+<li><strong>All</strong> coordinates reflected gives the <strong>survival copula</strong>
+  :math:<code>\hat C</code>, the copula of :math:<code>(1-U_1,\dots,1-U_d)</code>. In two dimensions
+  this is the 180-degree rotation. It swaps the tails: survival Clayton has
+  <em>upper</em> tail dependence, which is the usual way to get an
+  upper-tail-dependent alternative to Gumbel with a different shape.</li>
+<li><strong>One</strong> coordinate reflected, in two dimensions, gives the 90-degree (or
+  270-degree) rotation, which turns positive dependence into negative. Clayton
+  and Gumbel admit no negative dependence at all; rotating them is the standard
+  way to model it, and it is what vine libraries mean by "rotation 90".</li>
+</ul>
+<p>The CDF follows from inclusion-exclusion over the reflected coordinates,</p>
+<p>.. math::
+    C_S(\mathbf u) = \sum_{T \subseteq S} (-1)^{|T|}\, C(\mathbf x^T),
+    \qquad
+    x^T_j = \begin{cases} u_j &amp; j \notin S\ 1-u_j &amp; j \in T\ 1 &amp; j \in S\setminus T,\end{cases}</p>
+<p>while the density is simply the base density at the reflected point -- the
+Jacobian of a reflection is 1.</p>
+<p>.. warning::</p>
+<p>Rotation is why "Clayton for losses" is usually backwards. Aggregate loss
+   risk is driven by the <strong>upper</strong> tail, and plain Clayton has none: at
+   :math:<code>\tau = 0.5</code> the 99% expected shortfall of a two-line loss portfolio
+   comes out <em>below</em> the Gaussian answer. It is the <strong>survival</strong> Clayton that
+   belongs there.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Nelsen, R. B. (2006). <em>An Introduction to Copulas</em>, 2nd ed. Springer,
+    section 2.6 -- the survival copula and the reflection identities.
+Brechmann, E. C. and Schepsmeier, U. (2013). Modeling dependence with C- and
+    D-vine copulas: the R package CDVine.
+    <em>Journal of Statistical Software</em> 52(3), 1-27.
+    The 0/90/180/270 rotation convention used by vine libraries.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.structural.rotated.RotatedCopula" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">RotatedCopula</span>
+
+
+<a href="#rcopula.structural.rotated.RotatedCopula" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">RotatedCopula</span><span class="p">(</span><span class="n">base</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">flip</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">free</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code></p>
+
+
+
+        <p>A copula with some coordinates reflected.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>base</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The copula being reflected.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>flip</code>
+            </td>
+            <td>
+                  <code>bool, sequence of bool, or int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which coordinates to reflect. A single <code>bool</code> applies to all of them,
+so <code>flip=True</code> is the survival copula. In two dimensions an <code>int</code> in
+<code>{0, 90, 180, 270}</code> selects a rotation by that many degrees.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Rotations compose: <code>RotatedCopula(RotatedCopula(c, S1), S2)</code> collapses to a
+single rotation by the symmetric difference of <code>S1</code> and <code>S2</code>, so the
+class is closed under composition and a double rotation returns to the base.</p>
+<p>That symmetric difference is worth reading carefully. The operation is a
+coordinate <strong>reflection</strong>, which is an involution, so composition follows the
+Klein four-group rather than the cyclic one the degree labels suggest:
+applying 90 twice gives <strong>0</strong>, not 180, and reaching 180 takes a 90 and a
+270. The names match the vine convention and denote the right copulas; only
+their composition differs from what "rotate twice" would imply. (For a
+non-exchangeable base a true geometric rotation would also transpose the
+coordinates; for the exchangeable families this wraps, the two coincide.)</p>
+<p>Parameters are the base copula's, so :func:<code>~rcopula.fit.fit</code>,
+:func:<code>~rcopula.select_copula</code> and the goodness-of-fit machinery all work
+unchanged.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The survival Clayton has upper tail dependence where Clayton has lower:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">RotatedCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">base</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">base</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span>
+<span class="go">TailDependence(lower=0.7937005259840998, upper=0.0)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">RotatedCopula</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span>
+<span class="go">TailDependence(lower=0.0, upper=0.7937005259840998)</span>
+</code></pre></div>
+    <p>A 90-degree rotation turns positive dependence into negative:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">RotatedCopula</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="mi">90</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">tau</span><span class="p">(),</span> <span class="mi">12</span><span class="p">))</span>
+<span class="go">-0.6</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">tau</span><span class="p">(),</span> <span class="mi">12</span><span class="p">))</span>
+<span class="go">0.6</span>
+</code></pre></div>
+    <p>Rotating twice returns the original:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">RotatedCopula</span><span class="p">(</span><span class="n">RotatedCopula</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span> <span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">flip</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="go">[False, False]</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.flip" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">flip</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.rotated.RotatedCopula.flip" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">flip</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">bool_</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Boolean mask of reflected coordinates.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.degrees" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">degrees</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.rotated.RotatedCopula.degrees" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">degrees</span><span class="p">:</span> <span class="nb">int</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Rotation in degrees; bivariate only.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.is_survival" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">is_survival</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.rotated.RotatedCopula.is_survival" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">is_survival</span><span class="p">:</span> <span class="nb">bool</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>True when every coordinate is reflected.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.tau" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tau</span>
+
+
+<a href="#rcopula.structural.rotated.RotatedCopula.tau" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tau</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Kendall's tau. Exact in <code>d = 2</code>; the base's value when <code>d &gt; 2</code>.</p>
+<p>In two dimensions concordance simply flips sign with each reflection.
+Beyond two dimensions the scalar tau of an exchangeable family survives
+only when <em>all</em> or <em>no</em> coordinates are reflected; a partial reflection
+makes the pairwise taus differ, so there is no single number to report.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.rho" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rho</span>
+
+
+<a href="#rcopula.structural.rotated.RotatedCopula.rho" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rho</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Spearman's rho, with the same conventions as :meth:<code>tau</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.lambda_" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">lambda_</span>
+
+
+<a href="#rcopula.structural.rotated.RotatedCopula.lambda_" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">lambda_</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">TailDependence</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Tail dependence after reflection.</p>
+<p>Reflecting <strong>every</strong> coordinate swaps the two coefficients: the survival
+copula's lower tail is the base's upper tail. Reflecting <strong>none</strong> leaves
+them alone.</p>
+<p>A partial reflection is different in kind. In two dimensions the
+rotated copula's lower-tail coefficient is the base's <em>cross</em>
+coefficient :math:<code>\lim_{u\to0} P(U_1 &gt; 1-u,\ U_2 \le u)/u</code>, which
+measures mass at an off-diagonal corner. That is zero for any positively
+quadrant dependent copula, hence for every parametric family in this
+package. The one exception is the Frechet lower bound :math:<code>W</code>, whose
+entire mass sits on that anti-diagonal -- and reflecting it gives
+:math:<code>M</code>, which is comonotone -- so it is handled explicitly.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.calibrated" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">calibrated</span>
+
+
+<a href="#rcopula.structural.rotated.RotatedCopula.calibrated" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">calibrated</span><span class="p">(</span><span class="n">measure</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Copula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Calibrate the wrapped family so the <em>rotated</em> copula hits the target.</p>
+<p>This is why the instance-level hook exists: a classmethod cannot know
+which family is being rotated. It is what makes <code>method="itau"</code> and
+<code>"irho"</code> work on rotated copulas, and what supplies the starting value
+for <code>"mpl"</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.from_tau" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_tau</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#rcopula.structural.rotated.RotatedCopula.from_tau" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_tau</span><span class="p">(</span><span class="n">tau</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Copula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Calibrate the base family so the <em>rotated</em> copula has this tau.</p>
+<p><code>base</code> (a copula class) and <code>flip</code> are passed through as keywords.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">RotatedCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">RotatedCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">flip</span><span class="o">=</span><span class="mi">90</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">tau</span><span class="p">(),</span> <span class="mi">12</span><span class="p">))</span>
+<span class="go">-0.5</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.rotated.RotatedCopula.from_rho" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_rho</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#rcopula.structural.rotated.RotatedCopula.from_rho" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_rho</span><span class="p">(</span><span class="n">rho</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Copula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>As :meth:<code>from_tau</code>, for Spearman's rho.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.structural.rotated.survival" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">survival</span>
+
+
+<a href="#rcopula.structural.rotated.survival" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">survival</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RotatedCopula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The survival copula :math:<code>\hat C</code> -- every coordinate reflected.</p>
+<p>:math:<code>\hat C(\mathbf u)</code> is the copula of :math:<code>(1-U_1,\dots,1-U_d)</code>, and
+it is what you want whenever the risk lives in the <strong>upper</strong> tail: joint
+large losses, joint large claims, joint large flows.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Survival Clayton is the upper-tail-dependent version of Clayton. On a
+portfolio of two exponential losses at identical Kendall's tau, plain
+Clayton comes out <em>below</em> the Gaussian answer and survival Clayton above --
+a 29% difference in expected shortfall between two copulas with the same
+rank correlation:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GaussianCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">survival</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.risk</span><span class="w"> </span><span class="kn">import</span> <span class="n">expected_shortfall</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">es</span><span class="p">(</span><span class="n">cop</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">losses</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">cop</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">200_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">expected_shortfall</span><span class="p">(</span><span class="n">losses</span><span class="p">,</span> <span class="mf">0.99</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plain</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">es</span><span class="p">(</span><span class="n">plain</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">es</span><span class="p">(</span><span class="n">GaussianCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">))</span> <span class="o">&lt;</span> <span class="n">es</span><span class="p">(</span><span class="n">survival</span><span class="p">(</span><span class="n">plain</span><span class="p">)))</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Kendall's tau is unchanged, so no rank-correlation-based summary would show
+the difference:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">survival</span><span class="p">(</span><span class="n">plain</span><span class="p">)</span><span class="o">.</span><span class="n">tau</span><span class="p">()</span> <span class="o">-</span> <span class="n">plain</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.structural.khoudraji" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.structural.khoudraji</span>
+
+
+<a href="#rcopula.structural.khoudraji" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Khoudraji's device: making an asymmetric copula out of symmetric ones.</p>
+<p>Every Archimedean copula is <strong>exchangeable</strong> -- :math:<code>C(u,v) = C(v,u)</code> -- and so
+is every elliptical one with equal correlations. That is a real restriction.
+Exchangeability says the dependence between two variables looks the same viewed
+from either side, and plenty of data disagrees: an equity index and its
+volatility, a river's peak and its volume, a claim and its settlement cost.</p>
+<p>Khoudraji (1995) gives a construction that breaks it, using two copulas and a
+shape parameter per coordinate:</p>
+<p>.. math::</p>
+<pre><code>C(\mathbf u) = C_1\bigl(u_1^{1-a_1}, \dots, u_d^{1-a_d}\bigr)\;
+               C_2\bigl(u_1^{a_1},   \dots, u_d^{a_d}\bigr),
+\qquad a_j \in [0, 1].
+</code></pre>
+<p>Equal shapes give back an exchangeable copula; unequal ones tilt the dependence
+towards one coordinate. At :math:<code>\mathbf a = 0</code> it is :math:<code>C_1</code>, at
+:math:<code>\mathbf a = 1</code> it is :math:<code>C_2</code>, and in between it interpolates in a way
+that is genuinely asymmetric rather than a mixture.</p>
+<p>The usual recipe takes :math:<code>C_1</code> to be the independence copula and
+:math:<code>C_2</code> something with tail dependence, which produces a family whose
+dependence concentrates in one corner and one direction. That is what the
+example below does.</p>
+<p>Two facts make the construction practical rather than merely definable:</p>
+<ul>
+<li><strong>Sampling is exact and trivial.</strong> Draw :math:<code>\mathbf U \sim C_1</code> and
+  :math:<code>\mathbf V \sim C_2</code> independently and set
+  :math:<code>W_j = \max(U_j^{1/(1-a_j)},\, V_j^{1/a_j})</code>. The maximum of two
+  independent events gives the product of their probabilities, which is the
+  definition above -- no inversion, no rejection.</li>
+<li><strong>The extreme-value class is closed under it.</strong> If both components are
+  extreme-value then so is the result, with a Pickands function assembled from
+  theirs (see :meth:<code>KhoudrajiCopula.pickands</code>). This is <em>the</em> standard way to
+  build asymmetric extreme-value copulas, and it is what gives the tail
+  dependence coefficient in closed form.</li>
+</ul>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Khoudraji, A. (1995). Contributions a l'etude des copules et a la modelisation
+    de valeurs extremes bivariees. PhD thesis, Universite Laval.
+Genest, C., Ghoudi, K. and Rivest, L.-P. (1998). Discussion of
+    "Understanding relationships using copulas" by Frees and Valdez.
+    <em>North American Actuarial Journal</em> 2(3), 143-149.
+    Where the device reached a wider audience.
+Liebscher, E. (2008). Construction of asymmetric multivariate copulas.
+    <em>Journal of Multivariate Analysis</em> 99(10), 2234-2250.
+    The general form, of which this is the two-component case.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.structural.khoudraji.KhoudrajiCopula" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">KhoudrajiCopula</span>
+
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">KhoudrajiCopula</span><span class="p">(</span><span class="n">copula1</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">copula2</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">shapes</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">free</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code></p>
+
+
+
+        <p>An asymmetric copula built from two symmetric ones.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula1</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The two components, of the same dimension. <code>copula1</code> is raised to the
+<code>1 - a</code> powers and <code>copula2</code> to the <code>a</code> powers, so <code>shapes</code> near
+zero recovers <code>copula1</code> and near one recovers <code>copula2</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula2</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The two components, of the same dimension. <code>copula1</code> is raised to the
+<code>1 - a</code> powers and <code>copula2</code> to the <code>a</code> powers, so <code>shapes</code> near
+zero recovers <code>copula1</code> and near one recovers <code>copula2</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>shapes</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One shape in <code>[0, 1]</code> per coordinate. <strong>Equal shapes leave the result
+exchangeable</strong>, so asymmetry requires them to differ.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Parameters are the two components' parameters followed by the shapes, so
+:func:<code>~rcopula.fit.fit</code> and :func:<code>~rcopula.select_copula</code> work on the
+whole object. The density is available in two dimensions; above that only
+the CDF and the sampler are, which is the same trichotomy R applies.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The canonical construction -- independence tilted by a Gumbel:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">GumbelCopula</span><span class="p">,</span> <span class="n">IndependenceCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">KhoudrajiCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">KhoudrajiCopula</span><span class="p">(</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="p">[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">])</span>
+</code></pre></div>
+    <p>It is genuinely asymmetric: swapping the arguments changes the value, which
+no Archimedean or exchangeable elliptical copula can do.</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">cdf</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">]])[</span><span class="mi">0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">b</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">cdf</span><span class="p">([[</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">]])[</span><span class="mi">0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">a</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.01</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Equal shapes hand back exchangeability:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">even</span> <span class="o">=</span> <span class="n">KhoudrajiCopula</span><span class="p">(</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="p">[</span><span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">even</span><span class="o">.</span><span class="n">cdf</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">]])[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">even</span><span class="o">.</span><span class="n">cdf</span><span class="p">([[</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">]])[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Both components extreme-value makes the result extreme-value too, so the
+tail dependence is exact rather than estimated:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+<span class="go">0.3769268825</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.shapes" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">shapes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.shapes" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">shapes</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The per-coordinate shape parameters.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.is_exchangeable" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">is_exchangeable</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.is_exchangeable" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">is_exchangeable</span><span class="p">:</span> <span class="nb">bool</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Equal shapes leave the construction symmetric, defeating its purpose.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.is_extreme_value" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">is_extreme_value</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.is_extreme_value" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">is_extreme_value</span><span class="p">:</span> <span class="nb">bool</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the construction lands back in the extreme-value class.</p>
+<p>It does exactly when both components do -- and the Gumbel copula counts,
+being the one family that is both Archimedean and extreme-value, as does
+the independence copula.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.pickands" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">pickands</span>
+
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.pickands" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">pickands</span><span class="p">(</span><span class="n">w</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Pickands dependence function, when both components are extreme-value.</p>
+<p>Substituting :math:<code>C_i(u,v) = (uv)^{A_i(t_i)}</code> into the definition and
+collecting the exponent of :math:<code>\log(uv)</code> gives</p>
+<p>.. math::
+    A(t) = \bigl[(1-a_1)(1-t) + (1-a_2)t\bigr] A_1(t')
+         + \bigl[a_1(1-t) + a_2 t\bigr] A_2(t''),</p>
+<p>a convex combination of the components' Pickands functions evaluated at
+reweighted arguments. So the extreme-value class is closed under the
+device -- which is the whole reason it is the standard route to an
+<em>asymmetric</em> extreme-value copula.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Reproduces the copula's own CDF, which is the point:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">GumbelCopula</span><span class="p">,</span> <span class="n">IndependenceCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">KhoudrajiCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">KhoudrajiCopula</span><span class="p">(</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">),</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.7</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">direct</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">cdf</span><span class="p">([[</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">]])[</span><span class="mi">0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">viaA</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">v</span><span class="p">))</span> <span class="o">*</span> <span class="n">cop</span><span class="o">.</span><span class="n">pickands</span><span class="p">(</span><span class="n">t</span><span class="p">)))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">direct</span> <span class="o">-</span> <span class="n">viaA</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.tau" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tau</span>
+
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.tau" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tau</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Kendall's tau, by quadrature -- the device admits no closed form.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.rho" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rho</span>
+
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.rho" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rho</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Spearman's rho, by quadrature.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.lambda_" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">lambda_</span>
+
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.lambda_" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">lambda_</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">TailDependence</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Tail dependence.</p>
+<p>Exact when both components are extreme-value, where
+:math:<code>\lambda_U = 2(1 - A(1/2))</code> and :math:<code>\lambda_L = 0</code>. Otherwise
+the limit depends on how each component behaves along a direction the
+shapes choose, which no single coefficient of the components records --
+so it is refused rather than guessed.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.khoudraji.KhoudrajiCopula.from_tau" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_tau</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#rcopula.structural.khoudraji.KhoudrajiCopula.from_tau" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_tau</span><span class="p">(</span><span class="n">tau</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Copula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Not available: the shapes and both components are not identified by tau.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.structural.mixture" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.structural.mixture</span>
+
+
+<a href="#rcopula.structural.mixture" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Mixtures of copulas.</p>
+<p>A convex combination of copulas is a copula:</p>
+<p>.. math::  C(\mathbf u) = \sum_{i} w_i\, C_i(\mathbf u), \qquad
+           w_i \ge 0,\ \sum_i w_i = 1.</p>
+<p>Nothing needs checking -- the defining properties are all preserved by convex
+combination -- which makes this the cheapest way to build a family that no
+single parametric form can express. The usual reason is <strong>both tails at once</strong>:
+Clayton binds below and Gumbel above, and a mixture of the two has genuine
+asymmetric dependence in <em>both</em> corners, which neither component and no
+elliptical copula can produce.</p>
+<p>Three quantities are exactly linear in the copula and so are exact weighted
+averages of the components', with no integration at all:</p>
+<ul>
+<li><strong>Spearman's rho</strong>, because :math:<code>\rho = 12\int\int C - 3</code>;</li>
+<li><strong>both tail-dependence coefficients</strong>, because each is a limit of
+  :math:<code>C(u,u)/u</code> or its survival counterpart;</li>
+<li><strong>Blomqvist's beta</strong>, which depends on :math:<code>C</code> only at the centre.</li>
+</ul>
+<p><strong>Kendall's tau is not</strong>, since :math:<code>\tau = 4\int\int C\,dC - 1</code> is quadratic
+in :math:<code>C</code> -- a mixture of two copulas with the same tau generally has a
+different one. It is computed by quadrature.</p>
+<p>Weights are carried on an unconstrained log-odds scale internally, as R does,
+so that an optimiser sees a box rather than a simplex; :attr:<code>MixtureCopula.weights</code>
+converts back.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Nelsen, R. B. (2006). <em>An Introduction to Copulas</em>, 2nd ed. Springer,
+    section 3.2.4 -- convex sums of copulas.
+Hu, L. (2006). Dependence patterns across financial markets: a mixed copula
+    approach. <em>Applied Financial Economics</em> 16(10), 717-729.
+    The both-tails mixture, and why a single family cannot do it.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.structural.mixture.MixtureCopula" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">MixtureCopula</span>
+
+
+<a href="#rcopula.structural.mixture.MixtureCopula" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">MixtureCopula</span><span class="p">(</span><span class="n">copulas</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Copula</span><span class="p">],</span> <span class="n">weights</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">free</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code></p>
+
+
+
+        <p>A convex combination of copulas.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copulas</code>
+            </td>
+            <td>
+                  <code>sequence of Copula</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Two or more components, all of the same dimension.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weights</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Mixing weights, non-negative and summing to one. Equal weights by
+default.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Parameters are the components' parameters followed by <code>k - 1</code> log-odds
+against the last component. That parameterisation is what makes the object
+fittable: the weights live on a simplex, which a box-constrained optimiser
+cannot represent, while the log-odds are unconstrained.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Clayton binds in the lower tail, Gumbel in the upper, and the mixture has
+both -- which neither component, and no elliptical copula, can manage:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GumbelCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixtureCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mix</span> <span class="o">=</span> <span class="n">MixtureCopula</span><span class="p">([</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)],</span> <span class="p">[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lam</span> <span class="o">=</span> <span class="n">mix</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">lam</span><span class="o">.</span><span class="n">lower</span> <span class="o">&gt;</span> <span class="mf">0.3</span> <span class="ow">and</span> <span class="n">lam</span><span class="o">.</span><span class="n">upper</span> <span class="o">&gt;</span> <span class="mf">0.3</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Tail dependence is an exact weighted average, so it needs no integration:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span><span class="o">.</span><span class="n">lambda_</span><span class="p">(),</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">lam</span><span class="o">.</span><span class="n">lower</span> <span class="o">-</span> <span class="mf">0.4</span> <span class="o">*</span> <span class="n">a</span><span class="o">.</span><span class="n">lower</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">lam</span><span class="o">.</span><span class="n">upper</span> <span class="o">-</span> <span class="mf">0.6</span> <span class="o">*</span> <span class="n">b</span><span class="o">.</span><span class="n">upper</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>So is Spearman's rho:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="mf">0.4</span> <span class="o">*</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span><span class="o">.</span><span class="n">rho</span><span class="p">()</span> <span class="o">+</span> <span class="mf">0.6</span> <span class="o">*</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)</span><span class="o">.</span><span class="n">rho</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">mix</span><span class="o">.</span><span class="n">rho</span><span class="p">()</span> <span class="o">-</span> <span class="n">expected</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Kendall's tau is <em>not</em>, and the clearest case is half comonotonicity and
+half independence. Spearman's rho is exactly 0.5, as averaging says it must
+be; Kendall's tau is 0.416, not 0.5:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrechetUpperCopula</span><span class="p">,</span> <span class="n">IndependenceCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">half</span> <span class="o">=</span> <span class="n">MixtureCopula</span><span class="p">([</span><span class="n">FrechetUpperCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">)],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">half</span><span class="o">.</span><span class="n">rho</span><span class="p">(),</span> <span class="mi">10</span><span class="p">))</span>
+<span class="go">0.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">half</span><span class="o">.</span><span class="n">tau</span><span class="p">(),</span> <span class="mi">4</span><span class="p">))</span>
+<span class="go">0.4159</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.mixture.MixtureCopula.weights" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">weights</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.mixture.MixtureCopula.weights" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">weights</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The mixing weights, recovered from the internal log-odds scale.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.mixture.MixtureCopula.tau" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tau</span>
+
+
+<a href="#rcopula.structural.mixture.MixtureCopula.tau" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tau</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Kendall's tau, by quadrature -- it is <strong>not</strong> a weighted average.</p>
+<p>Tau is quadratic in the copula, so mixing two families with the same tau
+generally changes it. Averaging the components' values is the natural
+guess and it is wrong; see the class docstring.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.mixture.MixtureCopula.rho" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rho</span>
+
+
+<a href="#rcopula.structural.mixture.MixtureCopula.rho" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rho</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Spearman's rho -- exactly the weighted average.</p>
+<p>:math:<code>\rho = 12\int\int C - 3</code> is affine in :math:<code>C</code>, so mixing the
+copulas mixes their rhos. No integration needed.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.mixture.MixtureCopula.lambda_" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">lambda_</span>
+
+
+<a href="#rcopula.structural.mixture.MixtureCopula.lambda_" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">lambda_</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">TailDependence</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Tail dependence -- exactly the weighted average, in both tails.</p>
+<p>Each coefficient is a limit of a quantity affine in :math:<code>C</code>, so it
+mixes. This is what lets a Clayton-Gumbel mixture have dependence in
+<em>both</em> corners while each component has it in only one.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.mixture.MixtureCopula.beta" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">beta</span>
+
+
+<a href="#rcopula.structural.mixture.MixtureCopula.beta" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">beta</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Blomqvist's beta, which depends on <code>C</code> only at the centre.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.mixture.MixtureCopula.from_tau" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_tau</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#rcopula.structural.mixture.MixtureCopula.from_tau" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_tau</span><span class="p">(</span><span class="n">tau</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Copula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Not available: a mixture has more parameters than tau can identify.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.structural.nested" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.structural.nested</span>
+
+
+<a href="#rcopula.structural.nested" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Nested (hierarchical) Archimedean copulas.</p>
+<p>An Archimedean copula gives every pair of variables the same dependence. That is
+often wrong in an obvious way: three equity indices and two bond yields do not
+form one exchangeable block, and forcing them to does not merely lose detail, it
+puts the wrong number on every cross-asset pair.</p>
+<p>Nesting fixes it while keeping the Archimedean machinery. Replace an argument of
+one generator by a whole copula built from another:</p>
+<p>.. math::</p>
+<pre><code>C(\mathbf u) = \psi_0\Bigl(
+    \sum_{j \in \text{direct}} \psi_0^{-1}(u_j)
+    + \sum_{\text{children}} \psi_0^{-1}\bigl(C_{\text{child}}\bigr)\Bigr).
+</code></pre>
+<p>The result is a <strong>tree</strong>. Leaves sharing a parent are more dependent than leaves
+that meet only at the root, and the dependence between any two variables is
+governed by their <strong>lowest common ancestor</strong> -- which makes Kendall's tau
+between them exact and immediate, with no integration at all.</p>
+<p>For the result to be a copula the generators must nest compatibly. For two
+copulas of the same family the condition is simply that the inner parameter is
+at least the outer one: <strong>dependence may increase as you descend, never
+decrease</strong>. That is checked on construction rather than left to the user.</p>
+<p>============================  ================================================
+:class:<code>NestedArchimedean</code>    The tree, its CDF, sampler and tau structure.
+:func:<code>fit_nested</code>            Estimate every node by inverting Kendall's tau.
+============================  ================================================</p>
+<p>.. note::</p>
+<p>Sampling is exact for <strong>Gumbel</strong> and <strong>Clayton</strong>. Gumbel's inner frailty is
+   an ordinary positive stable law; Clayton's is an <em>exponentially tilted</em>
+   stable, which is why nested Archimedean copulas have not been available in
+   Python before -- see :func:<code>~rcopula.special.stable.retstable</code>. Frank and
+   Joe need their own conditional frailties and are refused explicitly rather
+   than approximated.</p>
+<p>The <strong>density</strong> is not implemented. It requires high-order derivatives of a
+   composition of generators, and every quantity this module does provide --
+   the CDF, exact sampling, exact pairwise tau and tail dependence, and
+   estimation by tau inversion -- is available without it.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Joe, H. (1997). <em>Multivariate Models and Dependence Concepts</em>. Chapman &amp; Hall.
+    The nesting condition.
+McNeil, A. J. (2008). Sampling nested Archimedean copulas.
+    <em>Journal of Statistical Computation and Simulation</em> 78(6), 567-581.
+    The frailty algorithm implemented here.
+Hofert, M. (2011). Efficiently sampling nested Archimedean copulas.
+    <em>Computational Statistics &amp; Data Analysis</em> 55(1), 57-70.
+    The tilted-stable inner frailty that nested Clayton needs.
+Okhrin, O., Okhrin, Y. and Schmid, W. (2013). On the structure and estimation
+    of hierarchical Archimedean copulas.
+    <em>Journal of Econometrics</em> 173(2), 189-204.
+    Estimation by inverting pairwise Kendall's tau.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.structural.nested.NestedArchimedean" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">NestedArchimedean</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">NestedArchimedean</span><span class="p">(</span><span class="n">generator</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">components</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">children</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">NestedArchimedean</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">free</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">_validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code></p>
+
+
+
+        <p>A hierarchical Archimedean copula.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>generator</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A one-parameter Archimedean copula supplying this node's generator. Its
+<code>dim</code> is ignored -- the tree determines dimension.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>components</code>
+            </td>
+            <td>
+                  <code>sequence of int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Zero-based indices of the variables attached <strong>directly</strong> to this node.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>children</code>
+            </td>
+            <td>
+                  <code>sequence of NestedArchimedean</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Sub-trees nested inside it.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Every variable must appear exactly once across the whole tree, and the
+indices must be <code>0 .. d-1</code>. Both are checked, because a mis-specified
+tree otherwise produces a plausible-looking object that is not a copula.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Five variables in two blocks -- the shape a single Archimedean copula cannot
+express:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">NestedArchimedean</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">equities</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">4.0</span><span class="p">),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bonds</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">1.5</span><span class="p">),</span> <span class="n">children</span><span class="o">=</span><span class="p">[</span><span class="n">equities</span><span class="p">,</span> <span class="n">bonds</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span><span class="o">.</span><span class="n">dim</span>
+<span class="go">5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">describe</span><span class="p">())</span>
+<span class="go">Nested Archimedean copula, dim 5</span>
+<span class="go">Gumbel(theta=1.5)</span>
+<span class="go">  Gumbel(theta=4) on [0, 1, 2]</span>
+<span class="go">  Gumbel(theta=3) on [3, 4]</span>
+</code></pre></div>
+    <p>Kendall's tau depends on where two variables meet, and is exact:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">tau</span> <span class="o">=</span> <span class="n">cop</span><span class="o">.</span><span class="n">tau_matrix</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">tau</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="mi">6</span><span class="p">))</span>     <span class="c1"># both inside the equity block</span>
+<span class="go">0.75</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">tau</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="mi">6</span><span class="p">))</span>     <span class="c1"># both inside the bond block</span>
+<span class="go">0.666667</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">tau</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="mi">6</span><span class="p">))</span>     <span class="c1"># they meet only at the root</span>
+<span class="go">0.333333</span>
+</code></pre></div>
+    <p>No single Archimedean copula can produce three different pairwise taus.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.theta" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">theta</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.nested.NestedArchimedean.theta" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">theta</span><span class="p">:</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>This node's dependence parameter.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.depth" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">depth</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.structural.nested.NestedArchimedean.depth" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">depth</span><span class="p">:</span> <span class="nb">int</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Height of the tree below this node; a flat copula has depth 1.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.leaves" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">leaves</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean.leaves" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">leaves</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Every variable index below this node, in tree order.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.nodes" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">nodes</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean.nodes" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">nodes</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">NestedArchimedean</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>This node and every node beneath it, root first.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.with_thetas" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">with_thetas</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean.with_thetas" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">with_thetas</span><span class="p">(</span><span class="n">thetas</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">NestedArchimedean</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Rebuild the tree with new parameters, in :meth:<code>nodes</code> order.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.lowest_common_ancestor" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">lowest_common_ancestor</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean.lowest_common_ancestor" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">lowest_common_ancestor</span><span class="p">(</span><span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NestedArchimedean</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The node whose generator governs the pair <code>(i, j)</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.tau_matrix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tau_matrix</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean.tau_matrix" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tau_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Pairwise Kendall's tau, exactly.</p>
+<p>Two variables meet at exactly one node, and that node's generator is the
+bivariate copula of the pair -- so the tau is the generator's own, with
+no integration. A flat Archimedean copula would give one number for
+every pair; this gives one per branch of the tree.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.lambda_matrix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">lambda_matrix</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean.lambda_matrix" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">lambda_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Pairwise lower and upper tail dependence, by the same argument.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.structural.nested.NestedArchimedean.tau" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tau</span>
+
+
+<a href="#rcopula.structural.nested.NestedArchimedean.tau" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tau</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Refused: a nested copula has no single tau, which is the point of it.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.structural.nested.fit_nested" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">fit_nested</span>
+
+
+<a href="#rcopula.structural.nested.fit_nested" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">fit_nested</span><span class="p">(</span><span class="n">structure</span><span class="p">:</span> <span class="n">NestedArchimedean</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NestedArchimedean</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate every node by inverting Kendall's tau.</p>
+<p>Each node governs the pairs whose lowest common ancestor it is, so the
+natural estimator averages the sample tau over exactly those pairs and
+inverts the generator's own tau function. That is Okhrin, Okhrin &amp; Schmid's
+estimator and R's <code>etau</code>, and it needs no density -- which matters here,
+because the nested density is not available.</p>
+<p>The estimates are then made to respect the nesting condition by taking a
+running maximum down the tree. Sampling noise can otherwise leave a child
+below its parent, which would not be a copula.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>structure</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="NestedArchimedean (rcopula.structural.nested.NestedArchimedean)" href="#rcopula.structural.nested.NestedArchimedean">NestedArchimedean</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The tree shape. Its parameters are ignored and replaced.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, d)</code> observations, on any scale -- only ranks are used.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">NestedArchimedean</span><span class="p">,</span> <span class="n">fit_nested</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inner</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">4.0</span><span class="p">),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">truth</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">1.6</span><span class="p">),</span> <span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="n">inner</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">truth</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">4000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fitted</span> <span class="o">=</span> <span class="n">fit_nested</span><span class="p">(</span><span class="n">truth</span><span class="p">,</span> <span class="n">u</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">theta</span> <span class="o">-</span> <span class="mf">1.6</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.15</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">theta</span> <span class="o">-</span> <span class="mf">4.0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.4</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.structural.marginal" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.structural.marginal</span>
+
+
+<a href="#rcopula.structural.marginal" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Lower-dimensional margins of a copula (R's <code>margCopula</code>).</p>
+<p>A :math:<code>d</code>-dimensional copula contains every lower-dimensional copula inside
+it: fix a subset of coordinates and let the rest go to one, and what is left is
+itself a copula. Extracting it is the natural way to ask "what does my
+five-asset model say about these two?", and to check a fitted model against a
+bivariate diagnostic that only makes sense in two dimensions -- a Pickands plot,
+a K-plot, a tail concentration function.</p>
+<p>For most families the answer is immediate: an Archimedean copula's margin is the
+same generator in fewer dimensions, and an elliptical copula's is the
+corresponding sub-matrix of its correlation. R supports exactly those two
+classes and refuses everything else. Here the structural constructions come too,
+because a rotation, a mixture and a Khoudraji device all commute with taking a
+margin.</p>
+<p>============================  ================================================
+:func:<code>marginal_copula</code>       The margin on a chosen subset of coordinates.
+============================  ================================================</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural.marginal</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_copula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">five</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="mf">0.72</span><span class="p">,</span> <span class="mf">0.63</span><span class="p">,</span> <span class="mf">0.54</span><span class="p">,</span> <span class="mf">0.45</span><span class="p">,</span> <span class="mf">0.56</span><span class="p">,</span> <span class="mf">0.48</span><span class="p">,</span> <span class="mf">0.40</span><span class="p">,</span> <span class="mf">0.42</span><span class="p">,</span> <span class="mf">0.35</span><span class="p">,</span> <span class="mf">0.30</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">&quot;un&quot;</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pair</span> <span class="o">=</span> <span class="n">marginal_copula</span><span class="p">(</span><span class="n">five</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pair</span><span class="o">.</span><span class="n">dim</span>
+<span class="go">2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="nb">float</span><span class="p">(</span><span class="n">five</span><span class="o">.</span><span class="n">sigma</span><span class="p">()[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Nelsen, R. B. (2006). <em>An Introduction to Copulas</em>, 2nd ed. Springer,
+    Theorem 2.10.13 -- margins of a copula are copulas.
+Joe, H. (2014). <em>Dependence Modeling with Copulas</em>. Chapman &amp; Hall/CRC.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.structural.marginal.marginal_copula" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">marginal_copula</span>
+
+
+<a href="#rcopula.structural.marginal.marginal_copula" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">marginal_copula</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Copula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The copula of a subset of the coordinates.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>indices</code>
+            </td>
+            <td>
+                  <code>sequence of int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which coordinates to keep, in the order they should appear. At least
+two, all distinct, all within range. The order matters for an
+asymmetric copula: <code>[1, 0]</code> is not <code>[0, 1]</code> unless the copula is
+exchangeable.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Of dimension <code>len(indices)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="NotImplementedError">NotImplementedError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>For families whose margins are not of the same family -- the empirical
+copula, and extreme-value families defined only in two dimensions.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Exchangeable families (Archimedean, and elliptical with <code>dispstr="ex"</code>)
+have the same margin whichever coordinates are chosen, so <code>indices</code> only
+fixes the dimension. For an unstructured correlation matrix it selects the
+sub-matrix, and for <code>ar1</code> or <code>toep</code> the result is generally <em>not</em> of the
+same structure -- dropping a coordinate from an AR(1) chain leaves a gap --
+so it comes back unstructured.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>An Archimedean margin is the same generator in fewer dimensions, so its
+Kendall's tau is unchanged:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural.marginal</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_copula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">five</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pair</span> <span class="o">=</span> <span class="n">marginal_copula</span><span class="p">(</span><span class="n">five</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pair</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="go">(2, 2.0)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">tau</span><span class="p">()</span> <span class="o">-</span> <span class="n">five</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>And the margin agrees with the parent, which is the property that defines
+it -- setting the dropped coordinates to one:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">point</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">full</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">point</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">five</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">full</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Dropping a coordinate from an AR(1) chain leaves a gap, so the result is
+unstructured rather than AR(1):</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">&quot;ar1&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">gapped</span> <span class="o">=</span> <span class="n">marginal_copula</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">gapped</span><span class="o">.</span><span class="n">dispstr</span>
+<span class="go">&#39;un&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">gapped</span><span class="o">.</span><span class="n">sigma</span><span class="p">(),</span> <span class="n">chain</span><span class="o">.</span><span class="n">sigma</span><span class="p">()[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])]))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="vines">Vines<a class="headerlink" href="#vines" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.vine" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.vine</span>
+
+
+<a href="#rcopula.vine" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Vine copulas: a joint distribution built from bivariate pieces.</p>
+<p>Archimedean copulas give every pair the same dependence; elliptical ones give
+every pair the same <em>shape</em>. A vine gives up neither flexibility nor
+tractability: it factorises a :math:<code>d</code>-dimensional density into
+:math:<code>d(d-1)/2</code> <strong>bivariate</strong> copulas, each of which may be a different family
+with a different parameter.</p>
+<p>.. math::</p>
+<pre><code>c(u_1,\dots,u_d) = \prod_{k=1}^{d-1}\prod_{i}
+    c_{\,e_{k,i}}\bigl(F(u_a \mid \mathbf u_D),\, F(u_b \mid \mathbf u_D)\bigr)
+</code></pre>
+<p>The conditioning arguments are <strong>h-functions</strong> -- conditional distribution
+functions -- and every one of them is available in closed form for the
+Archimedean and elliptical families, which is what makes the construction
+practical rather than merely decomposable.</p>
+<p>Two structures cover almost all use and are implemented here:</p>
+<ul>
+<li>a <strong>C-vine</strong> (canonical) puts one variable at the centre of each tree, which
+  suits a market factor plus its satellites;</li>
+<li>a <strong>D-vine</strong> (drawable) lays each tree out as a path, which suits an ordering
+  -- a term structure, a spatial transect, a time series of maturities.</li>
+</ul>
+<p>============================  ================================================
+:class:<code>VineCopula</code>           The construction: density, sampler, Rosenblatt.
+:func:<code>fit_vine</code>              Sequential estimation, selecting each pair.
+============================  ================================================</p>
+<p>Correctness has an unusually sharp check available. A vine whose pair-copulas
+are <strong>all Gaussian is itself a Gaussian copula</strong>, with a correlation matrix
+determined by the pair parameters through the partial-correlation recursion. So
+:meth:<code>VineCopula.to_gaussian</code> reconstructs that matrix and the vine's density
+can be compared against :class:<code>~rcopula.core.elliptical.GaussianCopula</code>
+directly -- an exact identity, not a tolerance.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Joe, H. (1996). Families of m-variate distributions with given margins and
+    m(m-1)/2 bivariate dependence parameters. In <em>Distributions with Fixed
+    Marginals and Related Topics</em>, IMS Lecture Notes 28, 120-141.
+Bedford, T. and Cooke, R. M. (2002). Vines -- a new graphical model for
+    dependent random variables. <em>Annals of Statistics</em> 30(4), 1031-1068.
+Aas, K., Czado, C., Frigessi, A. and Bakken, H. (2009). Pair-copula
+    constructions of multiple dependence.
+    <em>Insurance: Mathematics and Economics</em> 44(2), 182-198.
+    The likelihood and simulation algorithms implemented here.
+Dissmann, J., Brechmann, E. C., Czado, C. and Kurowicka, D. (2013). Selecting
+    and estimating regular vine copulae and application to financial returns.
+    <em>Computational Statistics &amp; Data Analysis</em> 59, 52-69.
+    The sequential selection used by :func:<code>fit_vine</code>.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.vine.VineCopula" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">VineCopula</span>
+
+
+<a href="#rcopula.vine.VineCopula" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">VineCopula</span><span class="p">(</span><span class="n">pair_copulas</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Copula</span><span class="p">]],</span> <span class="n">structure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;D&#39;</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">free</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code></p>
+
+
+
+        <p>A pair-copula construction.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>pair_copulas</code>
+            </td>
+            <td>
+                  <code>sequence of sequence of Copula</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>pair_copulas[k]</code> holds tree <code>k</code>'s copulas, so it has <code>d - 1 - k</code>
+entries. Every entry must be bivariate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>structure</code>
+            </td>
+            <td>
+                  <code>(&#39;C&#39;, &#39;D&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Canonical (star trees) or drawable (path trees).</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;C&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>order</code>
+            </td>
+            <td>
+                  <code>sequence of int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which variable takes which position in the structure. For a C-vine the
+first entry is the root of tree 1; for a D-vine the sequence is the path.
+Defaults to <code>0, 1, ..., d-1</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>A three-dimensional D-vine mixing three families -- something no single
+parametric copula can express:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.vine</span><span class="w"> </span><span class="kn">import</span> <span class="n">VineCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">vine</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">FrankCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)]],</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">vine</span><span class="o">.</span><span class="n">dim</span>
+<span class="go">3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">vine</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">2000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(2000, 3)</span>
+</code></pre></div>
+    <p>Tree 1 pairs adjacent variables, so their dependence is the pair-copula's:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tau</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">kendalltau</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">statistic</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">tau</span> <span class="o">-</span> <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">0.03</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>An all-Gaussian vine <strong>is</strong> a Gaussian copula, which makes it checkable
+against one exactly:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">gaussian</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.6</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)]],</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">equivalent</span> <span class="o">=</span> <span class="n">gaussian</span><span class="o">.</span><span class="n">to_gaussian</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">gaussian</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">pts</span><span class="p">),</span> <span class="n">equivalent</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">pts</span><span class="p">),</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.vine.VineCopula.n_pairs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">n_pairs</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.vine.VineCopula.n_pairs" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">n_pairs</span><span class="p">:</span> <span class="nb">int</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>How many bivariate copulas the construction uses.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.vine.VineCopula.is_gaussian" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">is_gaussian</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.vine.VineCopula.is_gaussian" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">is_gaussian</span><span class="p">:</span> <span class="nb">bool</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether every pair-copula is Gaussian, making the vine one too.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.vine.VineCopula.loglik" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">loglik</span>
+
+
+<a href="#rcopula.vine.VineCopula.loglik" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">loglik</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Total log-likelihood, on pseudo-observations if the data are raw.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.vine.VineCopula.rosenblatt" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rosenblatt</span>
+
+
+<a href="#rcopula.vine.VineCopula.rosenblatt" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rosenblatt</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Map the sample to independent uniforms.</p>
+<p>The forward direction of the sampler, and the sharpest available check
+on both: under the true vine the output is independent
+:math:<code>\mathrm{Unif}(0,1)</code>, so any error in either recursion shows up as
+dependence that should not be there.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.vine.VineCopula.to_gaussian" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">to_gaussian</span>
+
+
+<a href="#rcopula.vine.VineCopula.to_gaussian" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_gaussian</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">GaussianCopula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The equivalent Gaussian copula, when every pair-copula is Gaussian.</p>
+<p>A vine's tree-:math:<code>k</code> parameters are <strong>partial correlations</strong> given the
+conditioning set, and the partial-correlation recursion</p>
+<p>.. math::
+    \rho_{ab\mid D} = \frac{\rho_{ab\mid D'} - \rho_{ac\mid D'}\rho_{bc\mid D'}}
+                           {\sqrt{(1-\rho_{ac\mid D'}^2)(1-\rho_{bc\mid D'}^2)}}</p>
+<p>runs backwards to recover the ordinary correlations. So an all-Gaussian
+vine is a Gaussian copula, and its density can be checked against one
+<strong>exactly</strong> rather than statistically -- which is the strongest test
+available on the tree recursions.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.vine</span><span class="w"> </span><span class="kn">import</span> <span class="n">VineCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">vine</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.7</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.4</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.2</span><span class="p">)]],</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sigma</span> <span class="o">=</span> <span class="n">vine</span><span class="o">.</span><span class="n">to_gaussian</span><span class="p">()</span><span class="o">.</span><span class="n">sigma</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="mi">6</span><span class="p">)),</span> <span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="mi">6</span><span class="p">))</span>
+<span class="go">(0.7, 0.4)</span>
+</code></pre></div>
+    <p>The 1-2 correlation is <em>implied</em> rather than given, since tree 2 supplies
+only the partial one:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sigma</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="mi">6</span><span class="p">))</span>
+<span class="go">0.410905</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.vine.fit_vine" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">fit_vine</span>
+
+
+<a href="#rcopula.vine.fit_vine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">fit_vine</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;D&#39;</span><span class="p">,</span> <span class="n">families</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_FAMILIES</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">criterion</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;aic&#39;</span><span class="p">,</span> <span class="n">truncate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VineCopula</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate a vine sequentially, choosing each pair-copula's family.</p>
+<p>Tree by tree, each edge's family is selected by
+:func:<code>~rcopula.select.select_copula</code> on the h-transformed data that edge
+actually sees, and the h-functions for the next tree are built from the
+winner. That is Dissmann et al.'s sequential procedure, and it is what makes
+a :math:<code>d(d-1)/2</code>-parameter model estimable at all.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, d)</code> observations, rank-transformed internally.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>structure</code>
+            </td>
+            <td>
+                  <code>(&#39;C&#39;, &#39;D&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>&#34;C&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>families</code>
+            </td>
+            <td>
+                  <code>sequence of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Candidates for every edge; see
+:data:<code>~rcopula.select.FAMILIES</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="rcopula.vine.DEFAULT_FAMILIES">DEFAULT_FAMILIES</span></code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>order</code>
+            </td>
+            <td>
+                  <code>sequence of int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Variable ordering. For a C-vine, defaults to putting the variable with
+the strongest total rank dependence at the root -- which is what makes a
+C-vine worth choosing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>criterion</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to :func:<code>~rcopula.select.select_copula</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;aic&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>truncate</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fit only the first <code>truncate</code> trees and set the rest to independence.
+Higher trees usually carry little, and truncating is the standard way to
+stop a vine from spending parameters on noise.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.vine</span><span class="w"> </span><span class="kn">import</span> <span class="n">VineCopula</span><span class="p">,</span> <span class="n">fit_vine</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">truth</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">FrankCopula</span><span class="p">(</span><span class="mf">4.0</span><span class="p">)]],</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">truth</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">3000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fitted</span> <span class="o">=</span> <span class="n">fit_vine</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">families</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;clayton&quot;</span><span class="p">,</span> <span class="s2">&quot;gumbel&quot;</span><span class="p">,</span> <span class="s2">&quot;frank&quot;</span><span class="p">]</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">[</span><span class="n">cop</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="n">fitted</span><span class="o">.</span><span class="n">pair_copulas</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+<span class="go">[&#39;Clayton&#39;, &#39;Gumbel&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">loglik</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Left to itself it reorders the variables by dependence strength, which is
+what makes a C-vine's root the right one -- so read the structure from
+<code>fitted.order</code> rather than assuming it:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">fitted</span> <span class="o">=</span> <span class="n">fit_vine</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">families</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;clayton&quot;</span><span class="p">,</span> <span class="s2">&quot;gumbel&quot;</span><span class="p">,</span> <span class="s2">&quot;frank&quot;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">order</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

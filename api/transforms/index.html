@@ -1,0 +1,3418 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Copula modelling in Python, verified against R's copula package">
+      
+      
+      
+      
+        <link rel="prev" href="../gof/">
+      
+      
+        <link rel="next" href="../plots/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Transforms and Kendall - rcopula</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#transforms-and-the-kendall-function" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="rcopula" class="md-header__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            rcopula
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Transforms and Kendall
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="rcopula" class="md-nav__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    rcopula
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What copulas are for
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../choosing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a family
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../r-translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from R
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How parity is verified
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../families/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Copula families
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../structural/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structural constructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gof/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Goodness of fit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transforms and Kendall
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transforms and Kendall
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.transforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        transforms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="transforms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.conditional_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conditional_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.conditional_ppf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conditional_ppf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rosenblatt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.inverse_rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inverse_rosenblatt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.radial_simplex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        radial_simplex
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.htrafo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        htrafo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.kendall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="kendall">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_pdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_ppf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_ppf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_empirical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_empirical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_return_period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_return_period
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.return_period_level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        return_period_level
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.core.measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        measures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="measures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.core.measures.rho_by_quadrature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho_by_quadrature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.core.measures.tau_by_quadrature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau_by_quadrature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.core.measures.tau_by_partials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau_by_partials
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sampling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sampling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.quasi_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        quasi_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.antithetic_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        antithetic_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.latin_hypercube_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        latin_hypercube_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.variance_ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        variance_ratio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../applications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Applications
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../special/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Special functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.transforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        transforms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="transforms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.conditional_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conditional_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.conditional_ppf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conditional_ppf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rosenblatt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.inverse_rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inverse_rosenblatt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.radial_simplex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        radial_simplex
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.transforms.htrafo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        htrafo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.kendall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="kendall">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_pdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_ppf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_ppf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_empirical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_empirical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.kendall_return_period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kendall_return_period
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.kendall.return_period_level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        return_period_level
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.core.measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        measures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="measures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.core.measures.rho_by_quadrature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rho_by_quadrature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.core.measures.tau_by_quadrature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau_by_quadrature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.core.measures.tau_by_partials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tau_by_partials
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sampling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sampling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.quasi_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        quasi_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.antithetic_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        antithetic_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.latin_hypercube_rvs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        latin_hypercube_rvs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.sampling.variance_ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        variance_ratio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="transforms-and-the-kendall-function">Transforms and the Kendall function<a class="headerlink" href="#transforms-and-the-kendall-function" title="Permanent link">&para;</a></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.transforms" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.transforms</span>
+
+
+<a href="#rcopula.transforms" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Conditional copula distributions and the Rosenblatt transform.</p>
+<p>The central object is the <strong>h-function</strong>, the conditional distribution of one
+coordinate given the others:</p>
+<p>.. math::  h(u_1 \mid u_2) = P(U_1 \le u_1 \mid U_2 = u_2)
+           = \frac{\partial C(u_1, u_2)}{\partial u_2}.</p>
+<p>It does a surprising amount of work. It is the sampler for every copula without
+a closed-form generator (draw <code>w</code>, invert <code>h</code>); it is the building block of
+vine copulas; it is the Rosenblatt transform that turns dependent data into
+independent uniforms for goodness-of-fit; and in pairs trading it <em>is</em> the
+signal -- :math:<code>h(u_1 \mid u_2)</code> near zero says asset 1 is unusually cheap
+given where asset 2 sits, which is a statement no correlation can make.</p>
+<p>R exposes this as <code>cCopula</code> and supports Archimedean and elliptical families
+only. Analytic forms are used here for those, and numerical differentiation
+elsewhere, so <strong>every</strong> family in the package is covered.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Rosenblatt, M. (1952). Remarks on a multivariate transformation.
+    <em>Annals of Mathematical Statistics</em> 23(3), 470-472.
+Aas, K., Czado, C., Frigessi, A. and Bakken, H. (2009). Pair-copula
+    constructions of multiple dependence.
+    <em>Insurance: Mathematics and Economics</em> 44(2), 182-198.
+    The h-function as the workhorse of vine copulas.
+Joe, H. (2014). <em>Dependence Modeling with Copulas</em>. Chapman &amp; Hall/CRC.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.transforms.conditional_cdf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">conditional_cdf</span>
+
+
+<a href="#rcopula.transforms.conditional_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">conditional_cdf</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">given</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Conditional distribution :math:<code>P(U_j \le u_j \mid U_{given} = u_{given})</code>.</p>
+<p>The h-function. For a bivariate copula, <code>given=1</code> returns
+:math:<code>h(u_1 \mid u_2) = \partial C/\partial u_2</code> and <code>given=0</code> returns
+the other conditional.</p>
+<p>Analytic for Archimedean, Gaussian and Student-t families; numerical
+differentiation elsewhere.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bivariate copula.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, 2)</code> points in the unit square.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>given</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which coordinate to condition on.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Values in <code>[0, 1]</code>. Under the true copula these are <strong>uniform</strong>,
+which is what makes them usable as a standardised signal.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Under independence, conditioning changes nothing:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">IndependenceCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">conditional_cdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">conditional_cdf</span><span class="p">(</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">u</span><span class="p">)</span>
+<span class="go">array([0.3, 0.7])</span>
+</code></pre></div>
+    <p>Under positive dependence, a low value of the conditioning asset makes the
+other look <em>high</em> by comparison:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">GaussianCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">conditional_cdf</span><span class="p">(</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.8</span><span class="p">),</span> <span class="p">[[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">]])[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">6</span><span class="p">))</span>
+<span class="go">0.985851</span>
+</code></pre></div>
+    <p>The output is uniform when the copula is right -- the property the
+Rosenblatt transform and every h-function-based test rely on:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">h</span> <span class="o">=</span> <span class="n">conditional_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">cop</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">20_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">kstest</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="s2">&quot;uniform&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.01</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.transforms.conditional_ppf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">conditional_ppf</span>
+
+
+<a href="#rcopula.transforms.conditional_ppf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">conditional_ppf</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">w</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">cond</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">given</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Invert the h-function: find <code>x</code> with :math:<code>h(x \mid \text{cond}) = w</code>.</p>
+<p>This is the conditional-distribution sampling method -- draw <code>w</code> uniform,
+invert, and the pair <code>(x, cond)</code> follows the copula. Solved by vectorised
+bisection, which handles every family uniformly and converges to 1e-15 in 50
+halvings.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Round-trips against :func:<code>conditional_cdf</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">conditional_cdf</span><span class="p">,</span> <span class="n">conditional_ppf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cond</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">conditional_ppf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">cond</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">recovered</span> <span class="o">=</span> <span class="n">conditional_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">cond</span><span class="p">]))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">recovered</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.transforms.rosenblatt" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rosenblatt</span>
+
+
+<a href="#rcopula.transforms.rosenblatt" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rosenblatt</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Rosenblatt transform (R's <code>cCopula</code>).</p>
+<p>Maps dependent uniforms to <strong>independent</strong> uniforms by conditioning
+successively:</p>
+<p>.. math::
+    Z_1 = U_1,\quad Z_2 = C(U_2 \mid U_1),\quad
+    Z_3 = C(U_3 \mid U_1, U_2),\ \dots</p>
+<p>If the copula is correct the result is a sample of independent standard
+uniforms, which turns any goodness-of-fit question into a test of
+independence and uniformity -- the basis of the <code>SnB</code> and <code>SnC</code>
+statistics.</p>
+<p>Implemented analytically for Archimedean and elliptical families in any
+dimension, and for arbitrary bivariate copulas.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The right copula gives independent uniforms; the wrong one does not:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">rosenblatt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">z</span> <span class="o">=</span> <span class="n">rosenblatt</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">cop</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">5000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">all</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">kstest</span><span class="p">(</span><span class="n">z</span><span class="p">[:,</span> <span class="n">j</span><span class="p">],</span> <span class="s2">&quot;uniform&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.01</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)))</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">z</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">z</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Transformed with the wrong parameter, the output is visibly non-uniform:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">bad</span> <span class="o">=</span> <span class="n">rosenblatt</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">),</span> <span class="n">cop</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">5000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">kstest</span><span class="p">(</span><span class="n">bad</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;uniform&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.transforms.inverse_rosenblatt" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">inverse_rosenblatt</span>
+
+
+<a href="#rcopula.transforms.inverse_rosenblatt" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">inverse_rosenblatt</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Inverse Rosenblatt transform: independent uniforms to copula draws.</p>
+<p>The other direction of :func:<code>rosenblatt</code>, and the reason it matters is
+sampling. <code>rvs</code> draws its own randomness; this takes randomness you supply,
+which is what lets a <strong>quasi-random</strong> point set be pushed through a copula --
+see :mod:<code>rcopula.sampling</code>. It is also how conditional simulation works:
+fix the first coordinates, vary the rest.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>z</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Independent uniforms.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Draws from <code>copula</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Elliptical copulas invert analytically. Everything else is inverted by
+bisection <strong>against :func:<code>rosenblatt</code> itself</strong>, so the two are exact
+inverses by construction rather than by two derivations agreeing -- which is
+the failure mode this arrangement removes. The conditional CDF is monotone
+in its own argument, so bisection cannot fail; 60 steps takes the bracket
+below double precision.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Round trip, in both directions:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">inverse_rosenblatt</span><span class="p">,</span> <span class="n">rosenblatt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">cop</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">inverse_rosenblatt</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">rosenblatt</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">u</span><span class="p">))</span> <span class="o">-</span> <span class="n">u</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mf">1e-9</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Independent uniforms in, correctly dependent draws out:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">z</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">20000</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">inverse_rosenblatt</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">z</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">cor_kendall</span><span class="p">(</span><span class="n">u</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.transforms.radial_simplex" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">radial_simplex</span>
+
+
+<a href="#rcopula.transforms.radial_simplex" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">radial_simplex</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">ArchimedeanCopula</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">,</span> <span class="n">NDArray</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Split an Archimedean sample into its radial and angular parts.</p>
+<p>McNeil and Neslehova showed that :math:<code>U \sim C</code> for an Archimedean copula
+with generator :math:<code>\psi</code> if and only if</p>
+<p>.. math::  \bigl(\psi^{-1}(U_1), \dots, \psi^{-1}(U_d)\bigr) = R\,S,</p>
+<p>with :math:<code>S</code> <strong>uniform on the unit simplex</strong> and independent of the radial
+variable :math:<code>R = \sum_k \psi^{-1}(U_k)</code>. All the family-specific
+information sits in the distribution of :math:<code>R</code>; the angular part is the
+same for every Archimedean copula in every dimension.</p>
+<p>That is the whole basis for testing <em>Archimedeanity</em> rather than testing one
+particular family: if the angular part is not uniform on the simplex, no
+Archimedean copula fits, whatever generator is tried.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><span title="rcopula.core.archimedean.ArchimedeanCopula">ArchimedeanCopula</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Supplies the generator. Its parameter must be set.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>radial</code></td>            <td>
+                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>:math:<code>R</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+<td><code>angular</code></td>            <td>
+                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>:math:<code>S</code>, whose rows sum to one.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The angular part is uniform on the simplex, so each of its coordinates has
+mean :math:<code>1/d</code> -- and this does not depend on the family or the parameter:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">radial_simplex</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">copula</span> <span class="ow">in</span> <span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">4</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">4</span><span class="p">)):</span>
+<span class="gp">... </span>    <span class="n">u</span> <span class="o">=</span> <span class="n">copula</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">20000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="n">angular</span> <span class="o">=</span> <span class="n">radial_simplex</span><span class="p">(</span><span class="n">copula</span><span class="p">,</span> <span class="n">u</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">angular</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.25</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)))</span>
+<span class="go">True</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.transforms.htrafo" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">htrafo</span>
+
+
+<a href="#rcopula.transforms.htrafo" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">htrafo</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">ArchimedeanCopula</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Hering-Hofert transform: Archimedean data to independent uniforms.</p>
+<p>The Rosenblatt transform (:func:<code>rosenblatt</code>) does the same job by
+conditioning one coordinate at a time, which needs :math:<code>d-1</code> derivatives
+of the generator and loses accuracy fast as :math:<code>d</code> grows. This transform
+goes through the simplex decomposition instead, so it needs no high-order
+derivatives at all and stays usable at :math:<code>d = 100</code> -- which is why it
+exists.</p>
+<p>Writing :math:<code>S_j = \sum_{k \le j} \psi^{-1}(U_k)</code>,</p>
+<p>.. math::</p>
+<pre><code>Y_j = \left(\frac{S_j}{S_{j+1}}\right)^{j}, \quad j = 1, \dots, d-1,
+\qquad Y_d = K\bigl(\psi(S_d)\bigr),
+</code></pre>
+<p>with :math:<code>K</code> the Kendall distribution function. Under the null that <code>u</code>
+came from this copula the :math:<code>Y_j</code> are independent and uniform, so any
+test of multivariate uniformity becomes a goodness-of-fit test.</p>
+<p>The first :math:<code>d-1</code> components come from the angular part and the last
+from the radial part; since those are independent, so are the two groups.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><span title="rcopula.core.archimedean.ArchimedeanCopula">ArchimedeanCopula</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="see-also" open>
+  <summary>See Also</summary>
+  <p>rosenblatt : the conditioning-based alternative, exact but derivative-hungry.
+radial_simplex : the decomposition this is built on.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Data from the copula transforms to uniforms; data from a different copula
+does not:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">htrafo</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">copula</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">htrafo</span><span class="p">(</span><span class="n">copula</span><span class="p">,</span> <span class="n">copula</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">4000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">kstest</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="s2">&quot;uniform&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.01</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wrong</span> <span class="o">=</span> <span class="n">htrafo</span><span class="p">(</span><span class="n">copula</span><span class="p">,</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">4000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">kstest</span><span class="p">(</span><span class="n">wrong</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="s2">&quot;uniform&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>It still works where the Rosenblatt transform's derivatives would not:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">big</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">htrafo</span><span class="p">(</span><span class="n">big</span><span class="p">,</span> <span class="n">big</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">y</span><span class="p">))</span> <span class="ow">and</span> <span class="n">y</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.kendall" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.kendall</span>
+
+
+<a href="#rcopula.kendall" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>The Kendall distribution function.</p>
+<p>For a copula :math:<code>C</code> and :math:<code>\mathbf U \sim C</code>, the <strong>Kendall distribution
+function</strong> is the law of the copula evaluated at its own draw:</p>
+<p>.. math::  K(t) = P\bigl(C(\mathbf U) \le t\bigr).</p>
+<p>It is the univariate summary of a multivariate dependence structure: a single
+curve on :math:<code>[0, 1]</code> that determines Kendall's tau
+(:math:<code>\tau = 3 - 4\int_0^1 K</code>), identifies the generator of an Archimedean
+copula uniquely, and answers the question a joint quantile cannot.</p>
+<p>That last point is what makes it useful rather than merely elegant. Ask <em>how
+often is a flood this bad</em>, and there is no single answer from the margins: the
+set :math:<code>\{C(\mathbf u) &gt; t\}</code> is a region, not a point, and every point on its
+boundary is "equally extreme". :math:<code>K</code> measures that region. The <strong>Kendall
+return period</strong> :math:<code>1/(1 - K(t))</code> is therefore the honest multivariate
+analogue of a return period, and it is systematically longer than the
+univariate one -- treating a compound event as if only its worst component
+mattered understates how rare it is.</p>
+<p>=============================  ===============================================
+:func:<code>kendall_cdf</code>            :math:<code>K(t)</code>; R's <code>pK</code>.
+:func:<code>kendall_pdf</code>            Its density; R's <code>dK</code>.
+:func:<code>kendall_ppf</code>            Its quantile function; R's <code>qK</code>.
+:func:<code>kendall_rvs</code>            Draws of :math:<code>C(\mathbf U)</code>; R's <code>rK</code>.
+:func:<code>kendall_empirical</code>      The nonparametric estimator; R's <code>Kn</code>.
+:func:<code>kendall_return_period</code>  :math:<code>1/(1 - K(t))</code>, and its inverse.
+=============================  ===============================================</p>
+<p>For Archimedean copulas everything is closed form in any dimension. For other
+bivariate copulas :math:<code>K</code> is obtained by integrating the conditional
+distribution along the level curve of :math:<code>C</code>, which needs only the CDF.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Genest, C. and Rivest, L.-P. (1993). Statistical inference procedures for
+    bivariate Archimedean copulas. <em>JASA</em> 88(423), 1034-1043.
+    The bivariate form and the nonparametric estimator.
+Barbe, P., Genest, C., Ghoudi, K. and Remillard, B. (1996). On Kendall's
+    process. <em>Journal of Multivariate Analysis</em> 58(2), 197-229.
+    The multivariate generalisation used here.
+Salvadori, G. and De Michele, C. (2004). Frequency analysis via copulas.
+    <em>Water Resources Research</em> 40, W12511.
+    Kendall return periods, and why the univariate one is the wrong number.
+Nappo, G. and Spizzichino, F. (2009). Kendall distributions and level sets in
+    bivariate exchangeable survival models.
+    <em>Information Sciences</em> 179(17), 2878-2890.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.kendall.kendall_cdf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">kendall_cdf</span>
+
+
+<a href="#rcopula.kendall.kendall_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">kendall_cdf</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The Kendall distribution function :math:<code>K(t) = P(C(\mathbf U) \le t)</code>.</p>
+<p>For an Archimedean copula in :math:<code>d</code> dimensions (Barbe et al. 1996),</p>
+<p>.. math::
+    K(t) = \sum_{k=0}^{d-1} \frac{(-1)^k}{k!}\,
+           s^k\,\psi^{(k)}(s), \qquad s = \psi^{-1}(t),</p>
+<p>which is a sum of <strong>non-negative</strong> terms once the alternating sign is
+absorbed into :math:<code>|\psi^{(k)}|</code>, so it never cancels. In two dimensions it
+reduces to the familiar :math:<code>K(t) = t - s\,\psi'(s)</code>.</p>
+<p>For any other bivariate copula, integrating along the level curve gives</p>
+<p>.. math::
+    K(t) = t + \int_t^1 \frac{\partial C}{\partial u}\bigl(u, v_t(u)\bigr)\,du,</p>
+<p>where :math:<code>v_t(u)</code> solves :math:<code>C(u, v_t) = t</code>. Below :math:<code>u = t</code> the
+event is certain, which is where the leading :math:<code>t</code> comes from.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Independence has the closed form :math:<code>K(t) = t(1 - \log t)</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">IndependenceCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.kendall</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendall_cdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">kendall_cdf</span><span class="p">(</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">t</span><span class="p">),</span> <span class="n">t</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">t</span><span class="p">))))</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Comonotonicity leaves nothing to summarise -- :math:<code>C(\mathbf U) = U</code>, so
+:math:<code>K</code> is uniform:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrechetUpperCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">kendall_cdf</span><span class="p">(</span><span class="n">FrechetUpperCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">t</span><span class="p">),</span> <span class="n">t</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p><code>K</code> dominates the uniform for every copula, which is why the Kendall
+return period always exceeds the univariate one:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">kendall_cdf</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="n">t</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">t</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>It recovers Kendall's tau through :math:<code>\tau = 3 - 4\int_0^1 K</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">integrate</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">area</span> <span class="o">=</span> <span class="n">integrate</span><span class="o">.</span><span class="n">quad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">kendall_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">x</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">((</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">area</span><span class="p">)</span> <span class="o">-</span> <span class="n">cop</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.kendall.kendall_pdf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">kendall_pdf</span>
+
+
+<a href="#rcopula.kendall.kendall_pdf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">kendall_pdf</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Density of the Kendall distribution function (R's <code>dK</code>).</p>
+<p>Differentiating the Archimedean sum telescopes -- every term cancels against
+the next -- and only the last survives:</p>
+<p>.. math::
+    K'(t) = \frac{s^{d-1}\,\bigl|\psi^{(d)}(s)\bigr|}
+                 {(d-1)!\,\bigl|\psi'(s)\bigr|},
+    \qquad s = \psi^{-1}(t),</p>
+<p>manifestly non-negative, as a density must be. Elsewhere it is a central
+difference of :func:<code>kendall_cdf</code>.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Integrates to one, and matches the derivative of <code>K</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">integrate</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.kendall</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendall_cdf</span><span class="p">,</span> <span class="n">kendall_pdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">total</span> <span class="o">=</span> <span class="n">integrate</span><span class="o">.</span><span class="n">quad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">kendall_pdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">x</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">total</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-8</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">h</span> <span class="o">=</span> <span class="mf">1e-6</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">slope</span> <span class="o">=</span> <span class="p">(</span><span class="n">kendall_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="mf">0.4</span> <span class="o">+</span> <span class="n">h</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">kendall_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="mf">0.4</span> <span class="o">-</span> <span class="n">h</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">kendall_pdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">slope</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.kendall.kendall_ppf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">kendall_ppf</span>
+
+
+<a href="#rcopula.kendall.kendall_ppf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">kendall_ppf</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Quantile function of :math:<code>K</code> (R's <code>qK</code>), by bisection.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">GumbelCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.kendall</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendall_cdf</span><span class="p">,</span> <span class="n">kendall_ppf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">kendall_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">kendall_ppf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">p</span><span class="p">)),</span> <span class="n">p</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.kendall.kendall_rvs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">kendall_rvs</span>
+
+
+<a href="#rcopula.kendall.kendall_rvs" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">kendall_rvs</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from :math:<code>K</code> (R's <code>rK</code>), by evaluating :math:<code>C</code> at its own draws.</p>
+<p>Exact by construction -- :math:<code>K</code> <em>is</em> the law of :math:<code>C(\mathbf U)</code> --
+and cheaper than inverting :math:<code>K</code>.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The draws reproduce the analytic <code>K</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.kendall</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendall_cdf</span><span class="p">,</span> <span class="n">kendall_rvs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">w</span> <span class="o">=</span> <span class="n">kendall_rvs</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="mi">20_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">kstest</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">kendall_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span><span class="o">.</span><span class="n">pvalue</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">p</span> <span class="o">&gt;</span> <span class="mf">0.01</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.kendall.kendall_empirical" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">kendall_empirical</span>
+
+
+<a href="#rcopula.kendall.kendall_empirical" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">kendall_empirical</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The nonparametric Kendall function (R's <code>Kn</code>).</p>
+<p>Genest &amp; Rivest (1993) replace :math:<code>C(\mathbf X_i)</code> by the fraction of the
+sample it dominates,</p>
+<p>.. math::
+    W_i = \frac{1}{n-1}\,#{j \ne i : \mathbf X_j &lt; \mathbf X_i},</p>
+<p>and take the empirical distribution of the :math:<code>W_i</code>. Being rank-based it
+needs no margins and no fitted copula, which makes it the natural check on
+whether a family's :math:<code>K</code> matches the data -- and the basis of the
+<code>Sn^K</code> goodness-of-fit statistics.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, d)</code> observations, on any scale.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Where to evaluate. Defaults to the sorted <code>W_i</code> themselves.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>It tracks the true <code>K</code> without knowing the family:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.kendall</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendall_cdf</span><span class="p">,</span> <span class="n">kendall_empirical</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">cop</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">4000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">grid</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">gap</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">kendall_empirical</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">grid</span><span class="p">)</span> <span class="o">-</span> <span class="n">kendall_cdf</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">grid</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">gap</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mf">0.03</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.kendall.kendall_return_period" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">kendall_return_period</span>
+
+
+<a href="#rcopula.kendall.kendall_return_period" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">kendall_return_period</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Kendall return period :math:<code>\text{interval}/(1 - K(t))</code>.</p>
+<p>The multivariate answer to "how often is an event this severe". A univariate
+return period asks how often <em>one</em> variable is exceeded; the joint event
+:math:<code>\{C(\mathbf U) &gt; t\}</code> is a region, and every point on its boundary is
+equally extreme, so no single margin can express it.</p>
+<p>Because :math:<code>K(t) \ge t</code> for every copula, the Kendall return period is
+always <strong>longer</strong> than the univariate one at the same level. Reporting the
+univariate number for a compound event therefore overstates how often it
+happens.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fitted dependence structure.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Critical level, in copula units.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>interval</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Mean time between observations, in whatever unit the answer should be
+in -- 1 for annual maxima.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1.0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Comonotone variables move together exactly, so the joint event is the
+univariate one and the two return periods coincide. Everything else waits
+longer, and independence longest of all:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrechetUpperCopula</span><span class="p">,</span> <span class="n">IndependenceCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.kendall</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendall_return_period</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">kendall_return_period</span><span class="p">(</span><span class="n">FrechetUpperCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="mf">0.99</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+<span class="go">100.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">kendall_return_period</span><span class="p">(</span><span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="mf">0.99</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+<span class="go">19933.2</span>
+</code></pre></div>
+    <p>The number that should give a practitioner pause: <strong>two copulas with the
+same Kendall's tau of 0.5 give 199 years and 6689 years.</strong> Gumbel has upper
+tail dependence and Clayton has none, and the critical layer is an
+upper-corner event -- so a rank correlation, however carefully estimated,
+does not determine the design life.</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GumbelCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">kendall_return_period</span><span class="p">(</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="mf">0.99</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+<span class="go">199.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">kendall_return_period</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="mf">0.99</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+<span class="go">6689.0</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.kendall.return_period_level" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">return_period_level</span>
+
+
+<a href="#rcopula.kendall.return_period_level" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">return_period_level</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">period</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The critical level :math:<code>t</code> whose Kendall return period is <code>period</code>.</p>
+<p>The inverse of :func:<code>kendall_return_period</code>, and the quantity a design
+standard actually specifies -- "the 100-year event" is a return period, and
+what an engineer needs is the level that goes with it.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">GumbelCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.kendall</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendall_return_period</span><span class="p">,</span> <span class="n">return_period_level</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">return_period_level</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="mf">100.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">kendall_return_period</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">t</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mf">100.0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.core.measures" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.core.measures</span>
+
+
+<a href="#rcopula.core.measures" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Dependence measures by quadrature, for copulas with no closed form.</p>
+<p>Structural copulas -- rotations, mixtures, Khoudraji devices -- generally have no
+analytic Kendall's tau. Both measures are integrals of the copula itself,</p>
+<p>.. math::
+    \rho = 12\int_0^1!!\int_0^1 C(u,v)\,du\,dv - 3, \qquad
+    \tau = 4\int_0^1!!\int_0^1 C(u,v)\,dC(u,v) - 1,</p>
+<p>so a tensor-product rule evaluates them directly.</p>
+<p>The rule is <strong>tanh-sinh</strong> (double exponential) rather than Gauss-Legendre, and
+the reason is specific: a copula with tail dependence has a density that blows
+up at a corner of the unit square. Gauss-Legendre assumes an analytic integrand
+and degrades to algebraic convergence when that fails -- for a Gumbel copula it
+reaches only <code>4e-4</code> with 128 nodes per axis and improves like :math:<code>n^{-2}</code>.
+The tanh-sinh substitution
+:math:<code>u = \tfrac{1}{2}(1 + \tanh(\tfrac{\pi}{2}\sinh t))</code> sends the node
+spacing to zero doubly exponentially at each end, which absorbs endpoint
+singularities; the same Gumbel case reaches <code>5e-10</code> with 159 nodes.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Nelsen, R. B. (2006). <em>An Introduction to Copulas</em>, 2nd ed. Springer,
+    Theorems 5.1.1 and 5.1.3 -- the integral representations used here.
+Takahasi, H. and Mori, M. (1974). Double exponential formulas for numerical
+    integration. <em>Publications of RIMS, Kyoto University</em> 9(3), 721-741.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.core.measures.rho_by_quadrature" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rho_by_quadrature</span>
+
+
+<a href="#rcopula.core.measures.rho_by_quadrature" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rho_by_quadrature</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_LEVEL</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Spearman's rho as :math:<code>12\int\int C\,du\,dv - 3</code>.</p>
+<p>Needs only the CDF, so it works for every bivariate copula -- including
+those with no density at all.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Reproduces the analytic value for families that have one:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GumbelCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.core.measures</span><span class="w"> </span><span class="kn">import</span> <span class="n">rho_by_quadrature</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)):</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">rho_by_quadrature</span><span class="p">(</span><span class="n">cop</span><span class="p">)</span> <span class="o">-</span> <span class="n">cop</span><span class="o">.</span><span class="n">rho</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">1e-8</span><span class="p">))</span>
+<span class="go">True</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.core.measures.tau_by_quadrature" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tau_by_quadrature</span>
+
+
+<a href="#rcopula.core.measures.tau_by_quadrature" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tau_by_quadrature</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_LEVEL</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Kendall's tau as :math:<code>4\int\int C\,dC - 1 = 4\int\int C\,c\,du\,dv - 1</code>.</p>
+<p>Needs the density as well as the CDF. Unlike Spearman's rho, tau is <strong>not</strong>
+linear in the copula -- which is exactly why mixtures and rotations cannot
+simply average their components' values and have to come here instead.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">GumbelCopula</span><span class="p">,</span> <span class="n">JoeCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.core.measures</span><span class="w"> </span><span class="kn">import</span> <span class="n">tau_by_quadrature</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="p">(</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">),</span> <span class="n">JoeCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)):</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">tau_by_quadrature</span><span class="p">(</span><span class="n">cop</span><span class="p">)</span> <span class="o">-</span> <span class="n">cop</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">1e-7</span><span class="p">))</span>
+<span class="go">True</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.core.measures.tau_by_partials" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tau_by_partials</span>
+
+
+<a href="#rcopula.core.measures.tau_by_partials" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tau_by_partials</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">nodes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_PARTIAL_NODES</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Kendall's tau as :math:<code>1 - 4\int\int \partial_1 C\,\partial_2 C\,du\,dv</code>.</p>
+<p>The same quantity as :func:<code>tau_by_quadrature</code>, integrated a different way,
+and better in two situations that matter.</p>
+<ul>
+<li><strong>It needs only the CDF.</strong> The :math:<code>\int\int C\,dC</code> form silently
+  assumes the copula is absolutely continuous: a copula with a singular
+  component -- Marshall-Olkin, or Clayton below zero -- carries mass that no
+  density represents, and integrating the density alone misses it. Here the
+  partial derivatives are conditional distribution functions, which exist
+  regardless.</li>
+<li><strong>The integrand is bounded in</strong> :math:<code>[0, 1]</code>. Under strong dependence
+  the density concentrates into a near-delta on the diagonal and no
+  quadrature can resolve it: at Plackett <code>theta = 1e4</code> the density form
+  returns 1.0 against a true 0.9756. The bounded form gets 0.97572.</li>
+</ul>
+<p>The trade is a numerical derivative, so it carries about 4e-8 rather than
+1e-8 -- immaterial next to what it buys.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Agrees with the closed forms:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GumbelCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.core.measures</span><span class="w"> </span><span class="kn">import</span> <span class="n">tau_by_partials</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)):</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">tau_by_partials</span><span class="p">(</span><span class="n">cop</span><span class="p">)</span> <span class="o">-</span> <span class="n">cop</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">1e-7</span><span class="p">))</span>
+<span class="go">True</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>And works where the density form cannot -- Marshall-Olkin puts mass on a
+curve, so its density integrates to less than one:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">MarshallOlkinCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">MarshallOlkinCopula</span><span class="p">(</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">tau_by_partials</span><span class="p">(</span><span class="n">cop</span><span class="p">)</span> <span class="o">-</span> <span class="n">cop</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">1e-3</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.sampling" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.sampling</span>
+
+
+<a href="#rcopula.sampling" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Quasi-random and variance-reduced copula sampling.</p>
+<p>Every Monte Carlo answer in this package -- a CDO tranche spread, a basket
+option, a portfolio's expected shortfall -- has a standard error, and the
+default way to halve it is to quadruple the sample. These are the cheaper ways.</p>
+<p><strong>Quasi-random.</strong> A Sobol or Halton point set fills the unit cube more evenly
+than independent uniforms do, because it is <em>designed</em> to rather than merely
+tending to. Pushing such a set through the inverse Rosenblatt transform gives a
+sample from the copula whose integration error falls like :math:<code>(\log n)^d / n</code>
+rather than :math:<code>n^{-1/2}</code>. For a smooth payoff in a few dimensions that is
+the difference between four digits and two.</p>
+<p>The catch, stated plainly because it is usually not: the improvement depends on
+the integrand being smooth and of low effective dimension. A payoff with a kink
+(any option), a high dimension, or a discontinuity (a default indicator) erodes
+it, and the rate can fall back to :math:<code>n^{-1/2}</code>. :func:<code>variance_ratio</code>
+measures what you actually got instead of assuming it.</p>
+<p><strong>Antithetic.</strong> Pair every draw :math:<code>z</code> with :math:<code>1 - z</code>. Free, and helps
+exactly when the integrand is monotone in the uniforms -- which a European call
+on a single asset is, and a straddle is not. It can <em>increase</em> variance for a
+symmetric payoff, so it is not a default.</p>
+<p><strong>Latin hypercube.</strong> Stratifies each margin into :math:<code>n</code> equal bins and
+permutes. Guarantees marginal coverage, does nothing about the joint structure,
+and is a good default when the answer depends mostly on the margins.</p>
+<p>============================  ================================================
+:func:<code>quasi_rvs</code>             Sobol or Halton draws from a copula.
+:func:<code>antithetic_rvs</code>        Draws paired with their reflections.
+:func:<code>latin_hypercube_rvs</code>   Stratified draws.
+:func:<code>variance_ratio</code>        What the variance reduction actually was.
+============================  ================================================</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.sampling</span><span class="w"> </span><span class="kn">import</span> <span class="n">quasi_rvs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">quasi_rvs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="mi">1024</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(1024, 2)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">cor_kendall</span><span class="p">(</span><span class="n">u</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Cambou, M., Hofert, M. and Lemieux, C. (2017). Quasi-random numbers for copula
+    models. <em>Statistics and Computing</em> 27(5), 1307-1329.
+    The paper this implements: low-discrepancy sequences through the inverse
+    Rosenblatt transform.
+Sobol', I. M. (1967). On the distribution of points in a cube and the
+    approximate evaluation of integrals.
+    <em>USSR Computational Mathematics and Mathematical Physics</em> 7(4), 86-112.
+Owen, A. B. (1997). Scrambled net variance for integrals of smooth functions.
+    <em>Annals of Statistics</em> 25(4), 1541-1562.
+    Why scrambling is what makes an error estimate possible at all.
+McKay, M. D., Beckman, R. J. and Conover, W. J. (1979). A comparison of three
+    methods for selecting values of input variables in the analysis of output
+    from a computer code. <em>Technometrics</em> 21(2), 239-245.
+    Latin hypercube sampling.
+Glasserman, P. (2003). <em>Monte Carlo Methods in Financial Engineering</em>.
+    Springer. Chapter 4 on variance reduction, chapter 5 on quasi-Monte Carlo.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.sampling.quasi_rvs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">quasi_rvs</span>
+
+
+<a href="#rcopula.sampling.quasi_rvs" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">quasi_rvs</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">sequence</span><span class="p">:</span> <span class="n">Sequence</span> <span class="o">=</span> <span class="s1">&#39;sobol&#39;</span><span class="p">,</span> <span class="n">scramble</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from a copula using a low-discrepancy point set.</p>
+<p>Generates a Sobol or Halton set in :math:<code>[0,1]^d</code> and pushes it through the
+copula's inverse Rosenblatt transform (Cambou, Hofert and Lemieux 2017). The
+result has the right distribution and covers the space more evenly than
+independent draws.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of points. For Sobol, a power of two preserves the balance
+properties the construction is built on; scipy warns otherwise, and so
+does the note below.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>sequence</code>
+            </td>
+            <td>
+                  <code>(&#39;sobol&#39;, &#39;halton&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Sobol is the usual choice and better in moderate dimensions; Halton is
+simpler and degrades faster past about ten.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;sobol&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>scramble</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Owen scrambling. Keep it on: an unscrambled set is deterministic, so it
+gives <em>one</em> answer with no way to estimate its error, and its first
+point is the corner of the cube. Scrambling preserves the low
+discrepancy and restores the ability to replicate.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seeds the scrambling.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="size">size</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The gain depends on the integrand. Smooth and low-dimensional: large. Kinked
+(any option payoff), high-dimensional, or discontinuous (a default
+indicator): smaller, sometimes none. Measure it with :func:<code>variance_ratio</code>
+rather than assuming.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The margins are uniform and the dependence is right, as for <code>rvs</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.sampling</span><span class="w"> </span><span class="kn">import</span> <span class="n">quasi_rvs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">quasi_rvs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">),</span> <span class="mi">4096</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">))</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">cor_kendall</span><span class="p">(</span><span class="n">u</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Coverage is visibly more even -- the largest gap between consecutive sorted
+values in a margin is smaller than for independent draws:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plain</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">gap</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">a</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">gap</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">gap</span><span class="p">(</span><span class="n">plain</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.sampling.antithetic_rvs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">antithetic_rvs</span>
+
+
+<a href="#rcopula.sampling.antithetic_rvs" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">antithetic_rvs</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from a copula in antithetic pairs.</p>
+<p>Each independent uniform vector :math:<code>z</code> is used twice, as :math:<code>z</code> and
+:math:<code>1-z</code>, before the inverse Rosenblatt transform. The two resulting
+draws are negatively associated, so a Monte Carlo average over them has
+lower variance <strong>when the integrand is monotone in the uniforms</strong>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Total number of draws. Rounded up to an even number, since they come in
+pairs; the first half and second half are the partners of each other, so
+<code>u[i]</code> pairs with <code>u[size // 2 + i]</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="size">size</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="warning" open>
+  <summary>Warnings</summary>
+  <p>For a payoff symmetric about the middle of the distribution -- a straddle, an
+absolute deviation, a variance -- antithetic pairing can <em>raise</em> variance
+rather than lower it, because the two halves of a pair move the same way.
+Check with :func:<code>variance_ratio</code> before adopting it.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.sampling</span><span class="w"> </span><span class="kn">import</span> <span class="n">antithetic_rvs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">antithetic_rvs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="mi">2000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(2000, 2)</span>
+</code></pre></div>
+    <p>The pairing is exact on the first coordinate, which the transform leaves
+alone:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">half</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">u</span><span class="p">[:</span><span class="n">half</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">u</span><span class="p">[</span><span class="n">half</span><span class="p">:,</span> <span class="mi">0</span><span class="p">],</span> <span class="mf">1.0</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.sampling.latin_hypercube_rvs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">latin_hypercube_rvs</span>
+
+
+<a href="#rcopula.sampling.latin_hypercube_rvs" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">latin_hypercube_rvs</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from a copula using a Latin hypercube design.</p>
+<p>Each of the :math:<code>d</code> uniform coordinates is stratified into <code>size</code> equal
+bins with exactly one point per bin, then the columns are permuted
+independently. The marginal coverage is therefore guaranteed rather than
+random, which is worth having when the answer depends mostly on the margins.</p>
+<p>It says nothing about the <em>joint</em> structure -- that comes from the inverse
+Rosenblatt transform, as usual.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Every margin covers its range by construction, so the sample mean of a
+uniform coordinate is almost exactly one half:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.sampling</span><span class="w"> </span><span class="kn">import</span> <span class="n">latin_hypercube_rvs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">latin_hypercube_rvs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">FrankCopula</span><span class="p">(</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">),</span> <span class="mi">2000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.005</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">cor_kendall</span><span class="p">(</span><span class="n">u</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">rc</span><span class="o">.</span><span class="n">FrankCopula</span><span class="p">(</span><span class="mf">5.0</span><span class="p">)</span><span class="o">.</span><span class="n">tau</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mf">0.03</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.sampling.variance_ratio" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">variance_ratio</span>
+
+
+<a href="#rcopula.sampling.variance_ratio" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">variance_ratio</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">payoff</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]],</span> <span class="n">ArrayLike</span><span class="p">],</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;sobol&#39;</span><span class="p">,</span> <span class="n">replicates</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Measure what a variance-reduction method actually bought.</p>
+<p>Runs the estimator <code>replicates</code> times under plain Monte Carlo and again
+under <code>method</code>, and compares the spread of the answers. This is the honest
+way to report a quasi-Monte Carlo gain: the theory gives a rate, not a
+number, and the number depends on the payoff.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>payoff</code>
+            </td>
+            <td>
+                  <code><span title="callable">callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Takes an <code>(n, d)</code> array of copula draws and returns a value per row.
+The quantity estimated is its mean.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Draws per replicate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code>(&#39;sobol&#39;, &#39;halton&#39;, &#39;antithetic&#39;, &#39;lhs&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>&#34;sobol&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>replicates</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Independent repetitions. Each uses a different scramble or seed, which
+is what makes a spread measurable at all -- an unscrambled quasi-random
+set would give the same answer every time and no error estimate.</p>
+              </div>
+            </td>
+            <td>
+                  <code>20</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>"plain_se"</code>, <code>"reduced_se"</code>, <code>"ratio"</code> (plain over reduced;
+above 1 means the method helped), <code>"equivalent_sample_factor"</code> (how
+many times more plain draws would be needed to match), and the two mean
+estimates, which should agree.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>A smooth payoff, where quasi-random sampling does well:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.sampling</span><span class="w"> </span><span class="kn">import</span> <span class="n">variance_ratio</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smooth</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">out</span> <span class="o">=</span> <span class="n">variance_ratio</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">smooth</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="n">replicates</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="gp">... </span>                     <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="s2">&quot;ratio&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="s2">&quot;plain_mean&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">out</span><span class="p">[</span><span class="s2">&quot;reduced_mean&quot;</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

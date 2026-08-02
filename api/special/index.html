@@ -1,0 +1,3448 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Copula modelling in Python, verified against R's copula package">
+      
+      
+      
+      
+        <link rel="prev" href="../applications/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Special functions - rcopula</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#special-functions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="rcopula" class="md-header__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            rcopula
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Special functions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="rcopula" class="md-nav__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    rcopula
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What copulas are for
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../choosing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a family
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../r-translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from R
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How parity is verified
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../families/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Copula families
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../structural/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structural constructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gof/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Goodness of fit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transforms and Kendall
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../applications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Applications
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Special functions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Special functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stable
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.sinc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sinc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.rstable_positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rstable_positive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.rlog_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rlog_series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.rsibuya" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rsibuya
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.retstable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        retstable
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mvtnorm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mvtnorm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.bvn_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bvn_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.ndtr_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ndtr_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.tvn_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tvn_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.mvn_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mvn_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.mvt_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mvt_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.debye" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="debye">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.debye.debye_n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye_n
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.debye.debye1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.debye.debye2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye2
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.logexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        logexp
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="logexp">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.logexp.log1mexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log1mexp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.logexp.log1pexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log1pexp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.logexp.signed_logsumexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        signed_logsumexp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        combinatorics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="combinatorics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling1_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling1_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling2_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling2_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.eulerian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eulerian
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.eulerian_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eulerian_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stable
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.sinc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sinc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.rstable_positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rstable_positive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.rlog_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rlog_series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.rsibuya" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rsibuya
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.stable.retstable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        retstable
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mvtnorm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mvtnorm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.bvn_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bvn_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.ndtr_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ndtr_
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.tvn_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tvn_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.mvn_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mvn_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.mvtnorm.mvt_cdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mvt_cdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.debye" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="debye">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.debye.debye_n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye_n
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.debye.debye1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.debye.debye2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        debye2
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.logexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        logexp
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="logexp">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.logexp.log1mexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log1mexp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.logexp.log1pexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log1pexp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.logexp.signed_logsumexp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        signed_logsumexp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        combinatorics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="combinatorics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling1_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling1_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.stirling2_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stirling2_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.eulerian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eulerian
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.combinatorics.eulerian_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eulerian_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="special-functions">Special functions<a class="headerlink" href="#special-functions" title="Permanent link">&para;</a></h1>
+<p>Clean-room implementations of the numerics the families need. Every one is
+validated against <code>mpmath</code> at 60 digits as well as against R.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.special.stable" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.special.stable</span>
+
+
+<a href="#rcopula.special.stable" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Samplers for the frailty (mixing) distributions of Archimedean copulas.</p>
+<p>Every Archimedean copula whose generator is completely monotone can be written
+as a <em>frailty mixture</em>: draw :math:<code>V \sim F</code>, draw iid :math:<code>E_j \sim
+\mathrm{Exp}(1)</code>, and set :math:<code>U_j = \psi(E_j / V)</code>. The resulting
+:math:<code>U</code> has copula :math:<code>C</code> with generator :math:<code>\psi = \mathcal{L}[F]</code>.
+This is the Marshall-Olkin algorithm, and it is how <code>rcopula</code> samples every
+Archimedean family in :math:<code>d &gt; 2</code>.</p>
+<pre><code>Marshall, A. W. and Olkin, I. (1988). Families of multivariate
+distributions. *JASA* 83(403), 834-841.
+</code></pre>
+<p>Each family needs its own :math:<code>V_0</code>:</p>
+<p>======== ==================================== ==============================
+Family   :math:<code>V_0</code>                          Implemented by
+======== ==================================== ==============================
+Clayton  Gamma(1/theta, 1)                    <code>numpy</code> directly
+Gumbel   positive stable S(1/theta, 1, ...)   :func:<code>rstable_positive</code>
+Frank    logarithmic series, p = 1 - e^-theta :func:<code>rlog_series</code>
+Joe      Sibuya(1/theta)                      :func:<code>rsibuya</code>
+AMH      Geometric(1 - theta)                 <code>numpy</code> directly
+======== ==================================== ==============================</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Chambers, J. M., Mallows, C. L. and Stuck, B. W. (1976). A method for
+    simulating stable random variables. <em>JASA</em> 71(354), 340-344.
+    The CMS algorithm used by :func:<code>rstable_positive</code>.
+Kemp, A. W. (1981). Efficient generation of logarithmically distributed
+    pseudo-random variables. <em>Applied Statistics</em> 30(3), 249-253.
+    The "LK" algorithm used by :func:<code>rlog_series</code>.
+Hofert, M. (2008). Sampling Archimedean copulas. <em>Computational Statistics &amp;
+    Data Analysis</em> 52(12), 5163-5174.
+    Sibuya sampling and the family-to-frailty correspondence.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.stable.sinc" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">sinc</span>
+
+
+<a href="#rcopula.special.stable.sinc" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">sinc</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>sin(x) / x</code>, continuous at zero where it equals 1.</p>
+<p>Appears in Zolotarev's representation of the stable density.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.stable.rstable_positive" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rstable_positive</span>
+
+
+<a href="#rcopula.special.stable.rstable_positive" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rstable_positive</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rng</span><span class="p">:</span> <span class="n">Generator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from the positive stable law :math:<code>S(\alpha, 1, \gamma, 0; 1)</code>
+with :math:<code>\gamma = \cos(\pi\alpha/2)^{1/\alpha}</code>.</p>
+<p>This is the frailty distribution of the Gumbel copula with
+:math:<code>\alpha = 1/\theta</code>. Its Laplace transform is
+:math:<code>\mathbb{E}[e^{-tV}] = e^{-t^{\alpha}}</code>, which is exactly the Gumbel
+generator.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of draws.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>alpha</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Stability index in <code>(0, 1]</code>. <code>alpha = 1</code> degenerates to the constant
+<code>1</code> (the independence case, <code>theta = 1</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng</code>
+            </td>
+            <td>
+                  <code><span title="numpy.random.Generator">Generator</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Strictly positive draws.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Implements the Chambers-Mallows-Stuck transformation directly rather than
+going through <code>scipy.stats.levy_stable</code>: the generic scipy path is far
+slower and its S0/S1 parameterisation mapping is easy to get subtly wrong
+for the totally-skewed case needed here.</p>
+<p>With :math:<code>W \sim \mathrm{Exp}(1)</code> and :math:<code>U \sim \mathrm{Unif}(0, \pi)</code>,</p>
+<p>.. math::</p>
+<pre><code>V = \frac{\sin(\alpha U)}{\sin(U)^{1/\alpha}}
+    \left(\frac{\sin((1-\alpha)U)}{W}\right)^{(1-\alpha)/\alpha}
+</code></pre>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The defining Laplace transform, checked by Monte Carlo:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">v</span> <span class="o">=</span> <span class="n">rstable_positive</span><span class="p">(</span><span class="mi">200_000</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="mf">1.3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">t</span> <span class="o">*</span> <span class="n">v</span><span class="p">))</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">t</span> <span class="o">**</span> <span class="mf">0.5</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mf">5e-3</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.stable.rlog_series" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rlog_series</span>
+
+
+<a href="#rcopula.special.stable.rlog_series" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rlog_series</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rng</span><span class="p">:</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">log1mp</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from the logarithmic series distribution with parameter <code>p</code>.</p>
+<p>:math:<code>P(V = k) = -p^k / (k \log(1 - p))</code> for :math:<code>k = 1, 2, \dots</code>.
+This is the frailty of the Frank copula with :math:<code>p = 1 - e^{-\theta}</code>.</p>
+<p>Implements Kemp's (1981) "LK" algorithm: a chop-down search from the mode
+for small <code>p</code>, and an inversion-based shortcut otherwise.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of draws.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Series parameter in <code>(0, 1]</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng</code>
+            </td>
+            <td>
+                  <code><span title="Generator">Generator</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Source of randomness.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>log1mp</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A separately computed :math:<code>\log(1 - p)</code>. Supply it whenever <code>p</code> was
+formed as <code>1 - e^{-\theta}</code>: past <code>theta</code> around 37 that expression
+rounds to exactly 1, so <code>log1p(-p)</code> becomes <code>-inf</code> and the sampler
+fails outright -- even though the quantity it actually needs is just
+<code>-theta</code>, known exactly. The Frank copula reaches that at
+<code>tau = 0.92</code>, well inside the range people fit.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Mean of the logarithmic distribution is <code>-p / ((1-p) log(1-p))</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="mf">0.6</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">v</span> <span class="o">=</span> <span class="n">rlog_series</span><span class="p">(</span><span class="mi">200_000</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="o">-</span><span class="n">p</span> <span class="o">/</span> <span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="o">-</span><span class="n">p</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">expected</span><span class="p">)</span> <span class="o">/</span> <span class="n">expected</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Passing <code>log1mp</code> keeps it working where <code>p</code> itself has saturated:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">theta</span> <span class="o">=</span> <span class="mf">60.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="o">-</span><span class="n">theta</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">p</span> <span class="o">==</span> <span class="mf">1.0</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">v</span> <span class="o">=</span> <span class="n">rlog_series</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">rng</span><span class="p">,</span> <span class="n">log1mp</span><span class="o">=-</span><span class="n">theta</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">v</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.stable.rsibuya" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rsibuya</span>
+
+
+<a href="#rcopula.special.stable.rsibuya" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rsibuya</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rng</span><span class="p">:</span> <span class="n">Generator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from the Sibuya distribution with parameter <code>alpha</code> in <code>(0, 1]</code>.</p>
+<p>:math:<code>P(V = k) = \binom{k - 1 - \alpha}{k - 1}\frac{\alpha}{k}</code>, with
+generating function :math:<code>1 - (1 - t)^{\alpha}</code>. This is the frailty of the
+Joe copula with :math:<code>\alpha = 1/\theta</code>.</p>
+<p>Sampled by the inversion method of Hofert (2008): with
+:math:<code>U \sim \mathrm{Unif}(0,1)</code>, return 1 if
+:math:<code>U \le \alpha</code>, else invert the tail using the Beta relationship.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Sibuya is heavy-tailed with infinite mean for <code>alpha &lt; 1</code>; the sampler
+must therefore produce occasional very large values.</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">v</span> <span class="o">=</span> <span class="n">rsibuya</span><span class="p">(</span><span class="mi">100_000</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">((</span><span class="n">v</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">and</span> <span class="n">v</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p><code>alpha = 1</code> degenerates to the point mass at 1:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">((</span><span class="n">rsibuya</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">())</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>The survival function is matched, not just the shape:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">gammaln</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">v</span> <span class="o">=</span> <span class="n">rsibuya</span><span class="p">(</span><span class="mi">400_000</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">k</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">exact</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">gammaln</span><span class="p">(</span><span class="n">k</span> <span class="o">-</span> <span class="mf">0.7</span><span class="p">)</span> <span class="o">-</span> <span class="n">gammaln</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mf">0.7</span><span class="p">)</span> <span class="o">-</span> <span class="n">gammaln</span><span class="p">(</span><span class="n">k</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">((</span><span class="n">v</span> <span class="o">&gt;=</span> <span class="n">k</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">exact</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">5e-3</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.stable.retstable" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">retstable</span>
+
+
+<a href="#rcopula.special.stable.retstable" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">retstable</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">v0</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span> <span class="n">h</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rng</span><span class="p">:</span> <span class="n">Generator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Draw from the <strong>exponentially tilted</strong> positive stable distribution.</p>
+<p>Defined by its Laplace transform,</p>
+<p>.. math::
+    \mathbb{E}\bigl[e^{-tV}\bigr]
+        = \exp\bigl(-V_0\,\bigl[(t + h)^{\alpha} - h^{\alpha}\bigr]\bigr),</p>
+<p>which is the inner frailty of a <strong>nested Clayton</strong> copula and the reason
+nested Archimedean copulas have never been available in Python: this
+distribution has no closed-form density, no quantile function, and no
+implementation in NumPy, SciPy or any copula package.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of draws. Ignored when <code>v0</code> is an array, whose length wins.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>alpha</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Stability index in <code>(0, 1]</code>. At <code>alpha = 1</code> the law is degenerate at
+<code>v0</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>v0</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> or <span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The multiplier in the exponent. May vary per draw, which is what the
+nested sampler needs -- each observation carries its own outer frailty.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>h</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Tilt. <code>h = 0</code> gives the untilted stable.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng</code>
+            </td>
+            <td>
+                  <code><span title="Generator">Generator</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p><strong>Method.</strong> Rejection from the untilted stable accepts with probability
+exactly :math:<code>e^{-V_0 h^\alpha}</code>, which is fine for a small exponent and
+hopeless otherwise -- worse, for <code>V0 ~ Gamma(k, 1)</code> with <code>k &gt;= 1</code> the
+<em>expected</em> number of attempts is infinite, so a naive implementation does
+not merely run slowly, it occasionally does not finish.</p>
+<p>Infinite divisibility fixes it. The law is the sum of <code>k</code> independent
+draws with <code>V0/k</code> in place of <code>V0</code> -- the Laplace transforms multiply to
+give back the original -- and each of those accepts with probability
+:math:<code>e^{-V_0 h^\alpha / k}</code>. Taking :math:<code>k = \lceil V_0 h^\alpha\rceil</code>
+puts every piece's acceptance at about :math:<code>e^{-1}</code>, so the work becomes
+<strong>linear</strong> in :math:<code>V_0 h^\alpha</code> rather than exponential. The result is
+exact: no approximation enters at any point.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The defining Laplace transform, checked by Monte Carlo:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alpha</span><span class="p">,</span> <span class="n">v0</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.8</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">v</span> <span class="o">=</span> <span class="n">retstable</span><span class="p">(</span><span class="mi">200_000</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">v0</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">want</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">v0</span> <span class="o">*</span> <span class="p">((</span><span class="n">t</span> <span class="o">+</span> <span class="n">h</span><span class="p">)</span> <span class="o">**</span> <span class="n">alpha</span> <span class="o">-</span> <span class="n">h</span> <span class="o">**</span> <span class="n">alpha</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">t</span> <span class="o">*</span> <span class="n">v</span><span class="p">))</span> <span class="o">-</span> <span class="n">want</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">3e-3</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>The mean is <code>alpha * v0 * h**(alpha - 1)</code>, by differentiating it:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">alpha</span> <span class="o">*</span> <span class="n">v0</span> <span class="o">*</span> <span class="n">h</span> <span class="o">**</span> <span class="p">(</span><span class="n">alpha</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>A zero tilt gives the ordinary positive stable back:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">untilted</span> <span class="o">=</span> <span class="n">retstable</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">untilted</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.special.mvtnorm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.special.mvtnorm</span>
+
+
+<a href="#rcopula.special.mvtnorm" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Multivariate normal and Student-t distribution functions.</p>
+<p><code>scipy.stats.multivariate_normal.cdf</code> exists but is unsuitable here for two
+reasons. It is <strong>not deterministic</strong> — two identical calls on a 10-dimensional
+problem differ by ~5e-6 — and it accepts no <code>random_state</code>, so the
+non-determinism cannot even be pinned down. A copula library needs a CDF that
+returns the same number every time, both for reproducible research and so that
+golden fixtures mean anything.</p>
+<p>This module therefore provides its own, with the accuracy split by dimension:</p>
+<ul>
+<li><code>d = 2</code>: <strong>exact</strong>, via Owen's T function. No quadrature at all.</li>
+<li><code>d &gt;= 3</code>: the <strong>Genz separation-of-variables transformation</strong> evaluated on a
+  scrambled Sobol sequence with a fixed seed. Randomised QMC converges far
+  faster than plain Monte Carlo on this integrand and, with the seed pinned, is
+  reproducible to the last bit.</li>
+</ul>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Genz, A. (1992). Numerical computation of multivariate normal probabilities.
+    <em>Journal of Computational and Graphical Statistics</em> 1(2), 141-149.
+Genz, A. and Bretz, F. (2009). <em>Computation of Multivariate Normal and t
+    Probabilities</em>. Springer Lecture Notes in Statistics 195.
+    Chapter 4.2 gives the Student-t radial mixture used in :func:<code>mvt_cdf</code>.
+Owen, D. B. (1956). Tables for computing bivariate normal probabilities.
+    <em>Annals of Mathematical Statistics</em> 27(4), 1075-1090.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.mvtnorm.bvn_cdf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">bvn_cdf</span>
+
+
+<a href="#rcopula.special.mvtnorm.bvn_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">bvn_cdf</span><span class="p">(</span><span class="n">h</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">rho</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Exact standard bivariate normal CDF :math:<code>\Phi_2(h, k; \rho)</code>.</p>
+<p>Uses the Owen (1956) decomposition</p>
+<p>.. math::</p>
+<pre><code>\Phi_2(h,k;\rho) = \tfrac{1}{2}\bigl(\Phi(h) + \Phi(k)\bigr)
+                   - T(h, a_h) - T(k, a_k) - \beta
+</code></pre>
+<p>with :math:<code>a_h = (k/h - \rho)/\sqrt{1-\rho^2}</code>, and :math:<code>\beta = 1/2</code>
+when :math:<code>hk &lt; 0</code> (or :math:<code>hk = 0</code> with :math:<code>h + k &lt; 0</code>), else 0.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>h</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Upper integration limits, broadcast against each other.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>k</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Upper integration limits, broadcast against each other.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>rho</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Correlation in <code>[-1, 1]</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>:math:<code>P(X \le h,\ Y \le k)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Independence factorises:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special.mvtnorm</span><span class="w"> </span><span class="kn">import</span> <span class="n">bvn_cdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">bvn_cdf</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="mi">12</span><span class="p">))</span>
+<span class="go">0.427262552836</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">bvn_cdf</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-</span> <span class="n">ndtr_</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">ndtr_</span><span class="p">(</span><span class="mf">0.3</span><span class="p">),</span> <span class="mi">15</span><span class="p">))</span>
+<span class="go">0.0</span>
+</code></pre></div>
+    <p>At the origin there is a closed form, <code>1/4 + arcsin(rho)/(2*pi)</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">rho</span> <span class="o">=</span> <span class="mf">0.6</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">exact</span> <span class="o">=</span> <span class="mf">0.25</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">arcsin</span><span class="p">(</span><span class="n">rho</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">bvn_cdf</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">rho</span><span class="p">),</span> <span class="n">exact</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-14</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.mvtnorm.ndtr_" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">ndtr_</span>
+
+
+<a href="#rcopula.special.mvtnorm.ndtr_" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ndtr_</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Standard normal CDF, exposed so the doctest above reads cleanly.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.mvtnorm.tvn_cdf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">tvn_cdf</span>
+
+
+<a href="#rcopula.special.mvtnorm.tvn_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tvn_cdf</span><span class="p">(</span><span class="n">upper</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">corr</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Trivariate normal CDF, to near machine precision.</p>
+<p>Conditioning on the third coordinate reduces the problem to a <em>one</em>
+dimensional integral of the <strong>exact</strong> bivariate CDF:</p>
+<p>.. math::</p>
+<pre><code>\Phi_3(x_1,x_2,x_3; R) = \int_{-\infty}^{x_3} \phi(t)\,
+    \Phi_2\!\left(\frac{x_1 - \rho_{13}t}{\sigma_1},
+                    \frac{x_2 - \rho_{23}t}{\sigma_2};
+                    \rho_{12\cdot 3}\right) \mathrm{d}t,
+</code></pre>
+<p>with :math:<code>\sigma_i = \sqrt{1-\rho_{i3}^2}</code> and the partial correlation
+:math:<code>\rho_{12\cdot3} = (\rho_{12} - \rho_{13}\rho_{23})/(\sigma_1\sigma_2)</code>.</p>
+<p>The integrand is analytic, so a fixed Gauss-Legendre rule reaches ~1e-14 --
+seven orders of magnitude better than the quasi-Monte-Carlo path this
+replaces at <code>d = 3</code>, and comparable to R's TVPACK.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special.mvtnorm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tvn_cdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">corr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">tvn_cdf</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]],</span> <span class="n">corr</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">12</span><span class="p">))</span>
+<span class="go">0.22366080778</span>
+</code></pre></div>
+    <p>Independence factorises exactly:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">vals</span> <span class="o">=</span> <span class="n">tvn_cdf</span><span class="p">([[</span><span class="mf">0.4</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">]],</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">ndtr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="n">ndtr</span><span class="p">(</span><span class="mf">0.4</span><span class="p">)</span> <span class="o">*</span> <span class="n">ndtr</span><span class="p">(</span><span class="o">-</span><span class="mf">0.2</span><span class="p">)</span> <span class="o">*</span> <span class="n">ndtr</span><span class="p">(</span><span class="mf">1.1</span><span class="p">),</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-13</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.mvtnorm.mvn_cdf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">mvn_cdf</span>
+
+
+<a href="#rcopula.special.mvtnorm.mvn_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">mvn_cdf</span><span class="p">(</span><span class="n">upper</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">corr</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Multivariate normal CDF with unit variances.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>upper</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, d)</code> (or <code>(d,)</code>) array of upper integration limits.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>corr</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(d, d)</code> correlation matrix.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_points</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of QMC points for <code>d &gt;= 3</code>. Defaults to <code>2**14</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>P(X_1 &lt;= upper_1, ..., X_d &lt;= upper_d)</code> for each row.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Deterministic: repeated calls with the same arguments return bit-identical
+results. <code>d = 2</code> is exact; higher dimensions carry a QMC error of roughly
+1e-8 at the default point count.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special.mvtnorm</span><span class="w"> </span><span class="kn">import</span> <span class="n">mvn_cdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">corr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">mvn_cdf</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]],</span> <span class="n">corr</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">12</span><span class="p">))</span>
+<span class="go">0.333333333333</span>
+</code></pre></div>
+    <p>Determinism, which <code>scipy</code>'s version does not offer:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">c</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="mf">0.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">mvn_cdf</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">]</span> <span class="o">*</span> <span class="mi">5</span><span class="p">],</span> <span class="n">c</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">b</span> <span class="o">=</span> <span class="n">mvn_cdf</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">]</span> <span class="o">*</span> <span class="mi">5</span><span class="p">],</span> <span class="n">c</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.mvtnorm.mvt_cdf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">mvt_cdf</span>
+
+
+<a href="#rcopula.special.mvtnorm.mvt_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">mvt_cdf</span><span class="p">(</span><span class="n">upper</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">corr</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Multivariate Student-t CDF with unit scale.</p>
+<p>Uses the radial mixture representation: if :math:<code>X \sim t_\nu(0, R)</code> then
+:math:<code>X = Z / \sqrt{W/\nu}</code> with :math:<code>Z \sim N(0, R)</code> and
+:math:<code>W \sim \chi^2_\nu</code>, so the t probability is the normal probability at
+rescaled limits, averaged over :math:<code>W</code> (Genz &amp; Bretz 2009, §4.2).</p>
+<p>Unlike R's <code>mvtnorm::pmvt</code>, <strong>non-integer degrees of freedom are
+supported</strong> — the radial variable is continuous, so there is no reason to
+restrict it, and t copulas are routinely fitted with fractional <code>df</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>upper</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, d)</code> array of upper integration limits.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>corr</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(d, d)</code> correlation matrix.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Degrees of freedom, <code>&gt; 0</code>. May be non-integer.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_points</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of QMC points. Defaults to <code>2**14</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Large <code>df</code> converges to the normal case:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special.mvtnorm</span><span class="w"> </span><span class="kn">import</span> <span class="n">mvn_cdf</span><span class="p">,</span> <span class="n">mvt_cdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">corr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">t_big</span> <span class="o">=</span> <span class="n">mvt_cdf</span><span class="p">([[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.2</span><span class="p">]],</span> <span class="n">corr</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="mf">1e6</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">normal</span> <span class="o">=</span> <span class="n">mvn_cdf</span><span class="p">([[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.2</span><span class="p">]],</span> <span class="n">corr</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">t_big</span> <span class="o">-</span> <span class="n">normal</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-4</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Non-integer degrees of freedom, which <code>mvtnorm::pmvt</code> rejects:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">mvt_cdf</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]],</span> <span class="n">corr</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="mf">3.5</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mf">0.3</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.special.debye" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.special.debye</span>
+
+
+<a href="#rcopula.special.debye" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Debye functions :math:<code>D_n(x)</code>.</p>
+<p>.. math::</p>
+<pre><code>D_n(x) = \frac{n}{x^n} \int_0^x \frac{t^n}{e^t - 1}\,\mathrm{d}t
+</code></pre>
+<p><code>scipy</code> does not provide these, yet they are exactly what the Frank copula's
+dependence measures are made of:</p>
+<p>.. math::</p>
+<pre><code>\tau(\theta)  &amp;= 1 - \frac{4}{\theta}\bigl(1 - D_1(\theta)\bigr) \\
+\rho(\theta)  &amp;= 1 - \frac{12}{\theta}\bigl(D_1(\theta) - D_2(\theta)\bigr)
+</code></pre>
+<p>Implemented from the standard series representations:</p>
+<pre><code>Abramowitz, M. and Stegun, I. A. (1964). *Handbook of Mathematical Functions*,
+§27.1. NIST DLMF §25.12 gives the same expansions.
+</code></pre>
+<p>Two regimes are used, switching at :math:<code>|x| = 2</code>:</p>
+<ul>
+<li><strong>Small</strong> :math:<code>|x| \le 2</code> — the Bernoulli series, convergent for
+  :math:<code>|x| &lt; 2\pi</code>:</li>
+</ul>
+<p>.. math::</p>
+<pre><code>  D_n(x) = 1 - \frac{n x}{2(n+1)}
+         + n \sum_{k \ge 1} \frac{B_{2k}\, x^{2k}}{(2k+n)\,(2k)!}
+</code></pre>
+<p>Direct evaluation of the integral form here would cancel catastrophically.</p>
+<ul>
+<li><strong>Large</strong> :math:<code>|x| &gt; 2</code> — expand :math:<code>(e^t-1)^{-1} = \sum_{k\ge1} e^{-kt}</code>
+  and integrate termwise:</li>
+</ul>
+<p>.. math::</p>
+<pre><code>  D_n(x) = \frac{n\,n!}{x^n} \sum_{k \ge 1} \frac{1}{k^{n+1}}
+           \left[1 - e^{-kx} \sum_{j=0}^{n} \frac{(kx)^j}{j!}\right]
+</code></pre>
+<p>The bracket tends to :math:<code>1</code>, so the terms decay only like
+  :math:<code>k^{-(n+1)}</code> and truncating the sum directly would leave a zeta-tail
+  error of order :math:<code>K^{-n}</code> — about 1% at :math:<code>K = 60</code>, :math:<code>n = 1</code>.
+  Instead the constant part is summed in closed form,
+  :math:<code>\sum_{k\ge1} k^{-(n+1)} = \zeta(n+1)</code>, leaving</p>
+<p>.. math::</p>
+<pre><code>  D_n(x) = \frac{n\,n!}{x^n} \left[ \zeta(n+1)
+         - \sum_{k \ge 1} \frac{e^{-kx}}{k^{n+1}}
+           \sum_{j=0}^{n} \frac{(kx)^j}{j!} \right]
+</code></pre>
+<p>whose remaining sum decays geometrically like :math:<code>e^{-kx}</code>. This also makes
+  the correct asymptote :math:<code>D_n(x) \to n\,n!\,\zeta(n+1)/x^n</code> exact.</p>
+<p>Negative arguments use the exact reflection
+:math:<code>D_n(-x) = D_n(x) + \frac{n x}{n + 1}</code>, which follows from the series
+(only even powers of :math:<code>x</code> appear beyond the linear term).</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.debye.debye_n" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">debye_n</span>
+
+
+<a href="#rcopula.special.debye.debye_n" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">debye_n</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Evaluate the Debye function :math:<code>D_n(x)</code> of order <code>n</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Real arguments. <code>x = 0</code> returns <code>1</code> (the limiting value); negative
+arguments are handled exactly by reflection.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Order, <code>n &gt;= 1</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>:math:<code>D_n(x)</code>, elementwise.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>:math:<code>D_n</code> is decreasing on :math:<code>(0, \infty)</code> with :math:<code>D_n(0) = 1</code> and
+:math:<code>D_n(x) \to n\,n!\,\zeta(n+1) / x^n</code> as :math:<code>x \to \infty</code>.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">debye_n</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">debye_n</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+<span class="go">1.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">debye_n</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">10</span><span class="p">))</span>
+<span class="go">0.7775046341</span>
+</code></pre></div>
+    <p>The reflection identity holds exactly:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="mf">3.7</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lhs</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">debye_n</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rhs</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">debye_n</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="mi">3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-14</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.debye.debye1" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">debye1</span>
+
+
+<a href="#rcopula.special.debye.debye1" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">debye1</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>First-order Debye function :math:<code>D_1(x)</code>.</p>
+<p>Appears in the Frank copula's Kendall tau,
+:math:<code>\tau(\theta) = 1 - 4\bigl(1 - D_1(\theta)\bigr)/\theta</code>.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Frank's tau at <code>theta = 5</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">debye1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">theta</span> <span class="o">=</span> <span class="mf">5.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tau</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">4</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="nb">float</span><span class="p">(</span><span class="n">debye1</span><span class="p">(</span><span class="n">theta</span><span class="p">)))</span> <span class="o">/</span> <span class="n">theta</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">tau</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+<span class="go">0.4567009582</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.debye.debye2" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">debye2</span>
+
+
+<a href="#rcopula.special.debye.debye2" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">debye2</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Second-order Debye function :math:<code>D_2(x)</code>.</p>
+<p>Appears in the Frank copula's Spearman rho,
+:math:<code>\rho(\theta) = 1 - 12\bigl(D_1(\theta) - D_2(\theta)\bigr)/\theta</code>.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Frank's rho at <code>theta = 5</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">debye1</span><span class="p">,</span> <span class="n">debye2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">theta</span> <span class="o">=</span> <span class="mf">5.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rho</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">12</span> <span class="o">*</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">debye1</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span> <span class="o">-</span> <span class="nb">float</span><span class="p">(</span><span class="n">debye2</span><span class="p">(</span><span class="n">theta</span><span class="p">)))</span> <span class="o">/</span> <span class="n">theta</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">rho</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+<span class="go">0.6434871081</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.special.logexp" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.special.logexp</span>
+
+
+<a href="#rcopula.special.logexp" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Accurate evaluation of <code>log(1 - exp(-a))</code> and <code>log(1 + exp(x))</code>.</p>
+<p>Both expressions are numerically treacherous: each has a regime where the naive
+formula cancels catastrophically and a regime where it overflows. The
+piecewise-optimal cutoffs used here are derived in</p>
+<pre><code>Mächler, M. (2012). *Accurately Computing log(1 - exp(-|a|))*.
+Assessed by the Rmpfr package vignette.
+https://cran.r-project.org/package=Rmpfr/vignettes/log1mexp-note.pdf
+</code></pre>
+<p>For <code>log1mexp</code> the optimal switch is at <code>a = log 2</code>: below it <code>log(-expm1(-a))</code>
+is accurate, above it <code>log1p(-exp(-a))</code> is. For <code>log1pexp</code> the note gives the
+four-regime cutoffs -37 / 18 / 33.3, chosen so that the discarded term falls below
+the double-precision epsilon.</p>
+<p>Also provided is a sign-aware log-sum-exp, needed because the <code>d</code>-dimensional
+Archimedean densities are alternating sums whose terms span many orders of
+magnitude.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.logexp.log1mexp" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">log1mexp</span>
+
+
+<a href="#rcopula.special.logexp.log1mexp" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">log1mexp</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Compute <code>log(1 - exp(-a))</code> accurately for <code>a &gt; 0</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>a</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Non-negative values. <code>a = 0</code> yields <code>-inf</code> (since <code>log 0 = -inf</code>);
+negative values yield <code>nan</code>, because <code>1 - exp(-a) &lt; 0</code> there.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>log(1 - exp(-a))</code>, elementwise.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Uses <code>log(-expm1(-a))</code> for <code>a &lt;= log 2</code> and <code>log1p(-exp(-a))</code> above it,
+the switch point that minimises the worst-case relative error (Mächler 2012).</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">log1mexp</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">log1mexp</span><span class="p">(</span><span class="mf">1e-10</span><span class="p">))</span>          <span class="c1"># naive log(1 - exp(-a)) loses all precision here</span>
+<span class="go">-23.025850929990458</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">log1mexp</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.logexp.log1pexp" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">log1pexp</span>
+
+
+<a href="#rcopula.special.logexp.log1pexp" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">log1pexp</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Compute <code>log(1 + exp(x))</code> accurately for all real <code>x</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Any real values.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>log(1 + exp(x))</code>, elementwise. This is the softplus function.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Four regimes, with cutoffs from Mächler (2012):</p>
+<p>==================  ==============================
+Range               Formula
+==================  ==============================
+<code>x &lt;= -37</code>        <code>exp(x)</code>
+<code>-37 &lt; x &lt;= 18</code>   <code>log1p(exp(x))</code>
+<code>18 &lt; x &lt;= 33.3</code>  <code>x + exp(-x)</code>
+<code>x &gt; 33.3</code>        <code>x</code>
+==================  ==============================</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">log1pexp</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">log1pexp</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
+<span class="go">0.6931471805599453</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">log1pexp</span><span class="p">(</span><span class="mf">1000.0</span><span class="p">))</span>         <span class="c1"># naive exp(1000) would overflow</span>
+<span class="go">1000.0</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.logexp.signed_logsumexp" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">signed_logsumexp</span>
+
+
+<a href="#rcopula.special.logexp.signed_logsumexp" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">signed_logsumexp</span><span class="p">(</span><span class="n">log_abs</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">signs</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Sum signed terms given in log-absolute form, without leaving log space.</p>
+<p>Computes <code>log|S|</code> and <code>sign(S)</code> where <code>S = sum(signs * exp(log_abs))</code>.</p>
+<p>This is the workhorse for <code>d</code>-dimensional Archimedean densities, whose
+generator derivatives are alternating sums with terms spanning hundreds of
+orders of magnitude: forming them directly overflows, and dropping the sign
+information gives the wrong answer.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>log_abs</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Logarithms of the absolute values of the terms.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>signs</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Signs (<code>+1</code> or <code>-1</code>) of the terms; broadcast against <code>log_abs</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>axis</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Axis to sum over. <code>None</code> sums the flattened input.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>log_abs_sum</code></td>            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>log|S|</code>. Equals <code>-inf</code> where the terms cancel exactly.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+<td><code>sign_sum</code></td>            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>sign(S)</code>, one of <code>-1.0</code>, <code>0.0</code>, <code>1.0</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Cancellation that would be lost in ordinary arithmetic:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">signed_logsumexp</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lv</span><span class="p">,</span> <span class="n">sg</span> <span class="o">=</span> <span class="n">signed_logsumexp</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isneginf</span><span class="p">(</span><span class="n">lv</span><span class="p">)),</span> <span class="nb">float</span><span class="p">(</span><span class="n">sg</span><span class="p">)</span>
+<span class="go">(True, 0.0)</span>
+</code></pre></div>
+    <p>A plain sum, <code>exp(1) - exp(0) = 1.718...</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">lv</span><span class="p">,</span> <span class="n">sg</span> <span class="o">=</span> <span class="n">signed_logsumexp</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="n">sg</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">lv</span><span class="p">))</span>
+<span class="go">1.7182818284590453</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.special.combinatorics" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.special.combinatorics</span>
+
+
+<a href="#rcopula.special.combinatorics" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Stirling and Eulerian numbers.</p>
+<p>These are the coefficient machinery behind the <code>d</code>-dimensional Archimedean
+densities. The Gumbel generator's <code>d</code>-th derivative, in particular, is a
+polynomial whose coefficients are built from Stirling numbers of <em>both</em> kinds:</p>
+<p>.. math::</p>
+<pre><code>a_{d,k}(\theta) = (-1)^{d-k} \sum_{j=k}^{d}
+    \theta^{-j}\, s(d, j)\, S(j, k)
+</code></pre>
+<p>as given in</p>
+<pre><code>Hofert, M., Mächler, M. and McNeil, A. J. (2012). Likelihood inference for
+Archimedean copulas in high dimensions under known margins.
+*Journal of Multivariate Analysis* 110, 133-150.
+</code></pre>
+<p>Exact integer recurrences are used and results are cached, because these are
+evaluated inside likelihood loops and the values grow large enough that
+recomputing in floating point would both cost time and lose digits.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.combinatorics.stirling1" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">stirling1</span>
+
+
+<a href="#rcopula.special.combinatorics.stirling1" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">stirling1</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Signed Stirling number of the first kind <code>s(n, k)</code>.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special.combinatorics</span><span class="w"> </span><span class="kn">import</span> <span class="n">stirling1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">[</span><span class="n">stirling1</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">)]</span>
+<span class="go">[0.0, -6.0, 11.0, -6.0, 1.0]</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.combinatorics.stirling1_all" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">stirling1_all</span>
+
+
+<a href="#rcopula.special.combinatorics.stirling1_all" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">stirling1_all</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>All <code>s(n, k)</code> for <code>k = 1..n</code>, as an array.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.combinatorics.stirling2" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">stirling2</span>
+
+
+<a href="#rcopula.special.combinatorics.stirling2" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">stirling2</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Stirling number of the second kind <code>S(n, k)</code>.</p>
+<p>The number of ways to partition <code>n</code> labelled objects into <code>k</code> non-empty
+unlabelled subsets.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special.combinatorics</span><span class="w"> </span><span class="kn">import</span> <span class="n">stirling2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">[</span><span class="n">stirling2</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">)]</span>
+<span class="go">[0.0, 1.0, 7.0, 6.0, 1.0]</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.combinatorics.stirling2_all" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">stirling2_all</span>
+
+
+<a href="#rcopula.special.combinatorics.stirling2_all" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">stirling2_all</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>All <code>S(n, k)</code> for <code>k = 1..n</code>, as an array.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.combinatorics.eulerian" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">eulerian</span>
+
+
+<a href="#rcopula.special.combinatorics.eulerian" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">eulerian</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Eulerian number <code>A(n, k)</code> — permutations of <code>n</code> with <code>k</code> ascents.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.special.combinatorics</span><span class="w"> </span><span class="kn">import</span> <span class="n">eulerian</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">[</span><span class="n">eulerian</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">)]</span>
+<span class="go">[1.0, 11.0, 11.0, 1.0]</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.combinatorics.eulerian_all" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">eulerian_all</span>
+
+
+<a href="#rcopula.special.combinatorics.eulerian_all" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">eulerian_all</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>All <code>A(n, k)</code> for <code>k = 0..n-1</code>, as an array.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

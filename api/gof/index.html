@@ -1,0 +1,2436 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Copula modelling in Python, verified against R's copula package">
+      
+      
+      
+      
+        <link rel="prev" href="../inference/">
+      
+      
+        <link rel="next" href="../transforms/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Goodness of fit - rcopula</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#goodness-of-fit-and-hypothesis-tests" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="rcopula" class="md-header__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            rcopula
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Goodness of fit
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="rcopula" class="md-nav__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    rcopula
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What copulas are for
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../choosing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a family
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../r-translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from R
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How parity is verified
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../families/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Copula families
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../structural/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structural constructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Goodness of fit
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Goodness of fit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.gof.api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        api
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="api">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.api.GofResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GofResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.api.gof_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gof_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.gof.statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        statistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="statistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.statistics.empirical_copula_at" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        empirical_copula_at
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.statistics.gof_statistic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gof_statistic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.htest.api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        api
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="api">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.TestResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TestResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.DependogramResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DependogramResult
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DependogramResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.DependogramResult.significant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        significant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.DependogramResult.summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.exch_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exch_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.rad_sym_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rad_sym_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.indep_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        indep_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.ev_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ev_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.dependogram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dependogram
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transforms and Kendall
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../applications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Applications
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../special/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Special functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.gof.api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        api
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="api">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.api.GofResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GofResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.api.gof_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gof_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.gof.statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        statistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="statistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.statistics.empirical_copula_at" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        empirical_copula_at
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.gof.statistics.gof_statistic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gof_statistic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rcopula.htest.api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        api
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="api">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.TestResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TestResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.DependogramResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DependogramResult
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DependogramResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.DependogramResult.significant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        significant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.DependogramResult.summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.exch_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exch_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.rad_sym_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rad_sym_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.indep_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        indep_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.ev_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ev_test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.htest.api.dependogram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dependogram
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="goodness-of-fit-and-hypothesis-tests">Goodness of fit and hypothesis tests<a class="headerlink" href="#goodness-of-fit-and-hypothesis-tests" title="Permanent link">&para;</a></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.gof.api" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.gof.api</span>
+
+
+<a href="#rcopula.gof.api" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Goodness-of-fit testing for copulas.</p>
+<p>Two ways to get a p-value out of a Cramer-von Mises statistic, because its null
+distribution depends on the unknown parameter and so cannot be tabulated.</p>
+<p><strong>Parametric bootstrap</strong> (<code>simulation="pb"</code>). Simulate from the fitted copula,
+refit, recompute the statistic, repeat. Correct and simple, and the reference
+procedure of Genest, Remillard &amp; Beaudoin (2009) -- but it refits the copula on
+every replicate, so a thousand replicates cost a thousand fits.</p>
+<p><strong>Multiplier bootstrap</strong> (<code>simulation="mult"</code>). Replicate the limiting
+empirical process directly instead of resampling. Because
+:math:<code>\sqrt n(\hat\theta - \theta) \approx H^{-1} n^{-1/2}\sum_i W_i</code> for the
+same influence function :math:<code>W_i</code> the standard errors already use, a
+bootstrap replicate is obtained by reweighting with random multipliers
+:math:<code>Z_i</code> -- <strong>no refitting at all</strong>. Orders of magnitude faster, and the
+procedure that makes goodness-of-fit practical at large <code>n</code>.</p>
+<p>The multiplier bootstrap has no implementation anywhere else in Python.</p>
+<p>The p-value follows Pesarin's convention,
+:math:<code>(0.5 + \#\{T_b \ge T\})/(N+1)</code>, which is strictly inside <code>(0, 1)</code> --
+a p-value of exactly zero would be an artefact of finite <code>N</code>, not evidence.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Genest, C., Remillard, B. and Beaudoin, D. (2009). Goodness-of-fit tests for
+    copulas: a review and a power study.
+    <em>Insurance: Mathematics and Economics</em> 44(2), 199-213.
+Kojadinovic, I., Yan, J. and Holmes, M. (2011). Fast large-sample goodness-of-fit
+    tests for copulas. <em>Statistica Sinica</em> 21(2), 841-871.
+    The multiplier bootstrap implemented here.
+Remillard, B. and Scaillet, O. (2009). Testing for equality between two copulas.
+    <em>Journal of Multivariate Analysis</em> 100(3), 377-386.
+Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.gof.api.GofResult" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">GofResult</span>
+
+
+<a href="#rcopula.gof.api.GofResult" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.NamedTuple">NamedTuple</span></code></p>
+
+
+
+        <p>Outcome of a goodness-of-fit test.</p>
+<p>Follows the <code>scipy.stats</code> convention of exposing <code>statistic</code> and
+<code>pvalue</code>, so it unpacks like any other test result.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.gof.api.gof_test" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">gof_test</span>
+
+
+<a href="#rcopula.gof.api.gof_test" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_test</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;Sn&#39;</span><span class="p">,</span> <span class="n">simulation</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;pb&#39;</span><span class="p">,</span> <span class="n">estim_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;mpl&#39;</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GofResult</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Test whether a copula family fits the data (R's <code>gofCopula</code>).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The family to test. Parameters are estimated from the data.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, d)</code> observations. Always rank-transformed, whatever the scale.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code>(&#39;Sn&#39;, &#39;Tn&#39;, &#39;AnChisq&#39;, &#39;AnGamma&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which statistic to use. <code>Sn</code> is the default and the recommended one.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;Sn&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>simulation</code>
+            </td>
+            <td>
+                  <code>(&#39;pb&#39;, &#39;mult&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>"pb"</code> refits on every replicate; <code>"mult"</code> reweights instead and is
+far faster. <code>"mult"</code> supports <code>Sn</code> only.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;pb&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>estim_method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimation method passed to :func:<code>~rcopula.fit</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;mpl&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rep</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of bootstrap replicates.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="Generator">Generator</span>, <span title="int">int</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed or generator.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="GofResult (rcopula.gof.api.GofResult)" href="#rcopula.gof.api.GofResult">GofResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>With <code>statistic</code> and <code>pvalue</code>, as in <code>scipy.stats</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>A large p-value is <em>not</em> evidence that the family is correct -- only that
+this test could not reject it at this sample size.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>The right family is not rejected; the wrong one is:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GumbelCopula</span><span class="p">,</span> <span class="n">gof_test</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">4.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">300</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">right</span> <span class="o">=</span> <span class="n">gof_test</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(),</span> <span class="n">x</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wrong</span> <span class="o">=</span> <span class="n">gof_test</span><span class="p">(</span><span class="n">GumbelCopula</span><span class="p">(),</span> <span class="n">x</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">right</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">wrong</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>The multiplier bootstrap reaches the same conclusion without refitting:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">fast</span> <span class="o">=</span> <span class="n">gof_test</span><span class="p">(</span><span class="n">GumbelCopula</span><span class="p">(),</span> <span class="n">x</span><span class="p">,</span> <span class="n">simulation</span><span class="o">=</span><span class="s2">&quot;mult&quot;</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">fast</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.gof.statistics" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.gof.statistics</span>
+
+
+<a href="#rcopula.gof.statistics" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Goodness-of-fit test statistics for copulas.</p>
+<p>All of these compare a fitted parametric copula against the data's own
+empirical copula. They differ in <em>what</em> they compare and hence in what kind of
+departure they are sensitive to.</p>
+<p><code>Sn</code>
+    Cramer-von Mises distance between the empirical and fitted copulas,
+    :math:<code>S_n = \sum_i \{C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)\}^2</code>.
+    The blanket test: no tuning, good all-round power, and the one to reach for
+    by default.</p>
+<p><code>Tn</code>
+    The Kolmogorov-Smirnov analogue, :math:<code>\max_i |C_n - C_{\hat\theta}|</code>.
+    Less powerful than <code>Sn</code> in nearly every published comparison, but
+    occasionally more sensitive to a single localised discrepancy.</p>
+<p><code>AnChisq</code> / <code>AnGamma</code>
+    Anderson-Darling statistics applied after collapsing the Rosenblatt-
+    transformed data to one dimension -- by a chi-squared or a gamma
+    aggregation respectively. Cheap, and sensitive in the tails where <code>Sn</code>
+    is weakest, but they only see the aggregated variable.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Genest, C., Remillard, B. and Beaudoin, D. (2009). Goodness-of-fit tests for
+    copulas: a review and a power study.
+    <em>Insurance: Mathematics and Economics</em> 44(2), 199-213.
+    The definitive comparison; <code>Sn</code> is its recommendation.
+Genest, C. and Remillard, B. (2008). Validity of the parametric bootstrap for
+    goodness-of-fit testing in semiparametric models.
+    <em>Annales de l'IHP Probabilites et Statistiques</em> 44(6), 1096-1127.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.gof.statistics.empirical_copula_at" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">empirical_copula_at</span>
+
+
+<a href="#rcopula.gof.statistics.empirical_copula_at" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">empirical_copula_at</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">at</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Empirical copula :math:<code>C_n</code> evaluated at each row of <code>at</code>.</p>
+<p>Uses the <code>1/n</code> scaling of Genest-Remillard-Beaudoin, matching R's
+<code>C.n</code> with <code>offset = 0</code>.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.gof.statistics</span><span class="w"> </span><span class="kn">import</span> <span class="n">empirical_copula_at</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">empirical_copula_at</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+<span class="go">array([0.33333333, 0.66666667, 1.        ])</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.gof.statistics.gof_statistic" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">gof_statistic</span>
+
+
+<a href="#rcopula.gof.statistics.gof_statistic" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_statistic</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;Sn&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Evaluate a goodness-of-fit statistic (R's <code>gofTstat</code>).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code><span title="array_like">array_like</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(n, d)</code> pseudo-observations. For <code>AnChisq</code>/<code>AnGamma</code> these should
+already be Rosenblatt-transformed, as in R.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fitted copula, required for <code>Sn</code> and <code>Tn</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code>(&#39;Sn&#39;, &#39;Tn&#39;, &#39;AnChisq&#39;, &#39;AnGamma&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>&#34;Sn&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The statistic. Larger values indicate worse fit.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>A well-specified model gives a small <code>Sn</code>; a misspecified one does not:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GumbelCopula</span><span class="p">,</span> <span class="n">fit</span><span class="p">,</span> <span class="n">pseudo_obs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.gof</span><span class="w"> </span><span class="kn">import</span> <span class="n">gof_statistic</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">pseudo_obs</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">4.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">right</span> <span class="o">=</span> <span class="n">gof_statistic</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">fit</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(),</span> <span class="n">u</span><span class="p">)</span><span class="o">.</span><span class="n">copula</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wrong</span> <span class="o">=</span> <span class="n">gof_statistic</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">fit</span><span class="p">(</span><span class="n">GumbelCopula</span><span class="p">(),</span> <span class="n">u</span><span class="p">)</span><span class="o">.</span><span class="n">copula</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">wrong</span> <span class="o">&gt;</span> <span class="mi">5</span> <span class="o">*</span> <span class="n">right</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="rcopula.htest.api" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">rcopula.htest.api</span>
+
+
+<a href="#rcopula.htest.api" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Specification tests for copulas.</p>
+<p>These answer questions <em>about the dependence structure</em> that come before
+choosing a family, and each one narrows the search:</p>
+<p><code>indep_test</code>
+    Is there any dependence at all? If not, nothing else matters.
+<code>exch_test</code>
+    Is the copula <strong>exchangeable</strong>, :math:<code>C(u,v) = C(v,u)</code>? Every Archimedean
+    and elliptical family is. Rejecting exchangeability rules all of them out
+    at once and points at the Khoudraji device or a rotated family.
+<code>rad_sym_test</code>
+    Is the copula <strong>radially symmetric</strong>, equal to its own survival copula?
+    Gaussian, Student-t and Frank are; Clayton, Gumbel and Joe are not.
+    Rejecting radial symmetry means the tails differ, which is exactly what a
+    risk model needs to get right.
+<code>ev_test</code>
+    Is the copula an <strong>extreme-value</strong> copula? The natural null when modelling
+    componentwise maxima.</p>
+<p>Null distributions are obtained by <strong>randomisation</strong> rather than by R's
+multiplier bootstrap. Each null hypothesis here states an invariance --
+exchangeability says :math:<code>(U,V)</code> and :math:<code>(V,U)</code> have the same law, radial
+symmetry says :math:<code>(U,V)</code> and :math:<code>(1-U,1-V)</code> do -- so applying that
+transformation at random to each observation generates exact draws from the
+null. This is simpler than the multiplier process, needs no derivative
+estimates, and is valid in finite samples rather than asymptotically. The
+statistics match R's; the p-values are computed differently and agree only up to
+Monte-Carlo error.</p>
+
+
+<details class="references" open>
+  <summary>References</summary>
+  <p>Genest, C., Neslehova, J. and Quessy, J.-F. (2012). Tests of symmetry for
+    bivariate copulas. <em>Annals of the Institute of Statistical Mathematics</em>
+    64(4), 811-834.
+Genest, C. and Neslehova, J. G. (2014). On tests of radial symmetry for
+    bivariate copulas. <em>Statistical Papers</em> 55(4), 1107-1119.
+Genest, C., Remillard, B. (2004). Test of independence and randomness based on
+    the empirical copula process. <em>Test</em> 13(2), 335-370.
+Kojadinovic, I. (2014). Some copula inference procedures adapted to the
+    presence of ties. Overview of nonparametric tests of extreme-value
+    dependence. <em>International Statistical Review</em>.</p>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.htest.api.TestResult" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">TestResult</span>
+
+
+<a href="#rcopula.htest.api.TestResult" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.NamedTuple">NamedTuple</span></code></p>
+
+
+
+        <p>Outcome of a specification test.</p>
+<p>Exposes <code>statistic</code> and <code>pvalue</code>, as <code>scipy.stats</code> tests do.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.htest.api.DependogramResult" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DependogramResult</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#rcopula.htest.api.DependogramResult" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">DependogramResult</span><span class="p">(</span><span class="n">subsets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span> <span class="n">statistics</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="n">pvalues</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="n">global_pvalue</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Independence tested on every subset of the coordinates.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.DependogramResult.subsets">subsets</span></code></td>
+            <td>
+                  <code>list of tuple</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Every subset of size two or more, in the order the statistics are
+given -- :math:<code>2^d - d - 1</code> of them.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.DependogramResult.statistics">statistics</span></code></td>
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The Cramer-von Mises statistic for each subset.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.DependogramResult.pvalues">pvalues</span></code></td>
+            <td>
+                  <code><span title="ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Permutation p-values, one per subset.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.DependogramResult.global_pvalue">global_pvalue</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A single test combining all subsets, by the minimum p-value with a
+Bonferroni-style correction through the permutation distribution -- so
+it is exact rather than conservative.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.DependogramResult.n_rep">n_rep</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.htest.api.DependogramResult.significant" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">significant</span>
+
+
+<a href="#rcopula.htest.api.DependogramResult.significant" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">significant</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Subsets whose p-value falls below <code>level</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.htest.api.DependogramResult.summary" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">summary</span>
+
+
+<a href="#rcopula.htest.api.DependogramResult.summary" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">summary</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A printable report, most significant subset first.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.htest.api.exch_test" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">exch_test</span>
+
+
+<a href="#rcopula.htest.api.exch_test" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">exch_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Test whether the copula is exchangeable (R's <code>exchTest</code>).</p>
+<p>:math:<code>H_0: C(u,v) = C(v,u)</code>, tested with
+:math:<code>S_n = \sum_i \{C_n(U_i, V_i) - C_n(V_i, U_i)\}^2</code>.</p>
+<p>Rejecting is informative out of proportion to its cost: <strong>every Archimedean
+and every elliptical copula is exchangeable</strong>, so a rejection eliminates all
+of them and directs you to asymmetric constructions such as the Khoudraji
+device.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>An exchangeable copula is not rejected:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">exch_test</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">300</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">exch_test</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>A deliberately asymmetric construction is:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">6.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">400</span><span class="p">),</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">exch_test</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.htest.api.rad_sym_test" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">rad_sym_test</span>
+
+
+<a href="#rcopula.htest.api.rad_sym_test" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rad_sym_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Test whether the copula is radially symmetric (R's <code>radSymTest</code>).</p>
+<p>:math:<code>H_0</code>: :math:<code>(U,V)</code> and :math:<code>(1-U,1-V)</code> have the same distribution,
+equivalently :math:<code>C</code> equals its own survival copula.</p>
+<p>This is the test that separates the families whose tails behave alike from
+those whose do not. Gaussian, Student-t and Frank are radially symmetric;
+Clayton, Gumbel and Joe are not. For risk work the asymmetry <em>is</em> the
+modelling question -- a copula symmetric in the tails cannot represent
+"crashes cluster but rallies do not".</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Frank is radially symmetric:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrankCopula</span><span class="p">,</span> <span class="n">rad_sym_test</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">FrankCopula</span><span class="p">(</span><span class="mf">5.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">rad_sym_test</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Clayton, with its lower-tail dependence, is not:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">6.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">rad_sym_test</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.htest.api.indep_test" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">indep_test</span>
+
+
+<a href="#rcopula.htest.api.indep_test" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">indep_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Test for independence (R's <code>indepTest</code>).</p>
+<p>:math:<code>H_0: C = \Pi</code>, tested with a Cramer-von Mises distance between the
+empirical copula and the independence copula.</p>
+<p>The null is generated by <strong>permuting each column independently</strong>, which
+destroys any dependence while leaving the margins untouched -- an exact
+randomisation test rather than an asymptotic approximation. R's
+<code>indepTestSim</code> instead simulates the limiting distribution, which costs
+:math:<code>O(N n^2 p)</code> time and :math:<code>O(n^2 p)</code> memory and becomes infeasible
+for large <code>n</code>; permutation has neither problem.</p>
+<p>Works in any dimension, unlike the other tests in this module.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">IndependenceCopula</span><span class="p">,</span> <span class="n">indep_test</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">indep</span> <span class="o">=</span> <span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">indep_test</span><span class="p">(</span><span class="n">indep</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dep</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">indep_test</span><span class="p">(</span><span class="n">dep</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>It detects dependence that Pearson correlation misses entirely -- the
+textbook demonstration that "uncorrelated" and "independent" are different
+claims:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">quadratic</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">indep_test</span><span class="p">(</span><span class="n">quadratic</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.htest.api.ev_test" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">ev_test</span>
+
+
+<a href="#rcopula.htest.api.ev_test" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ev_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Test whether the copula is an extreme-value copula (R's <code>evTestC</code>).</p>
+<p>:math:<code>H_0</code>: :math:<code>C</code> is max-stable, :math:<code>C(u^{1/m}, v^{1/m})^m = C(u,v)</code>.</p>
+<p>The null distribution comes from a <strong>parametric bootstrap through the
+Gumbel family</strong>: Gumbel is extreme-value, so resampling from a Gumbel fitted
+to the data's Kendall tau gives draws satisfying the null with comparable
+dependence strength. This is cruder than R's multiplier construction and is
+best read as indicative.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Gumbel is an extreme-value copula; Clayton is not:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">GumbelCopula</span><span class="p">,</span> <span class="n">ev_test</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">ev_test</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&gt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">5.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">ev_test</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.htest.api.dependogram" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">dependogram</span>
+
+
+<a href="#rcopula.htest.api.dependogram" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">dependogram</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependogramResult</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Test independence on every subset of the coordinates (R's <code>dependogram</code>).</p>
+<p>:func:<code>indep_test</code> answers "are these independent?" with one number. This
+answers "and <em>which</em> of them are not?", by decomposing the empirical copula
+process into one component per subset (Genest and Remillard 2004). The
+components are asymptotically independent under the null, which is what
+makes reading them separately legitimate.</p>
+<p>It routinely finds structure a global test cannot report: three variables
+can be pairwise independent and jointly dependent, and only the
+three-element subset shows it.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rep</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Permutations. The null is generated by permuting each column
+independently, which is exact rather than asymptotic.</p>
+              </div>
+            </td>
+            <td>
+                  <code>500</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;average&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DependogramResult
+
+
+  
+      dataclass
+   (rcopula.htest.api.DependogramResult)" href="#rcopula.htest.api.DependogramResult">DependogramResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Cost is :math:<code>O(n^2 2^d)</code> per permutation, because each subset needs an
+:math:<code>n \times n</code> matrix product. That is fine to a few hundred
+observations in a handful of dimensions and prohibitive beyond; subsample
+rather than wait.</p>
+<p><strong>Ties cost power.</strong> The statistic is built from the empirical copula, and
+heavily tied margins make that coarse. The same pairwise-independent
+construction below is detected easily with continuous margins and not at all
+when the coordinates take two values each -- so for count or binary data,
+read a non-significant subset as uninformative rather than as evidence of
+independence.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Pairwise independent and jointly dependent -- the case a global test can
+detect but not locate. With :math:<code>Z = (X + Y) \bmod 1</code> every pair is
+exactly independent, while the triple is deterministic:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.htest</span><span class="w"> </span><span class="kn">import</span> <span class="n">dependogram</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">400</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span><span class="p">)</span> <span class="o">%</span> <span class="mf">1.0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">dependogram</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span><span class="o">.</span><span class="n">significant</span><span class="p">()</span>
+<span class="go">[(0, 1, 2)]</span>
+</code></pre></div>
+    <p>Genuinely independent data leaves every subset alone:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">quiet</span> <span class="o">=</span> <span class="n">dependogram</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">300</span><span class="p">,</span> <span class="mi">3</span><span class="p">)),</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">quiet</span><span class="o">.</span><span class="n">significant</span><span class="p">()</span>
+<span class="go">[]</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
