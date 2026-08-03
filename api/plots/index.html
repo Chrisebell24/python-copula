@@ -824,6 +824,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#rcopula.plots.pairs_rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pairs_rosenblatt
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1043,6 +1054,17 @@
     <span class="md-ellipsis">
       
         dependogram_plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.plots.pairs_rosenblatt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pairs_rosenblatt
       
     </span>
   </a>
@@ -1783,6 +1805,167 @@ and jointly dependent, and the bar for the triple stands alone.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">ax</span> <span class="o">=</span> <span class="n">dependogram_plot</span><span class="p">(</span><span class="n">dependogram</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">ax</span><span class="o">.</span><span class="n">get_ylabel</span><span class="p">()</span>
 <span class="go">&#39;Cramer-von Mises statistic&#39;</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.plots.pairs_rosenblatt" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">pairs_rosenblatt</span>
+
+
+<a href="#rcopula.plots.pairs_rosenblatt" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">pairs_rosenblatt</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Pairwise scatter of Rosenblatt-transformed data (R's <code>pairsRosenblatt</code>).</p>
+<p>A goodness-of-fit test says <em>whether</em> a copula fits. This says <strong>where</strong> it
+does not.</p>
+<p>Under the fitted copula the Rosenblatt transform produces independent
+uniforms, so every panel below should look like structureless noise on the
+unit square. Any panel that does not is a pair the model has failed to
+describe -- and unlike a single p-value, the picture names it.</p>
+<p>Each panel is shaded by the p-value of an independence test on that pair,
+using the asymptotic normality of Kendall's tau,</p>
+<p>.. math::  \sqrt{\tfrac{9n(n-1)}{2(2n+5)}}\;\hat\tau \;\to\; N(0, 1),</p>
+<p>which is exact enough at these sample sizes and costs nothing next to a
+permutation test run :math:<code>\binom{d}{2}</code> times.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fitted model to be judged.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pseudo-observations.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>level</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Panels below this p-value are shaded.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.05</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>axes</code>
+            </td>
+            <td>
+                  <code>ndarray of Axes</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A <code>(d, d)</code> grid to draw into.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of Axes</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Reading it: structure in the panel for :math:<code>(i, j)</code> implicates the
+dependence between coordinates :math:<code>i</code> and :math:<code>j</code> <strong>given</strong> the
+coordinates before them, because the Rosenblatt transform conditions
+successively. A misfit at :math:<code>(1, 2)</code> is a plain bivariate failure; one
+at :math:<code>(3, 4)</code> is a failure of conditional dependence, which is exactly
+what a vine's higher trees exist to capture.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">matplotlib</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;Agg&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.plots</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairs_rosenblatt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">truth</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">truth</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">600</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">grid</span> <span class="o">=</span> <span class="n">pairs_rosenblatt</span><span class="p">(</span><span class="n">truth</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(3, 3)</span>
+</code></pre></div>
+    <p>Fitted with the wrong family, panels light up:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">wrong</span> <span class="o">=</span> <span class="n">pairs_rosenblatt</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">&quot;ex&quot;</span><span class="p">),</span> <span class="n">data</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wrong</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(3, 3)</span>
 </code></pre></div>
 
 
