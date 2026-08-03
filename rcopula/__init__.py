@@ -106,6 +106,8 @@ from rcopula.transforms import (
     conditional_ppf,
     htrafo,
     inverse_rosenblatt,
+    radial_cdf,
+    radial_ppf,
     radial_simplex,
     rosenblatt,
 )
@@ -196,6 +198,8 @@ __all__ = [
     "portfolio",
     "pseudo_obs",
     "rad_sym_test",
+    "radial_cdf",
+    "radial_ppf",
     "radial_simplex",
     "return_period_level",
     "risk",

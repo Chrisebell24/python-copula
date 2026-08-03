@@ -44,6 +44,8 @@ __all__ = [
     "conditional_ppf",
     "htrafo",
     "inverse_rosenblatt",
+    "radial_cdf",
+    "radial_ppf",
     "radial_simplex",
     "rosenblatt",
 ]
@@ -547,3 +549,106 @@ def htrafo(copula: ArchimedeanCopula, u: ArrayLike) -> NDArray[np.float64]:
     # distribution function evaluated at C(u).
     out[:, dim - 1] = kendall_cdf(copula, copula.generator.psi(radial, theta))
     return np.clip(out, 0.0, 1.0)
+
+
+def radial_cdf(copula: ArchimedeanCopula, x: ArrayLike) -> NDArray[np.float64]:
+    r"""Distribution function of the radial part (R's ``pacR``).
+
+    :func:`radial_simplex` splits an Archimedean sample into a radial variable
+    :math:`R = \sum_j \psi^{-1}(U_j)` and a point uniform on the simplex. The
+    angular half is the same for every Archimedean copula in every dimension,
+    so **all** the family-specific information lives in the distribution of
+    :math:`R` -- which is this.
+
+    It needs no new machinery, because it is the Kendall distribution function
+    in disguise. Since :math:`C(\mathbf U) = \psi(R)` and :math:`\psi` is
+    decreasing,
+
+    .. math::
+
+        K(t) = P\{\psi(R) \le t\} = P\{R \ge \psi^{-1}(t)\},
+        \qquad\text{so}\qquad
+        F_R(x) = 1 - K(\psi(x)).
+
+    Parameters
+    ----------
+    copula : ArchimedeanCopula
+    x : array_like
+        Radii, non-negative.
+
+    Returns
+    -------
+    ndarray
+
+    Examples
+    --------
+    >>> import numpy as np, rcopula as rc
+    >>> from rcopula.transforms import radial_cdf
+    >>> cop = rc.ClaytonCopula(2.0, dim=3)
+    >>> values = radial_cdf(cop, [1.5861, 11.6107, 346.2882])
+    >>> np.round(values, 3)
+    array([0.1  , 0.499, 0.9  ])
+
+    Which is what the sampled radial part actually does:
+
+    >>> radii = np.sum(cop.generator.ipsi(cop.rvs(50000, random_state=0), 2.0), axis=1)
+    >>> bool(np.all(np.abs(np.mean(radii[:, None] <= [1.5861, 11.6107], axis=0)
+    ...                    - values[:2]) < 0.01))
+    True
+    """
+    if not isinstance(copula, ArchimedeanCopula):
+        raise TypeError(
+            f"the radial part is Archimedean; got {type(copula).__name__}. An "
+            "elliptical copula has its own radial decomposition, on the sphere "
+            "rather than the simplex."
+        )
+    from rcopula.kendall import kendall_cdf
+
+    radii = np.atleast_1d(np.asarray(x, dtype=np.float64))
+    if np.any(radii < 0.0):
+        raise ValueError("a radius cannot be negative")
+    theta = float(copula.params[0])
+    generator = copula.generator
+    return np.asarray(
+        1.0 - np.asarray(kendall_cdf(copula, generator.psi(radii, theta)), dtype=float),
+        dtype=np.float64,
+    )
+
+
+def radial_ppf(copula: ArchimedeanCopula, q: ArrayLike) -> NDArray[np.float64]:
+    r"""Quantile function of the radial part (R's ``qacR``).
+
+    The inverse of :func:`radial_cdf`, by the same identity: since
+    :math:`F_R(x) = 1 - K(\psi(x))`, the quantile is
+    :math:`\psi^{-1}(K^{-1}(1 - q))`, so it reduces to the Kendall function's
+    own quantile and needs no root-finding of its own.
+
+    Parameters
+    ----------
+    copula : ArchimedeanCopula
+    q : array_like
+        Probabilities in :math:`[0, 1]`.
+
+    Returns
+    -------
+    ndarray
+
+    Examples
+    --------
+    >>> import numpy as np, rcopula as rc
+    >>> from rcopula.transforms import radial_cdf, radial_ppf
+    >>> cop = rc.GumbelCopula(2.0, dim=4)
+    >>> levels = np.array([0.1, 0.25, 0.5, 0.75, 0.9])
+    >>> bool(np.max(np.abs(radial_cdf(cop, radial_ppf(cop, levels)) - levels)) < 1e-6)
+    True
+    """
+    if not isinstance(copula, ArchimedeanCopula):
+        raise TypeError(f"the radial part is Archimedean; got {type(copula).__name__}")
+    from rcopula.kendall import kendall_ppf
+
+    levels = np.atleast_1d(np.asarray(q, dtype=np.float64))
+    if np.any(levels < 0.0) or np.any(levels > 1.0):
+        raise ValueError("q must lie in [0, 1]")
+    theta = float(copula.params[0])
+    inner = np.asarray(kendall_ppf(copula, 1.0 - levels), dtype=np.float64)
+    return np.asarray(copula.generator.ipsi(inner, theta), dtype=np.float64)

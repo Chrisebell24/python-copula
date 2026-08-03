@@ -53,6 +53,9 @@ equivalent for.
   R supports the elliptical and Archimedean classes only; the structural
   constructions come too, and a nested Archimedean's bivariate margin is read
   straight off the tree as its lowest common ancestor's generator.
+- **`radial_cdf` / `radial_ppf`** (R's `pacR` / `qacR`). The law of an
+  Archimedean copula's radial part, which is where all the family-specific
+  information lives once the angular half is split off.
 - **`gof_two_sample`** (R's `gofT2stat`). Compares two samples' copulas to each
   other with no model between them -- for "did the dependence change after the
   crisis?" -- and is blind to the margins by construction.

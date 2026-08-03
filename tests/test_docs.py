@@ -131,6 +131,8 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "kendall_return_period",
                 "htrafo",
                 "radial_simplex",
+                "radial_cdf",
+                "radial_ppf",
                 "quasi_rvs",
                 "variance_ratio",
             ],

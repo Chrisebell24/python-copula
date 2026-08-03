@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -711,3 +712,81 @@ class TestToEmpiricalMargins:
 
         with pytest.raises(ValueError, match="uniform"):
             to_emp_margins(np.array([[1.5, 0.5]]), np.zeros((50, 2)))
+
+
+class TestRadialDistribution:
+    """The radial part's law, which carries all the family-specific information.
+
+    The angular half of the McNeil-Neslehova split is the same for every
+    Archimedean copula in every dimension, so everything that distinguishes one
+    family from another is in here. It is checked against the empirical
+    distribution of the radial part of an actual sample, which is the only
+    reference that does not go through the same identity.
+    """
+
+    CASES: ClassVar[list] = [
+        rc.ClaytonCopula(2.0, dim=3),
+        rc.ClaytonCopula(0.5, dim=2),
+        rc.GumbelCopula(2.0, dim=4),
+        rc.FrankCopula(5.0, dim=3),
+        rc.JoeCopula(2.5, dim=3),
+    ]
+
+    @pytest.mark.parametrize("copula", CASES, ids=lambda c: f"{type(c).__name__}d{c.dim}")
+    def test_it_matches_the_sampled_radial_part(self, copula: rc.Copula) -> None:
+        from rcopula.transforms import radial_cdf, radial_simplex
+
+        radii, _ = radial_simplex(copula, copula.rvs(100_000, random_state=0))
+        for level in (0.1, 0.25, 0.5, 0.75, 0.9):
+            x = float(np.quantile(radii, level))
+            assert float(radial_cdf(copula, x)[0]) == pytest.approx(level, abs=0.01)
+
+    @pytest.mark.parametrize("copula", CASES, ids=lambda c: f"{type(c).__name__}d{c.dim}")
+    def test_the_quantile_inverts_the_cdf(self, copula: rc.Copula) -> None:
+        from rcopula.transforms import radial_cdf, radial_ppf
+
+        levels = np.array([0.05, 0.25, 0.5, 0.75, 0.95])
+        np.testing.assert_allclose(
+            radial_cdf(copula, radial_ppf(copula, levels)), levels, atol=1e-6
+        )
+
+    @pytest.mark.parametrize("copula", CASES, ids=lambda c: f"{type(c).__name__}d{c.dim}")
+    def test_the_cdf_is_a_distribution_function(self, copula: rc.Copula) -> None:
+        from rcopula.transforms import radial_cdf, radial_ppf
+
+        # The grid has to reach as far as the family does. Clayton's radial part
+        # is heavy enough that a fixed upper limit of 1e4 only gets to 0.981,
+        # which is the distribution behaving correctly rather than a defect --
+        # so the top of the grid comes from the quantile function.
+        top = float(radial_ppf(copula, 0.9999)[0])
+        grid = np.concatenate([[0.0], np.geomspace(1e-6, top, 80)])
+        values = radial_cdf(copula, grid)
+        assert np.all(np.diff(values) >= -1e-12)
+        assert 0.0 <= values[0] <= 1e-9
+        assert values[-1] > 0.999
+
+    def test_the_quantile_is_increasing(self) -> None:
+        from rcopula.transforms import radial_ppf
+
+        levels = np.linspace(0.01, 0.99, 40)
+        assert np.all(np.diff(radial_ppf(rc.ClaytonCopula(2.0, dim=3), levels)) > 0)
+
+    def test_a_non_archimedean_copula_is_refused(self) -> None:
+        from rcopula.transforms import radial_cdf, radial_ppf
+
+        with pytest.raises(TypeError, match="Archimedean"):
+            radial_cdf(rc.GaussianCopula(0.5), 1.0)
+        with pytest.raises(TypeError, match="Archimedean"):
+            radial_ppf(rc.GaussianCopula(0.5), 0.5)
+
+    def test_a_negative_radius_is_refused(self) -> None:
+        from rcopula.transforms import radial_cdf
+
+        with pytest.raises(ValueError, match="negative"):
+            radial_cdf(rc.ClaytonCopula(2.0), -1.0)
+
+    def test_a_probability_outside_the_unit_interval_is_refused(self) -> None:
+        from rcopula.transforms import radial_ppf
+
+        with pytest.raises(ValueError, match=r"\[0, 1\]"):
+            radial_ppf(rc.ClaytonCopula(2.0), 1.4)

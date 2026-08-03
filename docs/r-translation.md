@@ -78,6 +78,7 @@ preserved so code ports across with the strings intact.
 | `gofT2stat(u1, u2)` | `rc.gof_two_sample(x, y)` |
 | `toEmpMargins(U, x)` | `rc.to_emp_margins(u, data)` |
 | *(no equivalent)* | `rc.radial_simplex(cop, u)` — the McNeil-Neslehova split |
+| `pacR(x, cop)` / `qacR(p, cop)` | `rc.radial_cdf(cop, x)` / `rc.radial_ppf(cop, q)` |
 | inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |
 | `rAntitheticVariates(n, d)` | `rc.sampling.antithetic_rvs(cop, n)` |
 | `rLatinHypercube(n, d)` | `rc.sampling.latin_hypercube_rvs(cop, n)` |
