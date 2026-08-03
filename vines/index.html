@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../vines/">
+        <link rel="prev" href="../choosing/">
       
       
-        <link rel="next" href="../parity/">
+        <link rel="next" href="../r-translation/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Coming from R - rcopula</title>
+        <title>Vine copulas - rcopula</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#coming-from-r" class="md-skip">
+        <a href="#vine-copulas-a-tutorial-checked-against-the-source" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Coming from R
+              Vine copulas
             
           </span>
         </div>
@@ -338,33 +338,6 @@
       
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../vines/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Vine copulas
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
@@ -384,7 +357,7 @@
   <span class="md-ellipsis">
     
   
-    Coming from R
+    Vine copulas
   
 
     
@@ -402,7 +375,7 @@
   <span class="md-ellipsis">
     
   
-    Coming from R
+    Vine copulas
   
 
     
@@ -428,10 +401,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#construction-and-evaluation" class="md-nav__link">
+  <a href="#the-h-function-is-what-the-paper-defines" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Construction and evaluation
+        The h-function is what the paper defines
       
     </span>
   </a>
@@ -439,10 +412,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dependence-measures" class="md-nav__link">
+  <a href="#the-factorisation-written-out-by-hand" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dependence measures
+        The factorisation, written out by hand
       
     </span>
   </a>
@@ -450,10 +423,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#inference" class="md-nav__link">
+  <a href="#how-many-vines-are-there" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Inference
+        How many vines are there?
       
     </span>
   </a>
@@ -461,10 +434,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
+  <a href="#a-gaussian-vine-is-a-multivariate-gaussian-copula" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing
+        A Gaussian vine is a multivariate Gaussian copula
       
     </span>
   </a>
@@ -472,10 +445,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#structural-constructions" class="md-nav__link">
+  <a href="#conditional-independence-which-is-what-the-trees-are-for" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Structural constructions
+        Conditional independence, which is what the trees are for
       
     </span>
   </a>
@@ -483,10 +456,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#transforms-kendall-function-plots" class="md-nav__link">
+  <a href="#what-dissmanns-algorithm-actually-buys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transforms, Kendall function, plots
+        What Dissmann's algorithm actually buys
       
     </span>
   </a>
@@ -494,10 +467,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#things-r-has-no-equivalent-for" class="md-nav__link">
+  <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Things R has no equivalent for
+        Using it
       
     </span>
   </a>
@@ -505,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#differences-worth-knowing" class="md-nav__link">
+  <a href="#references" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Differences worth knowing
+        References
       
     </span>
   </a>
@@ -519,6 +492,33 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../r-translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from R
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -887,10 +887,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#construction-and-evaluation" class="md-nav__link">
+  <a href="#the-h-function-is-what-the-paper-defines" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Construction and evaluation
+        The h-function is what the paper defines
       
     </span>
   </a>
@@ -898,10 +898,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dependence-measures" class="md-nav__link">
+  <a href="#the-factorisation-written-out-by-hand" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dependence measures
+        The factorisation, written out by hand
       
     </span>
   </a>
@@ -909,10 +909,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#inference" class="md-nav__link">
+  <a href="#how-many-vines-are-there" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Inference
+        How many vines are there?
       
     </span>
   </a>
@@ -920,10 +920,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
+  <a href="#a-gaussian-vine-is-a-multivariate-gaussian-copula" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing
+        A Gaussian vine is a multivariate Gaussian copula
       
     </span>
   </a>
@@ -931,10 +931,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#structural-constructions" class="md-nav__link">
+  <a href="#conditional-independence-which-is-what-the-trees-are-for" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Structural constructions
+        Conditional independence, which is what the trees are for
       
     </span>
   </a>
@@ -942,10 +942,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#transforms-kendall-function-plots" class="md-nav__link">
+  <a href="#what-dissmanns-algorithm-actually-buys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transforms, Kendall function, plots
+        What Dissmann's algorithm actually buys
       
     </span>
   </a>
@@ -953,10 +953,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#things-r-has-no-equivalent-for" class="md-nav__link">
+  <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Things R has no equivalent for
+        Using it
       
     </span>
   </a>
@@ -964,10 +964,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#differences-worth-knowing" class="md-nav__link">
+  <a href="#references" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Differences worth knowing
+        References
       
     </span>
   </a>
@@ -991,337 +991,247 @@
 
 
 
-<h1 id="coming-from-r">Coming from R<a class="headerlink" href="#coming-from-r" title="Permanent link">&para;</a></h1>
-<p>The API is Pythonic (scipy/statsmodels verbs), but R's option strings are
-preserved so code ports across with the strings intact.</p>
-<h2 id="construction-and-evaluation">Construction and evaluation<a class="headerlink" href="#construction-and-evaluation" title="Permanent link">&para;</a></h2>
+<h1 id="vine-copulas-a-tutorial-checked-against-the-source">Vine copulas: a tutorial, checked against the source<a class="headerlink" href="#vine-copulas-a-tutorial-checked-against-the-source" title="Permanent link">&para;</a></h1>
+<p>An Archimedean copula in <span class="arithmatex">\(d\)</span> dimensions has one parameter, so it says every pair
+of variables is equally dependent. In 100 dimensions that is one number
+describing 4,950 pairs, and
+<a href="https://github.com/Chrisebell24/python-copula/blob/main/examples/22_archimedean_internals.py"><code>examples/22</code></a>
+ends by measuring exactly that ceiling.</p>
+<p>A <strong>vine</strong> lifts it. The joint density is factored into <span class="arithmatex">\(d(d-1)/2\)</span> <em>pair</em>
+copulas, each free to be a different family with a different parameter, arranged
+in a nested sequence of trees. Nothing is assumed to be Gaussian, nothing is
+assumed to be exchangeable, and the dimension no longer constrains the shape.</p>
+<p>This page reproduces the results of the paper that introduced the construction —
+Aas, Czado, Frigessi and Bakken (2009) — rather than asserting agreement with
+it. Everything below is executable:
+<a href="https://github.com/Chrisebell24/python-copula/blob/main/examples/26_vine_tutorial.py"><code>examples/26_vine_tutorial.py</code></a>
+runs it all and asserts every number.</p>
+<div class="admonition note">
+<p class="admonition-title">What is not reproduced, and why</p>
+<p>The paper's headline figure is an AIC of <strong>−665.08</strong> for a four-dimensional
+D-vine on Norwegian financial returns. That series is not distributed with
+the paper, so no implementation can reproduce the number, and claiming to
+would be worthless. The same applies to R <code>VineCopula</code>'s <code>daxreturns</code>
+example: the dataset is GPL-3 and this package is MIT, so it is not
+vendored — see <a href="../parity/">How parity is verified</a>.</p>
+<p>The identities below need <strong>no data at all</strong>, which is precisely what makes
+them worth checking.</p>
+</div>
+<h2 id="the-h-function-is-what-the-paper-defines">The h-function is what the paper defines<a class="headerlink" href="#the-h-function-is-what-the-paper-defines" title="Permanent link">&para;</a></h2>
+<p>Everything in a vine is built from one object. Aas et al. equation (7):</p>
+<div class="arithmatex">\[h(x, v, \Theta) \;=\; F(x \mid v) \;=\; \frac{\partial C_{x,v}(x, v, \Theta)}{\partial v}\]</div>
+<p>with the <strong>conditioning variable second</strong>. Checked against a central difference
+of the CDF, which is the definition and nothing more:</p>
 <table>
 <thead>
 <tr>
-<th>R</th>
-<th><code>rcopula</code></th>
+<th>family</th>
+<th>max &#124;h − ∂C/∂v&#124;</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>claytonCopula(2, dim = 3)</code></td>
-<td><code>rc.ClaytonCopula(theta=2, dim=3)</code></td>
+<td>Clayton</td>
+<td>9.1e-11</td>
 </tr>
 <tr>
-<td><code>normalCopula(0.5, dim = 3, dispstr = "un")</code></td>
-<td><code>rc.GaussianCopula([...], dim=3, dispstr="un")</code></td>
+<td>Gumbel</td>
+<td>8.1e-11</td>
 </tr>
 <tr>
-<td><code>tCopula(0.5, df = 4, df.fixed = TRUE)</code></td>
-<td><code>rc.StudentCopula(0.5, df=4, df_fixed=True)</code></td>
+<td>Gaussian</td>
+<td>1.5e-10</td>
 </tr>
 <tr>
-<td><code>rCopula(n, cop)</code></td>
-<td><code>cop.rvs(n)</code></td>
+<td>Frank</td>
+<td>1.4e-10</td>
 </tr>
 <tr>
-<td><code>dCopula(u, cop)</code> / <code>pCopula(u, cop)</code></td>
-<td><code>cop.pdf(u)</code> / <code>cop.cdf(u)</code></td>
-</tr>
-<tr>
-<td><code>prob(cop, l, u)</code></td>
-<td><code>cop.prob(l, u)</code></td>
-</tr>
-<tr>
-<td><code>getSigma(cop)</code> / <code>p2P</code> / <code>P2p</code></td>
-<td><code>cop.sigma()</code> / <code>rc.p2P</code> / <code>rc.P2p</code></td>
-</tr>
-<tr>
-<td><code>fixParam(cop, c(FALSE))</code></td>
-<td><code>cop.fix_params([False])</code></td>
-</tr>
-<tr>
-<td><code>describeCop(cop)</code></td>
-<td><code>cop.describe()</code></td>
+<td>Student</td>
+<td>1.2e-10</td>
 </tr>
 </tbody>
 </table>
-<h2 id="dependence-measures">Dependence measures<a class="headerlink" href="#dependence-measures" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">conditional_cdf</span>
+
+<span class="n">h</span> <span class="o">=</span> <span class="n">conditional_cdf</span><span class="p">(</span><span class="n">copula</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]),</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># 1 = condition on v</span>
+</code></pre></div>
+<h2 id="the-factorisation-written-out-by-hand">The factorisation, written out by hand<a class="headerlink" href="#the-factorisation-written-out-by-hand" title="Permanent link">&para;</a></h2>
+<p>Aas et al. equation (11) gives the four-dimensional D-vine density as</p>
+<div class="arithmatex">\[f = c_{12}\,c_{23}\,c_{34}\;c_{13|2}\,c_{24|3}\;c_{14|23}\]</div>
+<p>with each conditional argument produced by an h-function. Typing that formula
+out and comparing it to <code>VineCopula.logpdf</code> is a real check on whether the
+package computes the published equation or merely something resembling it:</p>
+<div class="highlight"><pre><span></span><code><span class="n">by_hand</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c12</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]))</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c23</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]]))</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c34</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]]))</span>
+<span class="p">)</span>
+<span class="n">f1_2</span><span class="p">,</span> <span class="n">f3_2</span> <span class="o">=</span> <span class="n">h</span><span class="p">(</span><span class="n">c12</span><span class="p">,</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]),</span> <span class="n">h</span><span class="p">(</span><span class="n">c23</span><span class="p">,</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">f2_3</span><span class="p">,</span> <span class="n">f4_3</span> <span class="o">=</span> <span class="n">h</span><span class="p">(</span><span class="n">c23</span><span class="p">,</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]),</span> <span class="n">h</span><span class="p">(</span><span class="n">c34</span><span class="p">,</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="n">by_hand</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c13_2</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">f1_2</span><span class="p">,</span> <span class="n">f3_2</span><span class="p">])))</span>
+<span class="n">by_hand</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c24_3</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">f2_3</span><span class="p">,</span> <span class="n">f4_3</span><span class="p">])))</span>
+<span class="n">by_hand</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c14_23</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">h</span><span class="p">(</span><span class="n">c13_2</span><span class="p">,</span> <span class="n">f1_2</span><span class="p">,</span> <span class="n">f3_2</span><span class="p">),</span> <span class="n">h</span><span class="p">(</span><span class="n">c24_3</span><span class="p">,</span> <span class="n">f4_3</span><span class="p">,</span> <span class="n">f2_3</span><span class="p">)])))</span>
+
+<span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">VineCopula</span><span class="p">([[</span><span class="n">c12</span><span class="p">,</span> <span class="n">c23</span><span class="p">,</span> <span class="n">c34</span><span class="p">],</span> <span class="p">[</span><span class="n">c13_2</span><span class="p">,</span> <span class="n">c24_3</span><span class="p">],</span> <span class="p">[</span><span class="n">c14_23</span><span class="p">]],</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">by_hand</span> <span class="o">-</span> <span class="n">vine</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">u</span><span class="p">)))</span>  <span class="c1"># 1.8e-15</span>
+</code></pre></div>
+<p>The canonical-vine factorisation from the paper's section 2.3 agrees to the same
+<strong>1.8e-15</strong>, which is the accumulated rounding of a dozen floating-point
+operations and nothing else.</p>
+<h2 id="how-many-vines-are-there">How many vines are there?<a class="headerlink" href="#how-many-vines-are-there" title="Permanent link">&para;</a></h2>
+<p>Section 2.3 states that in four dimensions there are <em>"12 different D-vine
+decompositions and 12 different canonical vine decompositions"</em>. Counted by
+building every ordering and asking how many give distinct densities:</p>
 <table>
 <thead>
 <tr>
-<th>R</th>
-<th><code>rcopula</code></th>
+<th><span class="arithmatex">\(d\)</span></th>
+<th>D-vines</th>
+<th>C-vines</th>
+<th><span class="arithmatex">\(d!/2\)</span></th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>tau(cop)</code> / <code>rho(cop)</code> / <code>lambda(cop)</code></td>
-<td><code>cop.tau()</code> / <code>cop.rho()</code> / <code>cop.lambda_()</code></td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
 </tr>
 <tr>
-<td><code>beta(cop)</code></td>
-<td><code>cop.beta()</code></td>
+<td>4</td>
+<td><strong>12</strong></td>
+<td><strong>12</strong></td>
+<td>12</td>
 </tr>
 <tr>
-<td><code>iTau(claytonCopula(), 0.5)</code></td>
-<td><code>rc.ClaytonCopula.from_tau(0.5)</code></td>
-</tr>
-<tr>
-<td><code>iRho(normalCopula(), 0.5)</code></td>
-<td><code>rc.GaussianCopula.from_rho(0.5)</code></td>
-</tr>
-<tr>
-<td><code>cor(x, method = "kendall")</code></td>
-<td><code>rc.cor_kendall(x)</code></td>
-</tr>
-<tr>
-<td><code>pobs(x)</code></td>
-<td><code>rc.pseudo_obs(x)</code></td>
+<td>5</td>
+<td>60</td>
+<td>60</td>
+<td>60</td>
 </tr>
 </tbody>
 </table>
-<h2 id="inference">Inference<a class="headerlink" href="#inference" title="Permanent link">&para;</a></h2>
+<p>The halving is easy to get wrong. A D-vine is a <em>path</em>, and a path read
+backwards is the same path — so all <span class="arithmatex">\(d!\)</span> orderings collapse in pairs. Counting
+every ordering as distinct is the obvious thing to do and gives 24, not 12. The
+count above only comes out right if the same copula is placed on every edge of a
+tree, so that what is being counted is the structure rather than the labelling.</p>
+<h2 id="a-gaussian-vine-is-a-multivariate-gaussian-copula">A Gaussian vine is a multivariate Gaussian copula<a class="headerlink" href="#a-gaussian-vine-is-a-multivariate-gaussian-copula" title="Permanent link">&para;</a></h2>
+<p>Make every pair-copula Gaussian and the whole construction collapses to an
+ordinary Gaussian copula, whose correlation matrix follows from the
+partial-correlation recursion (Bedford and Cooke). That is an exact identity, so
+it admits an exact test:</p>
 <table>
 <thead>
 <tr>
-<th>R</th>
-<th><code>rcopula</code></th>
+<th>structure</th>
+<th>max &#124;Σ̂ − Σ&#124;</th>
+<th>log-density identity</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>fitCopula(cop, u, method = "mpl")</code></td>
-<td><code>rc.fit(cop, u, method="mpl")</code></td>
+<td>C-vine</td>
+<td>0.0179</td>
+<td>5.8e-15</td>
 </tr>
 <tr>
-<td><code>fitMvdc(x, mvdc, start)</code></td>
-<td><code>rc.fit_joint(mv, x, method="ifm")</code></td>
-</tr>
-<tr>
-<td><code>coef(fit)</code> / <code>vcov(fit)</code> / <code>logLik(fit)</code></td>
-<td><code>res.params</code> / <code>res.cov_params</code> / <code>res.loglik</code></td>
-</tr>
-<tr>
-<td><code>xvCopula(cop, x, k = 10)</code></td>
-<td><code>rc.cross_validate(cop, x, k=10)</code></td>
-</tr>
-<tr>
-<td><code>loglikCopula(par, u, cop)</code></td>
-<td><code>rc.loglik_copula(par, u, cop)</code></td>
-</tr>
-<tr>
-<td><em>(loop by hand)</em></td>
-<td><code>rc.select_copula(u)</code></td>
+<td>D-vine</td>
+<td>0.0184</td>
+<td>3.6e-15</td>
 </tr>
 </tbody>
 </table>
-<h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">fitted</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">families</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;gaussian&quot;</span><span class="p">,))</span>
+<span class="n">fitted</span><span class="o">.</span><span class="n">is_gaussian</span>  <span class="c1"># True</span>
+<span class="n">fitted</span><span class="o">.</span><span class="n">to_gaussian</span><span class="p">()</span>  <span class="c1"># the equivalent GaussianCopula</span>
+</code></pre></div>
+<p>Those two columns are different claims and worth keeping apart: the second says
+the algebra is right, the first only that 6,000 observations is enough.</p>
+<h2 id="conditional-independence-which-is-what-the-trees-are-for">Conditional independence, which is what the trees are for<a class="headerlink" href="#conditional-independence-which-is-what-the-trees-are-for" title="Permanent link">&para;</a></h2>
+<p>For a Markov chain <span class="arithmatex">\(1 \to 2 \to 3 \to 4\)</span>, every variable is independent of the
+rest given its neighbour. A D-vine in chain order should therefore find strong
+dependence in the first tree and nothing above it:</p>
 <table>
 <thead>
 <tr>
-<th>R</th>
-<th><code>rcopula</code></th>
+<th>tree</th>
+<th>conditioning</th>
+<th>Kendall's τ per edge</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>gofCopula(cop, x, simulation = "pb")</code></td>
-<td><code>rc.gof_test(cop, x, simulation="pb")</code></td>
+<td>1</td>
+<td>—</td>
+<td>0.716, 0.720, 0.719</td>
 </tr>
 <tr>
-<td><code>gofCopula(cop, x, simulation = "mult")</code></td>
-<td><code>rc.gof_test(cop, x, simulation="mult")</code></td>
+<td>2</td>
+<td>one variable</td>
+<td>0.000, 0.015</td>
 </tr>
 <tr>
-<td><code>exchTest(x)</code> / <code>radSymTest(x)</code></td>
-<td><code>rc.exch_test(x)</code> / <code>rc.rad_sym_test(x)</code></td>
-</tr>
-<tr>
-<td><code>indepTest(x, d)</code> / <code>evTestC(x)</code></td>
-<td><code>rc.indep_test(x)</code> / <code>rc.ev_test(x)</code></td>
+<td>3</td>
+<td>two variables</td>
+<td>0.015</td>
 </tr>
 </tbody>
 </table>
-<h2 id="structural-constructions">Structural constructions<a class="headerlink" href="#structural-constructions" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>R</th>
-<th><code>rcopula</code></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>rotCopula(cop, flip)</code></td>
-<td><code>rc.RotatedCopula(cop, flip)</code>, <code>rc.survival(cop)</code></td>
-</tr>
-<tr>
-<td><code>khoudrajiCopula(c1, c2, shapes)</code></td>
-<td><code>rc.KhoudrajiCopula(c1, c2, shapes)</code></td>
-</tr>
-<tr>
-<td><code>mixCopula(list(c1, c2), w)</code></td>
-<td><code>rc.MixtureCopula([c1, c2], w)</code></td>
-</tr>
-<tr>
-<td><code>margCopula(cop, keep)</code></td>
-<td><code>rc.marginal_copula(cop, indices)</code></td>
-</tr>
-<tr>
-<td><code>fitLambda(x, method = ...)</code></td>
-<td><code>rc.fit_lambda(x)</code></td>
-</tr>
-<tr>
-<td><code>onacopula("G", C(1.5, , list(C(4, 1:3))))</code></td>
-<td><code>rc.NestedArchimedean(rc.GumbelCopula(1.5), children=[...])</code></td>
-</tr>
-<tr>
-<td><code>enacopula(u, cop, method = "etau")</code></td>
-<td><code>rc.fit_nested(structure, u)</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="transforms-kendall-function-plots">Transforms, Kendall function, plots<a class="headerlink" href="#transforms-kendall-function-plots" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>R</th>
-<th><code>rcopula</code></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>cCopula(u, cop)</code></td>
-<td><code>rc.rosenblatt(cop, u)</code></td>
-</tr>
-<tr>
-<td><code>mvdc(cop, margins, paramMargins)</code></td>
-<td><code>rc.CopulaDistribution(cop, margins=[...])</code></td>
-</tr>
-<tr>
-<td><code>pK</code> / <code>qK</code> / <code>dK</code> / <code>rK</code></td>
-<td><code>rc.kendall_cdf</code> / <code>_ppf</code> / <code>_pdf</code> / <code>_rvs</code></td>
-</tr>
-<tr>
-<td><code>Kn(u, x)</code></td>
-<td><code>rc.kendall_empirical(x, u)</code></td>
-</tr>
-<tr>
-<td><code>contour(cop, dCopula)</code> / <code>persp(...)</code></td>
-<td><code>rc.plots.contour(cop)</code> / <code>rc.plots.surface(cop)</code></td>
-</tr>
-<tr>
-<td><code>retstable(n, V0, h, alpha)</code></td>
-<td><code>rcopula.special.stable.retstable(...)</code></td>
-</tr>
-<tr>
-<td><code>htrafo(u, cop)</code></td>
-<td><code>rc.htrafo(cop, u)</code></td>
-</tr>
-<tr>
-<td><code>dependogram(x, d)</code></td>
-<td><code>rc.dependogram(x)</code> + <code>rc.plots.dependogram_plot(result)</code></td>
-</tr>
-<tr>
-<td><em>(no equivalent)</em></td>
-<td><code>rc.radial_simplex(cop, u)</code> — the McNeil-Neslehova split</td>
-</tr>
-<tr>
-<td>inverse <code>cCopula</code></td>
-<td><code>rc.inverse_rosenblatt(cop, z)</code></td>
-</tr>
-<tr>
-<td><code>rAntitheticVariates(n, d)</code></td>
-<td><code>rc.sampling.antithetic_rvs(cop, n)</code></td>
-</tr>
-<tr>
-<td><code>rLatinHypercube(n, d)</code></td>
-<td><code>rc.sampling.latin_hypercube_rvs(cop, n)</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="things-r-has-no-equivalent-for">Things R has no equivalent for<a class="headerlink" href="#things-r-has-no-equivalent-for" title="Permanent link">&para;</a></h2>
-<p>Not translations -- there is nothing on the left-hand side to translate.</p>
-<table>
-<thead>
-<tr>
-<th></th>
-<th><code>rcopula</code></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Rank every admissible family at once</td>
-<td><code>rc.select_copula(u, criterion="bic")</code></td>
-</tr>
-<tr>
-<td>Dependence that moves over time</td>
-<td><code>rc.dynamic.fit_dynamic(u, cop, driver="patton")</code></td>
-</tr>
-<tr>
-<td>...score-driven instead</td>
-<td><code>rc.dynamic.fit_dynamic(u, cop, driver="gas")</code></td>
-</tr>
-<tr>
-<td>A whole correlation matrix that moves</td>
-<td><code>rc.dynamic.fit_dcc(u)</code></td>
-</tr>
-<tr>
-<td>Genuinely discrete margins</td>
-<td><code>rc.discrete.fit_discrete(x, cop, margins)</code></td>
-</tr>
-<tr>
-<td>...mixed with a continuous one</td>
-<td><code>rc.discrete.mixed_pdf(cop, x, margins, discrete)</code></td>
-</tr>
-<tr>
-<td>The ceiling ties impose on tau</td>
-<td><code>rc.discrete.tau_upper_bound(margins)</code></td>
-</tr>
-<tr>
-<td>Bootstrap intervals, in parallel</td>
-<td><code>rc.bootstrap.bootstrap_measure(u, "tau", n_jobs=4)</code></td>
-</tr>
-<tr>
-<td>...for a fitted parameter</td>
-<td><code>rc.bootstrap.bootstrap_fit(x, cop)</code></td>
-</tr>
-<tr>
-<td>Save a model to a readable file</td>
-<td><code>rc.serialize.to_json(cop)</code> / <code>from_json(text)</code></td>
-</tr>
-<tr>
-<td>Vines (R/C/D)</td>
-<td><code>rc.fit_vine(u, structure="D")</code></td>
-</tr>
-<tr>
-<td>Screen a universe for tradable pairs</td>
-<td><code>rc.statarb.select_pairs(returns, method=...)</code></td>
-</tr>
-<tr>
-<td>Pick vine partners for a target</td>
-<td><code>rc.statarb.select_partners(returns, target)</code></td>
-</tr>
-<tr>
-<td>Sobol/Halton draws from a copula</td>
-<td><code>rc.sampling.quasi_rvs(cop, n)</code></td>
-</tr>
-<tr>
-<td>Measure what variance reduction bought</td>
-<td><code>rc.sampling.variance_ratio(cop, payoff, n)</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="differences-worth-knowing">Differences worth knowing<a class="headerlink" href="#differences-worth-knowing" title="Permanent link">&para;</a></h2>
+<p>The Markov property, read straight off the fitted model, with no normality
+assumed anywhere — each edge was free to choose among six families.</p>
+<div class="admonition warning">
+<p class="admonition-title">What did <em>not</em> happen</p>
+<p>AIC selected outright independence on only <strong>one</strong> of the three conditional
+edges; the other two kept weak parametric families at τ ≈ 0.015. At
+<span class="arithmatex">\(n = 4000\)</span> one extra parameter is cheap, so a criterion will often retain a
+family rather than round to zero. The dependence is gone; the family label
+is not. Read the τ values, not the family names.</p>
+</div>
+<h2 id="what-dissmanns-algorithm-actually-buys">What Dissmann's algorithm actually buys<a class="headerlink" href="#what-dissmanns-algorithm-actually-buys" title="Permanent link">&para;</a></h2>
+<p>The structure is chosen greedily, by maximum spanning tree on |τ| at each level
+(Dissmann et al. 2013). With <span class="arithmatex">\(d = 4\)</span> an exhaustive search over all 24 orderings
+is feasible, so the heuristic can be graded:</p>
+<div class="highlight"><pre><span></span><code>Dissmann&#39;s greedy choice   order (1, 2, 3, 0), loglik 10162.65
+best of all 24 orderings   order (0, 2, 3, 1), loglik 10165.17
+worst of all 24 orderings                     loglik 10161.18
+</code></pre></div>
+<p>The greedy pick came <strong>2.5 units below the best</strong> — about 60% of the way down a
+spread it did not close. It is genuinely a heuristic and it is worth not
+pretending otherwise.</p>
+<p>What rescues it is the scale. Best and worst differ by 4.0 log-likelihood units
+out of 10,163: <strong>0.04%</strong>. The structure search is not where the modelling value
+sits — the family chosen on each edge is — and an exhaustive search costs <span class="arithmatex">\(d!\)</span>
+fits to recover almost nothing. That is a better argument for the greedy
+algorithm than "it finds the optimum", which it does not.</p>
+<h2 id="using-it">Using it<a class="headerlink" href="#using-it" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+
+<span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">)</span>  <span class="c1"># Dissmann selection, AIC per edge</span>
+<span class="n">vine</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>  <span class="c1"># density</span>
+<span class="n">vine</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># simulate</span>
+<span class="n">vine</span><span class="o">.</span><span class="n">rosenblatt</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>  <span class="c1"># to independent uniforms</span>
+<span class="n">rc</span><span class="o">.</span><span class="n">plots</span><span class="o">.</span><span class="n">vine_trees</span><span class="p">(</span><span class="n">vine</span><span class="p">)</span>  <span class="c1"># draw the trees</span>
+<span class="n">rc</span><span class="o">.</span><span class="n">marginal_copula</span>  <span class="c1"># ...and see api/structural</span>
+</code></pre></div>
+<p>Simulating from a fitted vine reproduces what it was fitted to — pairwise τ to
+within 0.007 at n = 20,000, margins uniform to 7e-4.</p>
+<p>For choosing <em>which</em> variables to put in a vine in the first place, see
+<a href="../api/applications/"><code>rcopula.statarb.select_partners</code></a>, which implements the
+four partner-selection approaches of Stübinger, Mangold and Krauss (2018).</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>fit()</code> returns a results object, not a modified copula.</strong> Copulas here are
-  immutable; <code>with_params</code> returns a new one.</li>
-<li><strong><code>iTau</code>/<code>iRho</code> are classmethods</strong> (<code>from_tau</code>, <code>from_rho</code>) because they
-  construct rather than mutate.</li>
-<li><strong>Margins are scipy frozen distributions</strong>, not name strings with parameter
-  lists — anything with <code>cdf</code>/<code>pdf</code>/<code>ppf</code> works.</li>
-<li><strong>Non-integer degrees of freedom are supported.</strong> <code>mvtnorm::pmvt</code> refuses
-  them, even though <code>fitCopula</code> happily produces them.</li>
-<li><strong>AMH works in <code>d &gt; 2</code>.</strong> R's <code>amhCopula</code> is bivariate-only, though its
-  <code>copAMH</code> generator object is not.</li>
-<li>Places where R is the less accurate side are listed under
-  <a href="../parity/">How parity is verified</a>.</li>
+<li>Aas, K., Czado, C., Frigessi, A. and Bakken, H. (2009). Pair-copula
+  constructions of multiple dependence. <em>Insurance: Mathematics and Economics</em>
+  44(2), 182–198.</li>
+<li>Bedford, T. and Cooke, R. M. (2002). Vines — a new graphical model for
+  dependent random variables. <em>Annals of Statistics</em> 30(4), 1031–1068.</li>
+<li>Dissmann, J., Brechmann, E. C., Czado, C. and Kurowicka, D. (2013). Selecting
+  and estimating regular vine copulae and application to financial returns.
+  <em>Computational Statistics and Data Analysis</em> 59, 52–69.</li>
+<li>Joe, H. (1996). Families of <span class="arithmatex">\(m\)</span>-variate distributions with given margins and
+  <span class="arithmatex">\(m(m-1)/2\)</span> bivariate dependence parameters. In <em>Distributions with Fixed
+  Marginals</em>, IMS Lecture Notes 28, 120–141.</li>
 </ul>
 
 
