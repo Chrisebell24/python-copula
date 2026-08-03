@@ -53,6 +53,8 @@ equivalent for.
   R supports the elliptical and Archimedean classes only; the structural
   constructions come too, and a nested Archimedean's bivariate margin is read
   straight off the tree as its lowest common ancestor's generator.
+- **`pairs_rosenblatt`** (R's `pairsRosenblatt`). A goodness-of-fit test says
+  whether a copula fits; this says where it does not, panel by panel.
 - **Dependogram** (`rcopula.dependogram`, `rcopula.plots.dependogram_plot`).
   Independence decomposed over every subset of the coordinates via the Mobius
   transform, so it locates the dependence rather than only detecting it.

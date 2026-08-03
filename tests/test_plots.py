@@ -326,3 +326,86 @@ class TestStructurePlots:
     def test_dependence_heatmap_rejects_a_non_square_matrix(self) -> None:
         with pytest.raises(ValueError, match="square matrix"):
             dependence_heatmap(np.zeros((2, 3)))
+
+
+@pytest.fixture(scope="module")
+def clayton_data() -> np.ndarray:
+    return rc.ClaytonCopula(3.0, dim=3).rvs(2000, random_state=0)
+
+
+class TestPairsRosenblatt:
+    """The diagnostic that says *where* a copula fails, not just whether.
+
+    A plot test that only checked "an Axes came back" would pass for a function
+    that drew noise. These check the statistic behind the shading: it must not
+    reject the model that generated the data, must reject a clearly wrong one,
+    and -- the reason the plot exists -- must be able to reject on some panels
+    while passing on others.
+    """
+
+    @staticmethod
+    def _panel_pvalues(model: rc.Copula, data: np.ndarray) -> list[float]:
+        from scipy import stats as _stats
+
+        from rcopula.transforms import rosenblatt
+
+        z = np.asarray(rosenblatt(model, data))
+        n, d = z.shape
+        scale = np.sqrt(9.0 * n * (n - 1) / (2.0 * (2 * n + 5)))
+        return [
+            float(2.0 * _stats.norm.sf(abs(scale * _stats.kendalltau(z[:, i], z[:, j]).statistic)))
+            for i in range(d)
+            for j in range(i + 1, d)
+        ]
+
+    def test_it_returns_a_full_grid(self, clayton_data: np.ndarray) -> None:
+        from rcopula.plots import pairs_rosenblatt
+
+        axes = pairs_rosenblatt(rc.ClaytonCopula(3.0, dim=3), clayton_data)
+        assert axes.shape == (3, 3)
+
+    def test_the_true_model_is_not_rejected(self, clayton_data: np.ndarray) -> None:
+        pvalues = self._panel_pvalues(rc.ClaytonCopula(3.0, dim=3), clayton_data)
+        assert min(pvalues) > 0.01
+
+    def test_a_wrong_family_is_rejected_everywhere(self, clayton_data: np.ndarray) -> None:
+        pvalues = self._panel_pvalues(rc.GaussianCopula(0.6, dim=3, dispstr="ex"), clayton_data)
+        assert max(pvalues) < 0.01
+
+    def test_it_can_reject_on_some_panels_and_not_others(self, clayton_data: np.ndarray) -> None:
+        # The entire justification for a picture over a single p-value. A Gumbel
+        # fitted to Clayton data matches the first pair well enough and fails on
+        # the conditional ones, which is information a scalar test discards.
+        pvalues = self._panel_pvalues(rc.GumbelCopula(2.5, dim=3), clayton_data)
+        assert max(pvalues) > 0.05
+        assert min(pvalues) < 0.01
+
+    def test_rejecting_panels_are_shaded(self, clayton_data: np.ndarray) -> None:
+        from rcopula.plots import pairs_rosenblatt
+
+        axes = pairs_rosenblatt(rc.GaussianCopula(0.6, dim=3, dispstr="ex"), clayton_data)
+        shaded = sum(
+            1
+            for i in range(3)
+            for j in range(3)
+            if i != j and axes[i, j].get_facecolor()[:3] != (1.0, 1.0, 1.0)
+        )
+        assert shaded > 0
+
+    def test_the_true_model_leaves_panels_unshaded(self, clayton_data: np.ndarray) -> None:
+        from rcopula.plots import pairs_rosenblatt
+
+        axes = pairs_rosenblatt(rc.ClaytonCopula(3.0, dim=3), clayton_data)
+        shaded = sum(
+            1
+            for i in range(3)
+            for j in range(3)
+            if i != j and axes[i, j].get_facecolor()[:3] != (1.0, 1.0, 1.0)
+        )
+        assert shaded == 0
+
+    def test_it_works_in_two_dimensions(self) -> None:
+        from rcopula.plots import pairs_rosenblatt
+
+        data = rc.FrankCopula(5.0).rvs(500, random_state=0)
+        assert pairs_rosenblatt(rc.FrankCopula(5.0), data).shape == (2, 2)

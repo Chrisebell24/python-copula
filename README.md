@@ -175,6 +175,7 @@ can paste them across.
 | `Kn(u, x)` | `rc.kendall_empirical(x, u)` |
 | `xvCopula(cop, x, k)` | `rc.cross_validate(cop, x, k)` |
 | `contour(cop, dCopula)` / `persp(...)` | `rc.plots.contour(cop)` / `rc.plots.surface(cop)` |
+| `pairsRosenblatt(...)` | `rc.plots.pairs_rosenblatt(cop, u)` — *where* a fit fails |
 | *(no equivalent)* | `rc.select_copula(u)` — rank every admissible family |
 | *(no equivalent)* | `rc.plots.tail_concentration(u, [c1, c2])` — where families disagree |
 | *(no equivalent)* | `rc.dynamic.fit_dynamic(u, cop)` — Patton / GAS time-varying dependence |

@@ -73,6 +73,7 @@ preserved so code ports across with the strings intact.
 | `retstable(n, V0, h, alpha)` | `rcopula.special.stable.retstable(...)` |
 | `htrafo(u, cop)` | `rc.htrafo(cop, u)` |
 | `dependogram(x, d)` | `rc.dependogram(x)` + `rc.plots.dependogram_plot(result)` |
+| `pairsRosenblatt(cuu, ...)` | `rc.plots.pairs_rosenblatt(cop, u)` |
 | *(no equivalent)* | `rc.radial_simplex(cop, u)` — the McNeil-Neslehova split |
 | inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |
 | `rAntitheticVariates(n, d)` | `rc.sampling.antithetic_rvs(cop, n)` |

@@ -64,6 +64,7 @@ __all__ = [
     "dependogram_plot",
     "kendall_plot",
     "nested_tree",
+    "pairs_rosenblatt",
     "pickands_plot",
     "scatter_matrix",
     "surface",
@@ -753,3 +754,134 @@ def dependogram_plot(
     ax.legend(frameon=False, fontsize=8)
     ax.margins(y=0.15)
     return ax
+
+
+def pairs_rosenblatt(
+    copula: Copula,
+    u: ArrayLike,
+    *,
+    level: float = 0.05,
+    axes: Any = None,
+) -> Any:
+    r"""Pairwise scatter of Rosenblatt-transformed data (R's ``pairsRosenblatt``).
+
+    A goodness-of-fit test says *whether* a copula fits. This says **where** it
+    does not.
+
+    Under the fitted copula the Rosenblatt transform produces independent
+    uniforms, so every panel below should look like structureless noise on the
+    unit square. Any panel that does not is a pair the model has failed to
+    describe -- and unlike a single p-value, the picture names it.
+
+    Each panel is shaded by the p-value of an independence test on that pair,
+    using the asymptotic normality of Kendall's tau,
+
+    .. math::  \sqrt{\tfrac{9n(n-1)}{2(2n+5)}}\;\hat\tau \;\to\; N(0, 1),
+
+    which is exact enough at these sample sizes and costs nothing next to a
+    permutation test run :math:`\binom{d}{2}` times.
+
+    Parameters
+    ----------
+    copula : Copula
+        The fitted model to be judged.
+    u : array_like, shape (n, d)
+        Pseudo-observations.
+    level : float
+        Panels below this p-value are shaded.
+    axes : ndarray of Axes, optional
+        A ``(d, d)`` grid to draw into.
+
+    Returns
+    -------
+    ndarray of Axes
+
+    Notes
+    -----
+    Reading it: structure in the panel for :math:`(i, j)` implicates the
+    dependence between coordinates :math:`i` and :math:`j` **given** the
+    coordinates before them, because the Rosenblatt transform conditions
+    successively. A misfit at :math:`(1, 2)` is a plain bivariate failure; one
+    at :math:`(3, 4)` is a failure of conditional dependence, which is exactly
+    what a vine's higher trees exist to capture.
+
+    Examples
+    --------
+    >>> import matplotlib
+    >>> matplotlib.use("Agg")
+    >>> import rcopula as rc
+    >>> from rcopula.plots import pairs_rosenblatt
+    >>> truth = rc.ClaytonCopula(3.0, dim=3)
+    >>> data = truth.rvs(600, random_state=0)
+    >>> grid = pairs_rosenblatt(truth, data)
+    >>> grid.shape
+    (3, 3)
+
+    Fitted with the wrong family, panels light up:
+
+    >>> wrong = pairs_rosenblatt(rc.GaussianCopula(0.7, dim=3, dispstr="ex"), data)
+    >>> wrong.shape
+    (3, 3)
+    """
+    import matplotlib.pyplot as plt
+    from scipy import stats as _stats
+
+    from rcopula.transforms import rosenblatt
+
+    arr = np.atleast_2d(np.asarray(u, dtype=float))
+    z = np.asarray(rosenblatt(copula, arr), dtype=float)
+    n, d = z.shape
+
+    if axes is None:
+        _, axes = plt.subplots(d, d, figsize=(1.8 * d, 1.8 * d), squeeze=False)
+    axes = np.asarray(axes).reshape(d, d)
+
+    # Kendall's tau is asymptotically normal under independence with this
+    # variance; no permutation needed, which matters when there are d(d-1)/2
+    # panels.
+    scale = np.sqrt(9.0 * n * (n - 1) / (2.0 * (2 * n + 5)))
+
+    for i in range(d):
+        for j in range(d):
+            ax = axes[i, j]
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if i == j:
+                ax.text(0.5, 0.5, f"$Z_{{{i + 1}}}$", ha="center", va="center", fontsize=11)
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1)
+                continue
+            if j > i:
+                tau = float(_stats.kendalltau(z[:, i], z[:, j]).statistic)
+                pvalue = float(2.0 * _stats.norm.sf(abs(scale * tau)))
+                ax.text(0.5, 0.58, f"p = {pvalue:.3f}", ha="center", va="center", fontsize=8)
+                ax.text(
+                    0.5,
+                    0.34,
+                    f"tau = {tau:+.3f}",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    color="0.4",
+                )
+                if pvalue < level:
+                    ax.set_facecolor("#f6d5d2")
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1)
+                continue
+            tau = float(_stats.kendalltau(z[:, j], z[:, i]).statistic)
+            pvalue = float(2.0 * _stats.norm.sf(abs(scale * tau)))
+            ax.scatter(z[:, j], z[:, i], s=3, alpha=0.35, color="0.25", linewidths=0)
+            if pvalue < level:
+                ax.set_facecolor("#f6d5d2")
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+
+    fig = axes[0, 0].figure
+    fig.suptitle(
+        f"Rosenblatt transform of {copula.describe()[:46]}\n"
+        f"independent uniforms if the model is right; shaded panels reject at {level:g}",
+        fontsize=9,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    return axes

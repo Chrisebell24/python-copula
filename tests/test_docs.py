@@ -123,7 +123,16 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "variance_ratio",
             ],
         ),
-        ("api/plots", ["tail_concentration", "kendall_plot", "pickands_plot", "dependogram_plot"]),
+        (
+            "api/plots",
+            [
+                "tail_concentration",
+                "kendall_plot",
+                "pickands_plot",
+                "dependogram_plot",
+                "pairs_rosenblatt",
+            ],
+        ),
         (
             "api/applications",
             [
