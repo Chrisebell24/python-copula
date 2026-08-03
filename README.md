@@ -125,7 +125,7 @@ data file is ever committed.
 
 ## Examples
 
-Twenty-six scripts in [`examples/`](examples/), each of which **runs and asserts
+Twenty-seven scripts in [`examples/`](examples/), each of which **runs and asserts
 its own claims** — so they cannot drift out of date without failing:
 
 ```bash

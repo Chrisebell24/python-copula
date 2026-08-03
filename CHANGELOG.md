@@ -104,7 +104,7 @@ reproduced by enumeration.
 
 ### Examples
 
-Twenty-one scripts, each of which runs and asserts its own claims. New in this
+Twenty-seven scripts, each of which runs and asserts its own claims. New in this
 cycle: vines, the nine diagnostic plots, science and engineering domains,
 statistics and machine learning, time-varying dependence, count data, and
 quasi-random sampling.

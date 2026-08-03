@@ -23,6 +23,7 @@ sit in a comment block beside the Python so the two can be compared directly.
 |---|---|
 | [05](05_fitting.py) | Five estimators, and the standard errors no other Python package reports |
 | [06](06_goodness_of_fit.py) | Testing a family against the data, and choosing among families |
+| [27](27_model_criticism.py) | Criticising a fitted copula, and reshaping one that will not fit |
 
 ## Applications
 
