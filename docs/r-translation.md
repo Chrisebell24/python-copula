@@ -74,6 +74,8 @@ preserved so code ports across with the strings intact.
 | `htrafo(u, cop)` | `rc.htrafo(cop, u)` |
 | `dependogram(x, d)` | `rc.dependogram(x)` + `rc.plots.dependogram_plot(result)` |
 | `pairsRosenblatt(cuu, ...)` | `rc.plots.pairs_rosenblatt(cop, u)` |
+| `serialIndepTest(x, d)` | `rc.serial_indep_test(x, lags)` |
+| `toEmpMargins(U, x)` | `rc.to_emp_margins(u, data)` |
 | *(no equivalent)* | `rc.radial_simplex(cop, u)` — the McNeil-Neslehova split |
 | inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |
 | `rAntitheticVariates(n, d)` | `rc.sampling.antithetic_rvs(cop, n)` |

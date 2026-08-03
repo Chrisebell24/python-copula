@@ -10,6 +10,7 @@ from rcopula.htest.api import (
     exch_test,
     indep_test,
     rad_sym_test,
+    serial_indep_test,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "exch_test",
     "indep_test",
     "rad_sym_test",
+    "serial_indep_test",
 ]

@@ -65,6 +65,7 @@ from rcopula.dependence import (
     cor_spearman,
     fit_lambda,
     pseudo_obs,
+    to_emp_margins,
 )
 from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, JointFitResult, fit, fit_joint, loglik_copula
@@ -77,6 +78,7 @@ from rcopula.htest import (
     exch_test,
     indep_test,
     rad_sym_test,
+    serial_indep_test,
 )
 from rcopula.kendall import (
     kendall_cdf,
@@ -199,7 +201,9 @@ __all__ = [
     "rosenblatt",
     "sampling",
     "select_copula",
+    "serial_indep_test",
     "serialize",
     "statarb",
     "survival",
+    "to_emp_margins",
 ]

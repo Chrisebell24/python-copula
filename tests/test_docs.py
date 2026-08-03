@@ -83,6 +83,8 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "GalambosCopula",
                 "MarshallOlkinCopula",
                 "CopulaDistribution",
+                "to_emp_margins",
+                "fit_lambda",
             ],
         ),
         (
@@ -109,7 +111,7 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "to_json",
             ],
         ),
-        ("api/gof", ["gof_test", "exch_test", "rad_sym_test", "dependogram"]),
+        ("api/gof", ["gof_test", "exch_test", "rad_sym_test", "dependogram", "serial_indep_test"]),
         (
             "api/transforms",
             [

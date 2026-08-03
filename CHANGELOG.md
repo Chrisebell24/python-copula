@@ -53,6 +53,10 @@ equivalent for.
   R supports the elliptical and Archimedean classes only; the structural
   constructions come too, and a nested Archimedean's bivariate margin is read
   straight off the tree as its lowest common ancestor's generator.
+- **`serial_indep_test`** (R's `serialIndepTest`) and **`to_emp_margins`**.
+  The first embeds a series in its own lags and runs the dependogram on it, so
+  it names which lag structure carries the dependence; the second maps uniforms
+  back onto a sample's empirical margins.
 - **`pairs_rosenblatt`** (R's `pairsRosenblatt`). A goodness-of-fit test says
   whether a copula fits; this says where it does not, panel by panel.
 - **Dependogram** (`rcopula.dependogram`, `rcopula.plots.dependogram_plot`).

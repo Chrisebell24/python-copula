@@ -338,3 +338,75 @@ class TestDependogram:
         matrices = _mobius_matrices(u)
         product = matrices[0] * matrices[1] * matrices[2]
         np.testing.assert_allclose(np.mean(product, axis=0), literal, atol=1e-14)
+
+
+class TestSerialIndependence:
+    """Serial dependence, located by lag structure rather than just detected.
+
+    The case that justifies it over an autocorrelation function is a series
+    that is uncorrelated in level and dependent in magnitude -- which is what
+    financial returns are, and what a correlogram reports as clean.
+    """
+
+    @staticmethod
+    def _ar1(n: int, phi: float, seed: int) -> np.ndarray:
+        rng = np.random.default_rng(seed)
+        series = np.zeros(n)
+        for t in range(1, n):
+            series[t] = phi * series[t - 1] + rng.standard_normal()
+        return series
+
+    def test_white_noise_passes(self) -> None:
+        from rcopula.htest import serial_indep_test
+
+        noise = np.random.default_rng(0).standard_normal(600)
+        assert serial_indep_test(noise, n_rep=200, random_state=1).global_pvalue > 0.05
+
+    def test_an_ar1_is_detected(self) -> None:
+        from rcopula.htest import serial_indep_test
+
+        result = serial_indep_test(self._ar1(600, 0.6, 0), n_rep=200, random_state=1)
+        assert result.global_pvalue < 0.05
+        # Lag 1 is where an AR(1) lives, so that subset must be among those
+        # rejected -- detecting *something* is not the claim.
+        assert (0, 1) in result.significant()
+
+    def test_it_is_invariant_to_an_increasing_transform(self) -> None:
+        # The reason to use ranks: an autocorrelation would change completely.
+        from rcopula.htest import serial_indep_test
+
+        series = self._ar1(500, 0.6, 0)
+        plain = serial_indep_test(series, n_rep=200, random_state=1)
+        warped = serial_indep_test(np.exp(series / 2), n_rep=200, random_state=1)
+        np.testing.assert_allclose(plain.statistics, warped.statistics, rtol=1e-12)
+
+    def test_it_finds_dependence_a_correlogram_misses(self) -> None:
+        from rcopula.htest import serial_indep_test
+
+        rng = np.random.default_rng(3)
+        volatility = np.exp(0.5 * rng.standard_normal(2000).cumsum() / 30)
+        returns = volatility * rng.standard_normal(2000)
+        # Uncorrelated in level...
+        assert abs(float(np.corrcoef(returns[:-1], returns[1:])[0, 1])) < 0.06
+        # ...and plainly dependent in magnitude.
+        assert serial_indep_test(np.abs(returns), n_rep=200, random_state=1).global_pvalue < 0.05
+
+    def test_the_embedding_dimension_sets_the_subsets(self) -> None:
+        from rcopula.htest import serial_indep_test
+
+        noise = np.random.default_rng(0).standard_normal(400)
+        for lags, expected in ((2, 1), (3, 4), (4, 11)):
+            result = serial_indep_test(noise, lags=lags, n_rep=50, random_state=1)
+            assert len(result.subsets) == expected  # 2^lags - lags - 1
+
+    def test_rejects_too_few_lags(self) -> None:
+        from rcopula.htest import serial_indep_test
+
+        with pytest.raises(ValueError, match="at least 2"):
+            serial_indep_test(np.zeros(100), lags=1)
+
+    def test_rejects_a_series_shorter_than_the_embedding(self) -> None:
+        from rcopula.htest import serial_indep_test
+
+        with pytest.raises(ValueError, match="more than 3 observations"):
+            serial_indep_test(np.zeros(3), lags=3)

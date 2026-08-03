@@ -62,6 +62,7 @@ __all__ = [
     "exch_test",
     "indep_test",
     "rad_sym_test",
+    "serial_indep_test",
 ]
 
 
@@ -565,3 +566,88 @@ def dependogram(
         global_pvalue=global_pvalue,
         n_rep=n_rep,
     )
+
+
+def serial_indep_test(
+    x: ArrayLike,
+    lags: int = 3,
+    n_rep: int = 500,
+    random_state: np.random.Generator | int | None = None,
+    ties_method: str = "average",
+) -> DependogramResult:
+    r"""Test a series for serial independence (R's ``serialIndepTest``).
+
+    Embeds the series into its own lags and runs :func:`dependogram` on the
+    result, so the answer names *which lag structure* carries the dependence
+    rather than only whether some does.
+
+    The subsets are read as lag sets: ``(0, 1)`` is the dependence between
+    consecutive observations, ``(0, 2)`` between observations two apart, and
+    ``(0, 1, 2)`` a three-way structure that neither pair reveals -- which is
+    exactly what a correlogram cannot show.
+
+    Being rank-based, it is invariant to any increasing transform of the series
+    and needs no moments, so it applies to heavy-tailed returns where the
+    autocorrelation function is not even well defined.
+
+    Parameters
+    ----------
+    x : array_like, shape (n,)
+        A univariate series, in time order.
+    lags : int
+        Embedding dimension. ``3`` looks at lags 1 and 2.
+    n_rep : int
+        Permutations for the null.
+    random_state : None, int or Generator
+    ties_method : str
+
+    Returns
+    -------
+    DependogramResult
+        Subsets are indices into the embedded vector, so ``0`` is the current
+        observation and ``k`` the one ``k`` steps back.
+
+    Notes
+    -----
+    Permuting the embedded matrix column by column destroys serial dependence
+    while preserving each column's marginal distribution, which is the exact
+    randomisation this needs. It does **not** preserve the overlap between rows
+    that embedding creates, so the test is mildly conservative -- the rows are
+    not independent, and the permutation null treats them as if they were.
+
+    Examples
+    --------
+    White noise passes; an AR(1) does not:
+
+    >>> import numpy as np
+    >>> from rcopula.htest import serial_indep_test
+    >>> rng = np.random.default_rng(0)
+    >>> noise = rng.standard_normal(600)
+    >>> bool(serial_indep_test(noise, n_rep=200, random_state=1).global_pvalue > 0.05)
+    True
+    >>> series = np.zeros(600)
+    >>> for t in range(1, 600):
+    ...     series[t] = 0.6 * series[t - 1] + rng.standard_normal()
+    >>> bool(serial_indep_test(series, n_rep=200, random_state=1).global_pvalue < 0.05)
+    True
+
+    A GARCH-like series is uncorrelated in level and dependent in magnitude,
+    which is the case an autocorrelation function reports as clean:
+
+    >>> volatility = np.exp(0.5 * rng.standard_normal(2000).cumsum() / 30)
+    >>> returns = volatility * rng.standard_normal(2000)
+    >>> bool(abs(np.corrcoef(returns[:-1], returns[1:])[0, 1]) < 0.06)
+    True
+    >>> bool(serial_indep_test(np.abs(returns), n_rep=200, random_state=1).global_pvalue < 0.05)
+    True
+    """
+    series = np.asarray(x, dtype=np.float64).ravel()
+    if lags < 2:
+        raise ValueError(f"lags must be at least 2 to have a pair to test, got {lags}")
+    if series.size <= lags:
+        raise ValueError(f"need more than {lags} observations, got {series.size}")
+
+    # Row t of the embedding is (x_t, x_{t-1}, ..., x_{t-lags+1}).
+    rows = series.size - lags + 1
+    embedded = np.column_stack([series[lags - 1 - k : lags - 1 - k + rows] for k in range(lags)])
+    return dependogram(embedded, n_rep=n_rep, random_state=random_state, ties_method=ties_method)

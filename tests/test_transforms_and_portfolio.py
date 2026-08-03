@@ -655,3 +655,59 @@ class TestFitLambda:
 
         with pytest.raises(ValueError, match="schmidt-stadtmuller"):
             fit_lambda(rc.ClaytonCopula(2.0).rvs(200, random_state=0), method="hill")
+
+
+class TestToEmpiricalMargins:
+    """The inverse of pseudo_obs: uniforms back onto a sample's own margins."""
+
+    def test_it_keeps_the_copula_and_takes_the_margins(self) -> None:
+        from rcopula.dependence import to_emp_margins
+
+        rng = np.random.default_rng(0)
+        history = rng.lognormal(size=(3000, 2)) * [1.0, 5.0]
+        drawn = to_emp_margins(rc.ClaytonCopula(2.0).rvs(8000, random_state=0), history)
+        # The dependence is the copula's, which the history did not have.
+        assert float(rc.cor_kendall(drawn)[0, 1]) == pytest.approx(0.5, abs=0.03)
+        # The margins are the history's.
+        ratio = np.median(drawn, axis=0) / np.median(history, axis=0)
+        assert np.all(np.abs(ratio - 1.0) < 0.1)
+
+    def test_nothing_outside_the_reference_range_comes_out(self) -> None:
+        # An empirical quantile function cannot extrapolate, which is a feature
+        # for historical simulation and a trap for a tail study: a 99.9% number
+        # computed this way can never exceed the worst loss already seen.
+        from rcopula.dependence import to_emp_margins
+
+        history = np.random.default_rng(0).standard_normal((500, 2))
+        drawn = to_emp_margins(rc.GaussianCopula(0.5).rvs(20_000, random_state=0), history)
+        assert drawn.max() <= history.max()
+        assert drawn.min() >= history.min()
+
+    def test_every_output_value_is_in_the_reference_sample(self) -> None:
+        from rcopula.dependence import to_emp_margins
+
+        history = np.random.default_rng(0).standard_normal((200, 2))
+        drawn = to_emp_margins(rc.ClaytonCopula(2.0).rvs(1000, random_state=0), history)
+        for j in range(2):
+            assert set(np.unique(drawn[:, j])).issubset(set(history[:, j]))
+
+    def test_it_round_trips_with_pseudo_obs(self) -> None:
+        # to_emp_margins(pseudo_obs(x), x) should return x, up to the tie
+        # convention at the largest observation.
+        from rcopula.dependence import to_emp_margins
+
+        data = np.random.default_rng(0).standard_normal((400, 3))
+        back = to_emp_margins(np.asarray(rc.pseudo_obs(data)), data)
+        assert np.mean(np.isclose(back, data)) > 0.99
+
+    def test_a_column_mismatch_is_refused(self) -> None:
+        from rcopula.dependence import to_emp_margins
+
+        with pytest.raises(ValueError, match="must match"):
+            to_emp_margins(np.full((10, 2), 0.5), np.zeros((50, 3)))
+
+    def test_values_outside_the_unit_interval_are_refused(self) -> None:
+        from rcopula.dependence import to_emp_margins
+
+        with pytest.raises(ValueError, match="uniform"):
+            to_emp_margins(np.array([[1.5, 0.5]]), np.zeros((50, 2)))

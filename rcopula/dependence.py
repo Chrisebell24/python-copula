@@ -28,7 +28,15 @@ import pandas as pd
 from numpy.typing import ArrayLike, NDArray
 from scipy import stats
 
-__all__ = ["TailEstimate", "beta_n", "cor_kendall", "cor_spearman", "fit_lambda", "pseudo_obs"]
+__all__ = [
+    "TailEstimate",
+    "beta_n",
+    "cor_kendall",
+    "cor_spearman",
+    "fit_lambda",
+    "pseudo_obs",
+    "to_emp_margins",
+]
 
 TIES_METHODS = ("average", "min", "max", "dense", "ordinal", "random")
 
@@ -411,3 +419,84 @@ def fit_lambda(
         method=method,
         path=path,
     )
+
+
+def to_emp_margins(u: ArrayLike, data: ArrayLike) -> NDArray[np.float64]:
+    r"""Map uniforms onto the empirical margins of a reference sample.
+
+    The inverse direction of :func:`pseudo_obs`, and the last step of a
+    simulation that wants to keep the data's own marginal shapes rather than
+    impose parametric ones. Draw from a fitted copula, push the draws through
+    here, and the result has the copula's dependence with the sample's margins
+    -- the copula analogue of filtered historical simulation.
+
+    Formally each coordinate is passed through the empirical quantile function
+    :math:`\hat F_j^{-1}`, so the output can only take values the reference
+    sample actually contains.
+
+    Parameters
+    ----------
+    u : array_like, shape (n, d)
+        Values in :math:`(0, 1)`, typically from ``copula.rvs``.
+    data : array_like, shape (m, d)
+        The reference sample. Needs the same number of columns, not the same
+        number of rows.
+
+    Returns
+    -------
+    ndarray, shape (n, d)
+
+    Notes
+    -----
+    The output is confined to the reference sample's range **by construction**:
+    an empirical quantile function cannot extrapolate. That is a feature for a
+    historical-simulation study and a serious limitation for a tail one -- a
+    99.9% capital number computed this way can never exceed the worst loss
+    already observed. Use parametric margins when the question is about events
+    larger than anything in the sample.
+
+    Examples
+    --------
+    >>> import numpy as np, rcopula as rc
+    >>> from rcopula.dependence import to_emp_margins
+    >>> rng = np.random.default_rng(0)
+    >>> history = rng.lognormal(size=(2000, 2)) * [1.0, 5.0]
+    >>> drawn = to_emp_margins(rc.ClaytonCopula(2.0).rvs(5000, random_state=0), history)
+
+    The margins are the sample's, so the medians match -- compared relatively,
+    since the second column is scaled by five and an absolute bound would be
+    measuring the scaling rather than the agreement:
+
+    >>> ratio = np.median(drawn, axis=0) / np.median(history, axis=0)
+    >>> bool(np.all(np.abs(ratio - 1.0) < 0.1))
+    True
+
+    ...and the dependence is the copula's, which the history did not have:
+
+    >>> bool(abs(rc.cor_kendall(drawn)[0, 1] - 0.5) < 0.03)
+    True
+
+    Nothing outside the reference range can come out:
+
+    >>> bool(drawn.max() <= history.max() and drawn.min() >= history.min())
+    True
+    """
+    values = np.atleast_2d(np.asarray(u, dtype=float))
+    reference = np.atleast_2d(np.asarray(data, dtype=float))
+    if values.shape[1] != reference.shape[1]:
+        raise ValueError(
+            f"u has {values.shape[1]} columns and the reference has "
+            f"{reference.shape[1]}; they must match"
+        )
+    if np.any(values < 0.0) or np.any(values > 1.0):
+        raise ValueError("u must lie in [0, 1]; it is meant to be uniform")
+
+    out = np.empty_like(values)
+    for j in range(values.shape[1]):
+        column = np.sort(reference[:, j])
+        # The empirical quantile at level p is the ceil(p*m)-th order statistic,
+        # which is the definition R's `quantile(type = 1)` uses and the only one
+        # that returns a value the sample actually contains.
+        index = np.clip(np.ceil(values[:, j] * column.size).astype(int) - 1, 0, column.size - 1)
+        out[:, j] = column[index]
+    return out
