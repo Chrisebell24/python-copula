@@ -111,7 +111,17 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "to_json",
             ],
         ),
-        ("api/gof", ["gof_test", "exch_test", "rad_sym_test", "dependogram", "serial_indep_test"]),
+        (
+            "api/gof",
+            [
+                "gof_test",
+                "gof_two_sample",
+                "exch_test",
+                "rad_sym_test",
+                "dependogram",
+                "serial_indep_test",
+            ],
+        ),
         (
             "api/transforms",
             [

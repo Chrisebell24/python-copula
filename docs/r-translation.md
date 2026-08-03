@@ -75,6 +75,7 @@ preserved so code ports across with the strings intact.
 | `dependogram(x, d)` | `rc.dependogram(x)` + `rc.plots.dependogram_plot(result)` |
 | `pairsRosenblatt(cuu, ...)` | `rc.plots.pairs_rosenblatt(cop, u)` |
 | `serialIndepTest(x, d)` | `rc.serial_indep_test(x, lags)` |
+| `gofT2stat(u1, u2)` | `rc.gof_two_sample(x, y)` |
 | `toEmpMargins(U, x)` | `rc.to_emp_margins(u, data)` |
 | *(no equivalent)* | `rc.radial_simplex(cop, u)` — the McNeil-Neslehova split |
 | inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |

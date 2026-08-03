@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rcopula.gof.api import GofResult, gof_test
+from rcopula.gof.api import GofResult, gof_test, gof_two_sample
 from rcopula.gof.statistics import STATISTICS, empirical_copula_at, gof_statistic
 
 __all__ = [
@@ -11,4 +11,5 @@ __all__ = [
     "empirical_copula_at",
     "gof_statistic",
     "gof_test",
+    "gof_two_sample",
 ]

@@ -69,7 +69,7 @@ from rcopula.dependence import (
 )
 from rcopula.distribution import CopulaDistribution, Margin
 from rcopula.fit import CopulaFitResult, JointFitResult, fit, fit_joint, loglik_copula
-from rcopula.gof import GofResult, gof_statistic, gof_test
+from rcopula.gof import GofResult, gof_statistic, gof_test, gof_two_sample
 from rcopula.htest import (
     DependogramResult,
     TestResult,
@@ -177,6 +177,7 @@ __all__ = [
     "garch",
     "gof_statistic",
     "gof_test",
+    "gof_two_sample",
     "htrafo",
     "indep_test",
     "insurance",

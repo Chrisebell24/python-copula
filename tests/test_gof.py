@@ -214,3 +214,131 @@ class TestEmpiricalLevel:
         # Generous, because the replicate count is small; the point is to catch
         # a test that rejects far too often, not to certify the exact level.
         assert rate < 0.35
+
+
+class TestTwoSample:
+    """Comparing two samples to each other, with no model in between.
+
+    Two properties carry this. It must be **calibrated** -- an uncalibrated
+    permutation test is worse than none, and an early version rejected 0% of
+    the time at a nominal 5% because the permuted halves were only
+    approximately uniform where the observed ones were exactly so. And it must
+    be **blind to the margins**, since that is the only thing distinguishing it
+    from a two-sample distribution test.
+    """
+
+    def test_the_same_copula_is_not_separated(self) -> None:
+        from rcopula.gof import gof_two_sample
+
+        a = rc.ClaytonCopula(2.0).rvs(600, random_state=0)
+        b = rc.ClaytonCopula(2.0).rvs(600, random_state=1)
+        assert gof_two_sample(a, b, n_rep=300, random_state=0).pvalue > 0.05
+
+    @pytest.mark.parametrize(
+        ("first", "second"),
+        [
+            (rc.ClaytonCopula.from_tau(0.5), rc.GumbelCopula.from_tau(0.5)),
+            (rc.GaussianCopula.from_tau(0.5), rc.ClaytonCopula.from_tau(0.5)),
+            (rc.ClaytonCopula.from_tau(0.3), rc.ClaytonCopula.from_tau(0.7)),
+        ],
+        ids=lambda c: type(c).__name__,
+    )
+    def test_different_copulas_are_separated(self, first: rc.Copula, second: rc.Copula) -> None:
+        from rcopula.gof import gof_two_sample
+
+        result = gof_two_sample(
+            first.rvs(600, random_state=0),
+            second.rvs(600, random_state=1),
+            n_rep=300,
+            random_state=0,
+        )
+        assert result.pvalue < 0.05
+
+    def test_the_margins_make_no_difference_at_all(self) -> None:
+        # The design guarantee, and the reason ranks are taken within each
+        # sample: the same copula behind wildly different margins must give
+        # bit-identical output.
+        from scipy import stats as _stats
+
+        from rcopula.gof import gof_two_sample
+
+        reference = rc.ClaytonCopula(2.0).rvs(600, random_state=0)
+        same = rc.ClaytonCopula(2.0).rvs(600, random_state=1)
+        rescaled = np.column_stack(
+            [
+                _stats.expon(scale=50).ppf(same[:, 0]),
+                _stats.norm(loc=-9, scale=0.01).ppf(same[:, 1]),
+            ]
+        )
+        plain = gof_two_sample(reference, same, n_rep=300, random_state=0)
+        warped = gof_two_sample(reference, rescaled, n_rep=300, random_state=0)
+        assert warped.pvalue == plain.pvalue
+        assert warped.statistic == pytest.approx(plain.statistic)
+
+    @pytest.mark.slow
+    def test_it_is_calibrated(self) -> None:
+        """The property an early version failed outright.
+
+        Splitting the pooled sample without re-ranking each half left the
+        permuted margins only approximately uniform where the observed ones
+        were exact, so every replicate exceeded the observed statistic and the
+        rejection rate was 0.0%.
+        """
+        from rcopula.gof import gof_two_sample
+
+        trials = 40
+        pvalues = [
+            gof_two_sample(
+                rc.ClaytonCopula(2.0).rvs(300, random_state=2 * seed),
+                rc.ClaytonCopula(2.0).rvs(300, random_state=2 * seed + 1),
+                n_rep=200,
+                random_state=seed,
+            ).pvalue
+            for seed in range(trials)
+        ]
+        rate = float(np.mean(np.asarray(pvalues) < 0.05))
+        # Binomial standard error at p = 0.05 over 40 trials is 3.4%, so this
+        # band is about three of them on the upper side. The lower side is left
+        # open: mild conservatism is acceptable in a permutation test, being
+        # anti-conservative is not.
+        assert rate <= 0.15
+
+    def test_it_accepts_samples_of_different_sizes(self) -> None:
+        from rcopula.gof import gof_two_sample
+
+        a = rc.ClaytonCopula(2.0).rvs(400, random_state=0)
+        b = rc.ClaytonCopula(2.0).rvs(900, random_state=1)
+        assert gof_two_sample(a, b, n_rep=200, random_state=0).pvalue > 0.05
+
+    def test_it_works_above_two_dimensions(self) -> None:
+        from rcopula.gof import gof_two_sample
+
+        a = rc.ClaytonCopula(2.0, dim=4).rvs(500, random_state=0)
+        b = rc.GumbelCopula(2.0, dim=4).rvs(500, random_state=1)
+        assert gof_two_sample(a, b, n_rep=200, random_state=0).pvalue < 0.05
+
+    def test_the_result_reports_no_copula(self) -> None:
+        # There is no model in a two-sample test, and the field says so rather
+        # than holding something arbitrary.
+        from rcopula.gof import gof_two_sample
+
+        result = gof_two_sample(
+            rc.ClaytonCopula(2.0).rvs(200, random_state=0),
+            rc.ClaytonCopula(2.0).rvs(200, random_state=1),
+            n_rep=50,
+            random_state=0,
+        )
+        assert result.copula is None
+        assert result.simulation == "permutation"
+
+    def test_a_column_mismatch_is_refused(self) -> None:
+        from rcopula.gof import gof_two_sample
+
+        with pytest.raises(ValueError, match="must match"):
+            gof_two_sample(np.zeros((50, 2)), np.zeros((50, 3)))
+
+    def test_a_degenerate_sample_is_refused(self) -> None:
+        from rcopula.gof import gof_two_sample
+
+        with pytest.raises(ValueError, match="at least 2 observations"):
+            gof_two_sample(np.zeros((1, 2)), np.zeros((50, 2)))

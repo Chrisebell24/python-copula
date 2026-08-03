@@ -160,6 +160,7 @@ can paste them across.
 | `fitMvdc(x, mvdc, start)` | `rc.fit_joint(mv, x)` — margins and copula together |
 | `cCopula(u, cop)` | `rc.rosenblatt(cop, u)` |
 | `gofCopula(cop, x, simulation = "mult")` | `rc.gof_test(cop, x, simulation="mult")` |
+| `gofT2stat(u1, u2)` | `rc.gof_two_sample(x, y)` — did the dependence change? |
 | `dependogram(x, d)` | `rc.dependogram(x)` — which subsets are dependent |
 | `rotCopula(cop, flip)` | `rc.RotatedCopula(cop, flip)` / `rc.survival(cop)` |
 | `khoudrajiCopula(c1, c2, shapes)` | `rc.KhoudrajiCopula(c1, c2, shapes)` |

@@ -53,6 +53,9 @@ equivalent for.
   R supports the elliptical and Archimedean classes only; the structural
   constructions come too, and a nested Archimedean's bivariate margin is read
   straight off the tree as its lowest common ancestor's generator.
+- **`gof_two_sample`** (R's `gofT2stat`). Compares two samples' copulas to each
+  other with no model between them -- for "did the dependence change after the
+  crisis?" -- and is blind to the margins by construction.
 - **`serial_indep_test`** (R's `serialIndepTest`) and **`to_emp_margins`**.
   The first embeds a series in its own lags and runs the dependogram on it, so
   it names which lag structure carries the dependence; the second maps uniforms
