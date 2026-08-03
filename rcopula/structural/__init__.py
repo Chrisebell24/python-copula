@@ -16,6 +16,7 @@ unchanged.
 :class:`MixtureCopula`      Convex combination -- both tails at once.
 :class:`NestedArchimedean`  A tree: dependence that varies by branch.
 :func:`marginal_copula`     The copula of a subset of the coordinates.
+:func:`opower`              Raise a generator to an outer power: a second dial.
 ==========================  ==================================================
 """
 
@@ -25,14 +26,17 @@ from rcopula.structural.khoudraji import KhoudrajiCopula
 from rcopula.structural.marginal import marginal_copula
 from rcopula.structural.mixture import MixtureCopula
 from rcopula.structural.nested import NestedArchimedean, fit_nested
+from rcopula.structural.opower import OuterPowerCopula, opower
 from rcopula.structural.rotated import RotatedCopula, survival
 
 __all__ = [
     "KhoudrajiCopula",
     "MixtureCopula",
     "NestedArchimedean",
+    "OuterPowerCopula",
     "RotatedCopula",
     "fit_nested",
     "marginal_copula",
+    "opower",
     "survival",
 ]

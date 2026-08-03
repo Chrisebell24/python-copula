@@ -45,6 +45,10 @@ equivalent for.
   Two estimators with standard errors, and the whole threshold path, because
   there is no threshold-free estimator of a tail coefficient and reading one
   number off a plateau is the only defensible way to use it.
+- **The outer power transformation** (`rcopula.opower`, R's `opower`). A second
+  parameter on any Archimedean generator, moving Kendall's tau by
+  `1 - (1 - tau)/alpha` and creating upper tail dependence in families that have
+  none.
 - **Lower-dimensional margins** (`rcopula.marginal_copula`, R's `margCopula`).
   R supports the elliptical and Archimedean classes only; the structural
   constructions come too, and a nested Archimedean's bivariate margin is read

@@ -64,6 +64,7 @@ import numpy as np
 from rcopula.core.base import Copula
 
 if TYPE_CHECKING:
+    from rcopula.core.archimedean import ArchimedeanCopula
     from rcopula.structural.nested import NestedArchimedean
 
 __all__ = ["from_dict", "from_json", "to_dict", "to_json"]
@@ -95,6 +96,7 @@ def _encode(copula: Copula) -> dict[str, Any]:
     from rcopula.structural.khoudraji import KhoudrajiCopula
     from rcopula.structural.mixture import MixtureCopula
     from rcopula.structural.nested import NestedArchimedean
+    from rcopula.structural.opower import OuterPowerCopula
     from rcopula.structural.rotated import RotatedCopula
     from rcopula.vine import VineCopula
 
@@ -112,6 +114,12 @@ def _encode(copula: Copula) -> dict[str, Any]:
             "kind": kind,
             "base": _encode(copula.base),
             "flip": _bools(copula.flip),
+        }
+    if isinstance(copula, OuterPowerCopula):
+        return {
+            "kind": kind,
+            "base": _encode(copula.base),
+            "alpha": float(copula.alpha),
         }
     if isinstance(copula, KhoudrajiCopula):
         return {
@@ -238,6 +246,9 @@ def _decode(node: dict[str, Any]) -> Copula:
 
     if kind == "RotatedCopula":
         return rc.RotatedCopula(_decode(node["base"]), np.asarray(node["flip"], dtype=bool))
+    if kind == "OuterPowerCopula":
+        base = _decode(node["base"])
+        return rc.OuterPowerCopula(cast("ArchimedeanCopula", base), float(node["alpha"]))
     if kind == "KhoudrajiCopula":
         return rc.KhoudrajiCopula(
             _decode(node["copula1"]), _decode(node["copula2"]), shapes=node["shapes"]

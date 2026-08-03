@@ -770,3 +770,130 @@ class TestMarginalCopula:
         # is no third coordinate to drop.
         with pytest.raises(ValueError, match=r"\[0, 2\)"):
             rc.marginal_copula(rc.PlackettCopula(4.0), [0, 1, 2])
+
+
+class TestOuterPower:
+    """The outer power transformation.
+
+    Three checks carry the weight. It reduces to the base copula at alpha = 1,
+    so the transformation is the identity where it should be. Applied to the
+    independence generator it *is* the Gumbel copula, which pins the whole
+    construction against a family implemented independently. And Nelsen's
+    closed form for Kendall's tau is confirmed against a quadrature that knows
+    nothing about it.
+    """
+
+    CASES: ClassVar[list] = [
+        (rc.ClaytonCopula(2.0), 1.5),
+        (rc.ClaytonCopula(0.8), 2.5),
+        (rc.FrankCopula(4.0), 2.0),
+        (rc.GumbelCopula(1.6), 1.8),
+        (rc.JoeCopula(2.0), 1.4),
+    ]
+
+    @pytest.mark.parametrize(("base", "alpha"), CASES, ids=lambda v: str(v)[:22])
+    def test_alpha_one_is_the_identity(self, base: rc.Copula, alpha: float) -> None:
+        del alpha
+        points = np.array([[0.3, 0.7], [0.5, 0.5], [0.9, 0.2], [0.05, 0.95]])
+        np.testing.assert_allclose(rc.opower(base, 1.0).cdf(points), base.cdf(points), rtol=1e-12)
+
+    @pytest.mark.parametrize("alpha", [1.5, 2.0, 3.0, 4.5])
+    def test_applied_to_independence_it_is_gumbel(self, alpha: float) -> None:
+        # psi(t) = exp(-t) gives psi(t^(1/a)) = exp(-t^(1/a)), which is Gumbel's
+        # generator exactly. Clayton at theta -> 0 is the independence limit.
+        points = np.array([[0.3, 0.7], [0.5, 0.5], [0.9, 0.2], [0.15, 0.42]])
+        lifted = rc.opower(rc.ClaytonCopula(1e-10), alpha).cdf(points)
+        np.testing.assert_allclose(lifted, rc.GumbelCopula(alpha).cdf(points), atol=1e-6)
+
+    @pytest.mark.parametrize(("base", "alpha"), CASES, ids=lambda v: str(v)[:22])
+    def test_the_tau_closed_form(self, base: rc.Copula, alpha: float) -> None:
+        # Nelsen: tau_alpha = 1 - (1 - tau_base)/alpha, checked against the
+        # definition tau = 1 - 4 int int dC/du dC/dv, which is derived from the
+        # CDF and knows nothing about the formula.
+        from numpy.polynomial.legendre import leggauss
+
+        copula = rc.opower(base, alpha)
+        n = 260
+        nodes, weights = leggauss(n)
+        grid, weight = 0.5 * (nodes + 1.0), 0.5 * weights
+        first, second = np.meshgrid(grid, grid, indexing="ij")
+        points = np.column_stack([first.ravel(), second.ravel()])
+        du = np.asarray(rc.conditional_cdf(copula, points, 0)).reshape(n, n)
+        dv = np.asarray(rc.conditional_cdf(copula, points, 1)).reshape(n, n)
+        quadrature = 1.0 - 4.0 * float(weight @ (du * dv) @ weight)
+        assert copula.tau() == pytest.approx(quadrature, abs=1e-5)
+        assert copula.tau() == pytest.approx(1 - (1 - base.tau()) / alpha, abs=1e-12)
+
+    @pytest.mark.parametrize(("base", "alpha"), CASES, ids=lambda v: str(v)[:22])
+    def test_the_density_integrates_to_one(self, base: rc.Copula, alpha: float) -> None:
+        from numpy.polynomial.legendre import leggauss
+
+        copula = rc.opower(base, alpha)
+        n = 200
+        nodes, weights = leggauss(n)
+        grid, weight = 0.5 * (nodes + 1.0), 0.5 * weights
+        first, second = np.meshgrid(grid, grid, indexing="ij")
+        density = np.asarray(copula.pdf(np.column_stack([first.ravel(), second.ravel()]))).reshape(
+            n, n
+        )
+        assert float(weight @ density @ weight) == pytest.approx(1.0, abs=2e-3)
+
+    @pytest.mark.parametrize(("base", "alpha"), CASES, ids=lambda v: str(v)[:22])
+    def test_the_density_is_the_mixed_derivative_of_the_cdf(
+        self, base: rc.Copula, alpha: float
+    ) -> None:
+        copula = rc.opower(base, alpha)
+        step = 1e-4
+        for first, second in ((0.3, 0.4), (0.55, 0.62), (0.8, 0.25)):
+
+            def corner(a: float, b: float) -> float:
+                return float(np.asarray(copula.cdf(np.array([[a, b]])))[0])
+
+            numeric = (
+                corner(first + step, second + step)
+                - corner(first + step, second - step)
+                - corner(first - step, second + step)
+                + corner(first - step, second - step)
+            ) / (4 * step * step)
+            analytic = float(np.asarray(copula.pdf(np.array([[first, second]])))[0])
+            assert analytic == pytest.approx(numeric, rel=2e-4)
+
+    def test_it_creates_upper_tail_dependence_from_none(self) -> None:
+        # The point of the transformation: Clayton has no upper tail, and the
+        # lifted version does.
+        base = rc.ClaytonCopula(2.0)
+        assert base.lambda_().upper == 0.0
+        assert rc.opower(base, 2.0).lambda_().upper > 0.5
+
+    def test_sampling_matches_the_copula(self) -> None:
+        copula = rc.opower(rc.ClaytonCopula(2.0), 1.5)
+        drawn = copula.rvs(30_000, random_state=0)
+        assert float(rc.cor_kendall(drawn)[0, 1]) == pytest.approx(copula.tau(), abs=0.01)
+        assert np.max(np.abs(drawn.mean(axis=0) - 0.5)) < 0.005
+
+    def test_it_round_trips_through_json(self) -> None:
+        # Before it was added to the registry this encoded happily and then
+        # failed on the way back, which is the worst of both -- a document that
+        # looks valid and is not readable.
+        from rcopula.serialize import from_json, to_json
+
+        original = rc.opower(rc.ClaytonCopula(2.0), 1.5)
+        reloaded = from_json(to_json(original))
+        assert reloaded.describe() == original.describe()
+        points = np.array([[0.3, 0.7], [0.5, 0.5], [0.9, 0.2]])
+        assert np.array_equal(np.asarray(original.cdf(points)), np.asarray(reloaded.cdf(points)))
+
+    def test_higher_dimensions_have_a_cdf_but_no_density(self) -> None:
+        copula = rc.opower(rc.ClaytonCopula(2.0, dim=4), 1.5)
+        points = np.full((5, 4), 0.6)
+        assert np.all(np.isfinite(copula.cdf(points)))
+        with pytest.raises(NotImplementedError, match="dim=2 only"):
+            copula.logpdf(points)
+
+    def test_a_non_archimedean_base_is_refused(self) -> None:
+        with pytest.raises(TypeError, match="Archimedean"):
+            rc.opower(rc.GaussianCopula(0.5), 2.0)
+
+    def test_alpha_below_one_is_refused(self) -> None:
+        with pytest.raises(ValueError):
+            rc.opower(rc.ClaytonCopula(2.0), 0.5)

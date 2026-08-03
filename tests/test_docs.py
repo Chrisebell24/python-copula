@@ -94,6 +94,7 @@ def test_every_navigation_page_is_produced(built: Path) -> None:
                 "NestedArchimedean",
                 "fit_nested",
                 "marginal_copula",
+                "opower",
             ],
         ),
         (

@@ -8,6 +8,7 @@ tests all work on them unchanged.
 ::: rcopula.structural.khoudraji
 ::: rcopula.structural.mixture
 ::: rcopula.structural.nested
+::: rcopula.structural.opower
 ::: rcopula.structural.marginal
 
 ## Vines

@@ -92,9 +92,11 @@ from rcopula.structural import (
     KhoudrajiCopula,
     MixtureCopula,
     NestedArchimedean,
+    OuterPowerCopula,
     RotatedCopula,
     fit_nested,
     marginal_copula,
+    opower,
     survival,
 )
 from rcopula.transforms import (
@@ -137,6 +139,7 @@ __all__ = [
     "MarshallOlkinCopula",
     "MixtureCopula",
     "NestedArchimedean",
+    "OuterPowerCopula",
     "P2p",
     "PlackettCopula",
     "RotatedCopula",
@@ -184,6 +187,7 @@ __all__ = [
     "kendall_rvs",
     "loglik_copula",
     "marginal_copula",
+    "opower",
     "p2P",
     "plots",
     "portfolio",

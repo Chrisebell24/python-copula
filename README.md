@@ -164,6 +164,7 @@ can paste them across.
 | `rotCopula(cop, flip)` | `rc.RotatedCopula(cop, flip)` / `rc.survival(cop)` |
 | `khoudrajiCopula(c1, c2, shapes)` | `rc.KhoudrajiCopula(c1, c2, shapes)` |
 | `mixCopula(list(c1, c2), w)` | `rc.MixtureCopula([c1, c2], w)` |
+| `opower(cop, alpha)` | `rc.opower(cop, alpha)` — a second dial on the tails |
 | `margCopula(cop, keep)` | `rc.marginal_copula(cop, [0, 3])` |
 | `fitLambda(x)` | `rc.fit_lambda(x)` — tail dependence without a family |
 | `onacopula("G", C(1.5, , list(C(4, 1:3))))` | `rc.NestedArchimedean(rc.GumbelCopula(1.5), ...)` |
