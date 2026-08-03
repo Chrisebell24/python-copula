@@ -2000,6 +2000,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#rcopula.dependence.to_emp_margins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_emp_margins
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3758,6 +3769,17 @@
     <span class="md-ellipsis">
       
         fit_lambda
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.dependence.to_emp_margins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_emp_margins
       
     </span>
   </a>
@@ -8297,6 +8319,139 @@ the threshold is pushed out, because it is converging to zero:</p>
 <span class="gp">... </span>    <span class="n">keep</span> <span class="o">=</span> <span class="n">path</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">50</span>
 <span class="gp">... </span>    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="n">keep</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">path</span><span class="p">[</span><span class="n">keep</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">slope</span><span class="p">(</span><span class="n">heavy</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">slope</span><span class="p">(</span><span class="n">light</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.dependence.to_emp_margins" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">to_emp_margins</span>
+
+
+<a href="#rcopula.dependence.to_emp_margins" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_emp_margins</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Map uniforms onto the empirical margins of a reference sample.</p>
+<p>The inverse direction of :func:<code>pseudo_obs</code>, and the last step of a
+simulation that wants to keep the data's own marginal shapes rather than
+impose parametric ones. Draw from a fitted copula, push the draws through
+here, and the result has the copula's dependence with the sample's margins
+-- the copula analogue of filtered historical simulation.</p>
+<p>Formally each coordinate is passed through the empirical quantile function
+:math:<code>\hat F_j^{-1}</code>, so the output can only take values the reference
+sample actually contains.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Values in :math:<code>(0, 1)</code>, typically from <code>copula.rvs</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="m">m</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The reference sample. Needs the same number of columns, not the same
+number of rows.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The output is confined to the reference sample's range <strong>by construction</strong>:
+an empirical quantile function cannot extrapolate. That is a feature for a
+historical-simulation study and a serious limitation for a tail one -- a
+99.9% capital number computed this way can never exceed the worst loss
+already observed. Use parametric margins when the question is about events
+larger than anything in the sample.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.dependence</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_emp_margins</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">history</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">lognormal</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span> <span class="o">*</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">drawn</span> <span class="o">=</span> <span class="n">to_emp_margins</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">5000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">history</span><span class="p">)</span>
+</code></pre></div>
+    <p>The margins are the sample's, so the medians match -- compared relatively,
+since the second column is scaled by five and an absolute bound would be
+measuring the scaling rather than the agreement:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">ratio</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">drawn</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">history</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">ratio</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">))</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>...and the dependence is the copula's, which the history did not have:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">cor_kendall</span><span class="p">(</span><span class="n">drawn</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.03</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+    <p>Nothing outside the reference range can come out:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">drawn</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="n">history</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="ow">and</span> <span class="n">drawn</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="n">history</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
 <span class="go">True</span>
 </code></pre></div>
 
