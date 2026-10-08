@@ -14,7 +14,7 @@
         <link rel="prev" href="../choosing/">
       
       
-        <link rel="next" href="../r-translation/">
+        <link rel="next" href="../finance-tutorials/">
       
       
         
@@ -503,6 +503,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../finance-tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../r-translation/" class="md-nav__link">
         
   
@@ -597,10 +624,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -618,8 +645,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1071,7 +1098,7 @@ package computes the published equation or merely something resembling it:</p>
 <span class="n">by_hand</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c24_3</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">f2_3</span><span class="p">,</span> <span class="n">f4_3</span><span class="p">])))</span>
 <span class="n">by_hand</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">c14_23</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">h</span><span class="p">(</span><span class="n">c13_2</span><span class="p">,</span> <span class="n">f1_2</span><span class="p">,</span> <span class="n">f3_2</span><span class="p">),</span> <span class="n">h</span><span class="p">(</span><span class="n">c24_3</span><span class="p">,</span> <span class="n">f4_3</span><span class="p">,</span> <span class="n">f2_3</span><span class="p">)])))</span>
 
-<span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">VineCopula</span><span class="p">([[</span><span class="n">c12</span><span class="p">,</span> <span class="n">c23</span><span class="p">,</span> <span class="n">c34</span><span class="p">],</span> <span class="p">[</span><span class="n">c13_2</span><span class="p">,</span> <span class="n">c24_3</span><span class="p">],</span> <span class="p">[</span><span class="n">c14_23</span><span class="p">]],</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">)</span>
+<span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">VineCopula</span><span class="p">([[</span><span class="n">c12</span><span class="p">,</span> <span class="n">c23</span><span class="p">,</span> <span class="n">c34</span><span class="p">],</span> <span class="p">[</span><span class="n">c13_2</span><span class="p">,</span> <span class="n">c24_3</span><span class="p">],</span> <span class="p">[</span><span class="n">c14_23</span><span class="p">]],</span> <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">)</span>
 <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">by_hand</span> <span class="o">-</span> <span class="n">vine</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">u</span><span class="p">)))</span>  <span class="c1"># 1.8e-15</span>
 </code></pre></div>
 <p>The canonical-vine factorisation from the paper's section 2.3 agrees to the same
@@ -1142,7 +1169,7 @@ it admits an exact test:</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><span class="n">fitted</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">families</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;gaussian&quot;</span><span class="p">,))</span>
+<div class="highlight"><pre><span></span><code><span class="n">fitted</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">,</span> <span class="n">families</span><span class="o">=</span><span class="p">(</span><span class="s2">"gaussian"</span><span class="p">,))</span>
 <span class="n">fitted</span><span class="o">.</span><span class="n">is_gaussian</span>  <span class="c1"># True</span>
 <span class="n">fitted</span><span class="o">.</span><span class="n">to_gaussian</span><span class="p">()</span>  <span class="c1"># the equivalent GaussianCopula</span>
 </code></pre></div>
@@ -1192,7 +1219,7 @@ is not. Read the τ values, not the family names.</p>
 <p>The structure is chosen greedily, by maximum spanning tree on |τ| at each level
 (Dissmann et al. 2013). With <span class="arithmatex">\(d = 4\)</span> an exhaustive search over all 24 orderings
 is feasible, so the heuristic can be graded:</p>
-<div class="highlight"><pre><span></span><code>Dissmann&#39;s greedy choice   order (1, 2, 3, 0), loglik 10162.65
+<div class="highlight"><pre><span></span><code>Dissmann's greedy choice   order (1, 2, 3, 0), loglik 10162.65
 best of all 24 orderings   order (0, 2, 3, 1), loglik 10165.17
 worst of all 24 orderings                     loglik 10161.18
 </code></pre></div>
@@ -1207,7 +1234,7 @@ algorithm than "it finds the optimum", which it does not.</p>
 <h2 id="using-it">Using it<a class="headerlink" href="#using-it" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
 
-<span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">)</span>  <span class="c1"># Dissmann selection, AIC per edge</span>
+<span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">)</span>  <span class="c1"># Dissmann selection, AIC per edge</span>
 <span class="n">vine</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>  <span class="c1"># density</span>
 <span class="n">vine</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># simulate</span>
 <span class="n">vine</span><span class="o">.</span><span class="n">rosenblatt</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>  <span class="c1"># to independent uniforms</span>

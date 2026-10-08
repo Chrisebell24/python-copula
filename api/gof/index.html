@@ -368,6 +368,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../finance-tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../r-translation/" class="md-nav__link">
         
   
@@ -464,10 +491,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -485,8 +512,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1386,7 +1413,7 @@ Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
 
 
 <a href="#rcopula.gof.api.gof_test" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_test</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;Sn&#39;</span><span class="p">,</span> <span class="n">simulation</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;pb&#39;</span><span class="p">,</span> <span class="n">estim_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;mpl&#39;</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GofResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_test</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'Sn'</span><span class="p">,</span> <span class="n">simulation</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'pb'</span><span class="p">,</span> <span class="n">estim_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'mpl'</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GofResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1564,7 +1591,7 @@ this test could not reject it at this sample size.</p>
 <span class="go">True</span>
 </code></pre></div>
     <p>The multiplier bootstrap reaches the same conclusion without refitting:</p>
-    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">fast</span> <span class="o">=</span> <span class="n">gof_test</span><span class="p">(</span><span class="n">GumbelCopula</span><span class="p">(),</span> <span class="n">x</span><span class="p">,</span> <span class="n">simulation</span><span class="o">=</span><span class="s2">&quot;mult&quot;</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">fast</span> <span class="o">=</span> <span class="n">gof_test</span><span class="p">(</span><span class="n">GumbelCopula</span><span class="p">(),</span> <span class="n">x</span><span class="p">,</span> <span class="n">simulation</span><span class="o">=</span><span class="s2">"mult"</span><span class="p">,</span> <span class="n">n_rep</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">fast</span><span class="o">.</span><span class="n">pvalue</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span>
 <span class="go">True</span>
 </code></pre></div>
@@ -1582,7 +1609,7 @@ this test could not reject it at this sample size.</p>
 
 
 <a href="#rcopula.gof.api.gof_two_sample" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_two_sample</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GofResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_two_sample</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GofResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1870,7 +1897,7 @@ Genest, C. and Remillard, B. (2008). Validity of the parametric bootstrap for
 
 
 <a href="#rcopula.gof.statistics.gof_statistic" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_statistic</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;Sn&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gof_statistic</span><span class="p">(</span><span class="n">u</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'Sn'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2283,7 +2310,7 @@ it is exact rather than conservative.</p>
 
 
 <a href="#rcopula.htest.api.exch_test" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">exch_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">exch_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2326,7 +2353,7 @@ device.</p>
 
 
 <a href="#rcopula.htest.api.rad_sym_test" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rad_sym_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">rad_sym_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2368,7 +2395,7 @@ modelling question -- a copula symmetric in the tails cannot represent
 
 
 <a href="#rcopula.htest.api.indep_test" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">indep_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">indep_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2420,7 +2447,7 @@ claims:</p>
 
 
 <a href="#rcopula.htest.api.ev_test" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ev_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ev_test</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TestResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2458,7 +2485,7 @@ best read as indicative.</p>
 
 
 <a href="#rcopula.htest.api.dependogram" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">dependogram</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependogramResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">dependogram</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependogramResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2628,7 +2655,7 @@ exactly independent, while the triple is deterministic:</p>
 
 
 <a href="#rcopula.htest.api.serial_indep_test" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">serial_indep_test</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">lags</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependogramResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">serial_indep_test</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">lags</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependogramResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">

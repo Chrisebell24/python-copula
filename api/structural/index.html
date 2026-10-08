@@ -368,6 +368,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../finance-tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../r-translation/" class="md-nav__link">
         
   
@@ -464,10 +491,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -485,8 +512,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4634,7 +4661,7 @@ margin.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural.marginal</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_copula</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">five</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span>
 <span class="gp">... </span>    <span class="p">[</span><span class="mf">0.72</span><span class="p">,</span> <span class="mf">0.63</span><span class="p">,</span> <span class="mf">0.54</span><span class="p">,</span> <span class="mf">0.45</span><span class="p">,</span> <span class="mf">0.56</span><span class="p">,</span> <span class="mf">0.48</span><span class="p">,</span> <span class="mf">0.40</span><span class="p">,</span> <span class="mf">0.42</span><span class="p">,</span> <span class="mf">0.35</span><span class="p">,</span> <span class="mf">0.30</span><span class="p">],</span>
-<span class="gp">... </span>    <span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">&quot;un&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">"un"</span><span class="p">,</span>
 <span class="gp">... </span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">pair</span> <span class="o">=</span> <span class="n">marginal_copula</span><span class="p">(</span><span class="n">five</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">pair</span><span class="o">.</span><span class="n">dim</span>
@@ -4815,10 +4842,10 @@ it -- setting the dropped coordinates to one:</p>
 </code></pre></div>
     <p>Dropping a coordinate from an AR(1) chain leaves a gap, so the result is
 unstructured rather than AR(1):</p>
-    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">&quot;ar1&quot;</span><span class="p">)</span>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">"ar1"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">gapped</span> <span class="o">=</span> <span class="n">marginal_copula</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">gapped</span><span class="o">.</span><span class="n">dispstr</span>
-<span class="go">&#39;un&#39;</span>
+<span class="go">'un'</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">gapped</span><span class="o">.</span><span class="n">sigma</span><span class="p">(),</span> <span class="n">chain</span><span class="o">.</span><span class="n">sigma</span><span class="p">()[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])]))</span>
 <span class="go">True</span>
 </code></pre></div>
@@ -4926,7 +4953,7 @@ Dissmann, J., Brechmann, E. C., Czado, C. and Kurowicka, D. (2013). Selecting
 
 
 <a href="#rcopula.vine.VineCopula" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">VineCopula</span><span class="p">(</span><span class="n">pair_copulas</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Copula</span><span class="p">]],</span> <span class="n">structure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;D&#39;</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">free</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">VineCopula</span><span class="p">(</span><span class="n">pair_copulas</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Copula</span><span class="p">]],</span> <span class="n">structure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'D'</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">free</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -5011,7 +5038,7 @@ parametric copula can express:</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.vine</span><span class="w"> </span><span class="kn">import</span> <span class="n">VineCopula</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">vine</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
 <span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">FrankCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)]],</span>
-<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">,</span>
 <span class="gp">... </span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">vine</span><span class="o">.</span><span class="n">dim</span>
 <span class="go">3</span>
@@ -5029,7 +5056,7 @@ parametric copula can express:</p>
 against one exactly:</p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">gaussian</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
 <span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.6</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)]],</span>
-<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">,</span>
 <span class="gp">... </span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">equivalent</span> <span class="o">=</span> <span class="n">gaussian</span><span class="o">.</span><span class="n">to_gaussian</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -5182,7 +5209,7 @@ available on the tree recursions.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.vine</span><span class="w"> </span><span class="kn">import</span> <span class="n">VineCopula</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">vine</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
 <span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.7</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.4</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="mf">0.2</span><span class="p">)]],</span>
-<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">"C"</span><span class="p">,</span>
 <span class="gp">... </span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">sigma</span> <span class="o">=</span> <span class="n">vine</span><span class="o">.</span><span class="n">to_gaussian</span><span class="p">()</span><span class="o">.</span><span class="n">sigma</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="mi">6</span><span class="p">)),</span> <span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="mi">6</span><span class="p">))</span>
@@ -5216,7 +5243,7 @@ only the partial one:</p>
 
 
 <a href="#rcopula.vine.fit_vine" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">fit_vine</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;D&#39;</span><span class="p">,</span> <span class="n">families</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_FAMILIES</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">criterion</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;aic&#39;</span><span class="p">,</span> <span class="n">truncate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VineCopula</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">fit_vine</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'D'</span><span class="p">,</span> <span class="n">families</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_FAMILIES</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">criterion</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'aic'</span><span class="p">,</span> <span class="n">truncate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VineCopula</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -5350,21 +5377,21 @@ stop a vine from spending parameters on noise.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.vine</span><span class="w"> </span><span class="kn">import</span> <span class="n">VineCopula</span><span class="p">,</span> <span class="n">fit_vine</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">truth</span> <span class="o">=</span> <span class="n">VineCopula</span><span class="p">(</span>
 <span class="gp">... </span>    <span class="p">[[</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">2.5</span><span class="p">)],</span> <span class="p">[</span><span class="n">rc</span><span class="o">.</span><span class="n">FrankCopula</span><span class="p">(</span><span class="mf">4.0</span><span class="p">)]],</span>
-<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">,</span>
 <span class="gp">... </span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">truth</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">3000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fitted</span> <span class="o">=</span> <span class="n">fit_vine</span><span class="p">(</span>
-<span class="gp">... </span>    <span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">families</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;clayton&quot;</span><span class="p">,</span> <span class="s2">&quot;gumbel&quot;</span><span class="p">,</span> <span class="s2">&quot;frank&quot;</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">families</span><span class="o">=</span><span class="p">[</span><span class="s2">"clayton"</span><span class="p">,</span> <span class="s2">"gumbel"</span><span class="p">,</span> <span class="s2">"frank"</span><span class="p">]</span>
 <span class="gp">... </span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="p">[</span><span class="n">cop</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="n">fitted</span><span class="o">.</span><span class="n">pair_copulas</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
-<span class="go">[&#39;Clayton&#39;, &#39;Gumbel&#39;]</span>
+<span class="go">['Clayton', 'Gumbel']</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">loglik</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
 <span class="go">True</span>
 </code></pre></div>
     <p>Left to itself it reorders the variables by dependence strength, which is
 what makes a C-vine's root the right one -- so read the structure from
 <code>fitted.order</code> rather than assuming it:</p>
-    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">fitted</span> <span class="o">=</span> <span class="n">fit_vine</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">families</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;clayton&quot;</span><span class="p">,</span> <span class="s2">&quot;gumbel&quot;</span><span class="p">,</span> <span class="s2">&quot;frank&quot;</span><span class="p">])</span>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">fitted</span> <span class="o">=</span> <span class="n">fit_vine</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">,</span> <span class="n">families</span><span class="o">=</span><span class="p">[</span><span class="s2">"clayton"</span><span class="p">,</span> <span class="s2">"gumbel"</span><span class="p">,</span> <span class="s2">"frank"</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">order</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span>
 <span class="go">True</span>
 </code></pre></div>

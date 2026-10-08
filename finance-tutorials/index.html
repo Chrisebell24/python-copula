@@ -1,0 +1,1414 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Copula modelling in Python, verified against R's copula package">
+      
+      
+      
+      
+        <link rel="prev" href="../vines/">
+      
+      
+        <link rel="next" href="../r-translation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Finance tutorials - rcopula</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#finance-tutorials" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="rcopula" class="md-header__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            rcopula
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Finance tutorials
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="rcopula" class="md-nav__button md-logo" aria-label="rcopula" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    rcopula
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Chrisebell24/python-copula" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Chrisebell24/python-copula
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What copulas are for
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../choosing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a family
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vine copulas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance tutorials
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finance tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#vine-copulas-for-markets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vine copulas for markets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risk-management-for-a-trading-book" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk management for a trading book
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading-strategies-with-copulas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trading strategies with copulas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#valuing-odd-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valuing odd assets
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../r-translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from R
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How parity is verified
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/families/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Copula families
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/structural/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structural constructions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/gof/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Goodness of fit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transforms and Kendall
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/applications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Applications
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/special/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Special functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#vine-copulas-for-markets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vine copulas for markets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risk-management-for-a-trading-book" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk management for a trading book
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading-strategies-with-copulas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trading strategies with copulas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#valuing-odd-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valuing odd assets
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="finance-tutorials">Finance tutorials<a class="headerlink" href="#finance-tutorials" title="Permanent link">&para;</a></h1>
+<p>Four plain-language walk-throughs, each a sequence of short steps from data to an
+answer a desk would act on. Every one has a runnable script in
+<a href="https://github.com/Chrisebell24/python-copula/tree/main/examples"><code>examples/</code></a>
+that simulates its own market, so it works offline and <strong>asserts every number
+quoted here</strong>. To use real data, swap step 1 for your own returns.</p>
+<table>
+<thead>
+<tr>
+<th>Tutorial</th>
+<th>You will learn to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#vine-copulas-for-markets">Vine copulas for markets</a></td>
+<td>Fit a vine to returns, read it, forecast VaR, stress test, build a crash-aware portfolio</td>
+</tr>
+<tr>
+<td><a href="#risk-management-for-a-trading-book">Risk management</a></td>
+<td>Backtest VaR, allocate risk to desks, measure diversification and contagion, reverse stress test</td>
+</tr>
+<tr>
+<td><a href="#trading-strategies-with-copulas">Trading strategies</a></td>
+<td>Pick pairs, turn a copula into a signal, backtest with costs, trade a basket with a vine, spot a broken pair</td>
+</tr>
+<tr>
+<td><a href="#valuing-odd-assets">Valuing odd assets</a></td>
+<td>Price worst-of notes, basket puts, first-to-default, cat bonds and private stakes under different tails</td>
+</tr>
+</tbody>
+</table>
+<p>The thread through all four: a correlation matrix is a <strong>Gaussian copula</strong>, and a
+Gaussian copula says extreme days happen independently. Each tutorial measures
+what that assumption costs.</p>
+<h2 id="vine-copulas-for-markets">Vine copulas for markets<a class="headerlink" href="#vine-copulas-for-markets" title="Permanent link">&para;</a></h2>
+<p>A correlation matrix says how assets move together <em>on average</em>. It cannot say
+that small caps crash with the S&amp;P far more often than they rally with it, or
+that Treasuries rally in a sell-off. A <strong>vine copula</strong> can: it links assets in
+pairs, and every pair gets its own shape. Eight steps, from a table of returns to
+a crash-aware portfolio. The full runnable version, with the data simulated so it
+works offline, is
+<a href="https://github.com/Chrisebell24/python-copula/blob/main/examples/28_vine_markets_howto.py"><code>examples/28_vine_markets_howto.py</code></a>.</p>
+<p><strong>1. Get daily returns.</strong> Any <code>DataFrame</code> of returns, one column per asset.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yfinance</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">yf</span>  <span class="c1"># pip install yfinance -- or use your own data</span>
+
+<span class="n">tickers</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="s2">"QQQ"</span><span class="p">,</span> <span class="s2">"IWM"</span><span class="p">,</span> <span class="s2">"HYG"</span><span class="p">,</span> <span class="s2">"TLT"</span><span class="p">]</span>  <span class="c1"># large caps, tech, small caps, credit, bonds</span>
+<span class="n">prices</span> <span class="o">=</span> <span class="n">yf</span><span class="o">.</span><span class="n">download</span><span class="p">(</span><span class="n">tickers</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="s2">"2015-01-01"</span><span class="p">)[</span><span class="s2">"Close"</span><span class="p">][</span><span class="n">tickers</span><span class="p">]</span>
+<span class="n">returns</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">prices</span><span class="p">)</span><span class="o">.</span><span class="n">diff</span><span class="p">()</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>2. Strip out volatility.</strong> Calm and stormy periods hit every asset at once, and
+a copula fitted to raw returns mistakes that for dependence. Fit a GARCH to each
+asset and keep the <em>standardised residuals</em>: how surprising each day was, given
+how volatile things already were. Then convert them to ranks in (0, 1), where
+0.01 means "a 1-in-100 bad day for this asset".</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.garch</span><span class="w"> </span><span class="kn">import</span> <span class="n">fit_garch</span>
+
+<span class="n">margins</span> <span class="o">=</span> <span class="p">[</span><span class="n">fit_garch</span><span class="p">(</span><span class="n">returns</span><span class="p">[</span><span class="n">t</span><span class="p">],</span> <span class="n">dist</span><span class="o">=</span><span class="s2">"t"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tickers</span><span class="p">]</span>
+<span class="n">u</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">pseudo_obs</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="n">m</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">m</span><span class="o">.</span><span class="n">resid</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">margins</span><span class="p">}))</span>
+</code></pre></div>
+<p><strong>3. Fit the vine.</strong> One line. A C-vine puts the most connected asset at the
+centre and links every other asset to it; higher trees capture what is left once
+that asset is accounted for. Each link picks its own family by AIC.</p>
+<div class="highlight"><pre><span></span><code><span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">structure</span><span class="o">=</span><span class="s2">"C"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">vine</span><span class="o">.</span><span class="n">describe</span><span class="p">())</span>
+<span class="c1"># C-vine copula, dim 5, order [0, 1, 2, 3, 4]       &lt;- SPY (column 0) is the centre</span>
+<span class="c1">#   tree 1  0,1      Student copula, rho=0.877, df=4.06</span>
+<span class="c1">#   tree 1  0,2      Clayton copula, theta=2.59</span>
+<span class="c1">#   tree 1  0,3      Clayton copula, theta=1.32</span>
+<span class="c1">#   tree 1  0,4      Frank copula, theta=-1.94</span>
+<span class="c1">#   tree 2  1,2|0    Gaussian copula, rho=0.208      &lt;- QQQ-IWM once SPY is known</span>
+<span class="c1">#   ...</span>
+</code></pre></div>
+<p><strong>4. Read what it found.</strong> Tree 1 is the part to read. Kendall's τ is the overall
+co-movement (−1 to 1); tail dependence is the chance that two assets have an
+extreme day <em>together</em> (0 to 1).</p>
+<div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">pair</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">vine</span><span class="o">.</span><span class="n">pair_copulas</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+    <span class="n">asset</span> <span class="o">=</span> <span class="n">tickers</span><span class="p">[</span><span class="n">vine</span><span class="o">.</span><span class="n">order</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]]</span>
+    <span class="n">tail</span> <span class="o">=</span> <span class="n">pair</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"SPY-</span><span class="si">{</span><span class="n">asset</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">pair</span><span class="o">.</span><span class="n">name</span><span class="si">:</span><span class="s2">&lt;8</span><span class="si">}</span><span class="s2"> tau=</span><span class="si">{</span><span class="n">pair</span><span class="o">.</span><span class="n">tau</span><span class="p">()</span><span class="si">:</span><span class="s2">+.2f</span><span class="si">}</span><span class="s2">  "</span>
+        <span class="sa">f</span><span class="s2">"crash together=</span><span class="si">{</span><span class="n">tail</span><span class="o">.</span><span class="n">lower</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">  rally together=</span><span class="si">{</span><span class="n">tail</span><span class="o">.</span><span class="n">upper</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">"</span>
+    <span class="p">)</span>
+<span class="c1"># SPY-QQQ  Student  tau=+0.68  crash together=0.59  rally together=0.59</span>
+<span class="c1"># SPY-IWM  Clayton  tau=+0.56  crash together=0.77  rally together=0.00</span>
+<span class="c1"># SPY-HYG  Clayton  tau=+0.40  crash together=0.59  rally together=0.00</span>
+<span class="c1"># SPY-TLT  Frank    tau=-0.21  crash together=0.00  rally together=0.00</span>
+</code></pre></div>
+<p>Small caps and credit fall with the S&amp;P but do not rally with it; bonds move the
+other way. A Gaussian copula, which is what a correlation matrix implies, sets
+every one of those tail numbers to zero.</p>
+<p><strong>5. Simulate tomorrow and measure risk.</strong> Put the GARCH margins and the vine
+back together. The forecast starts from <em>today's</em> volatility, so the risk number
+moves with the market.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.garch</span><span class="w"> </span><span class="kn">import</span> <span class="n">CopulaGarch</span>
+
+<span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.30</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.10</span><span class="p">,</span> <span class="mf">0.30</span><span class="p">]</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">CopulaGarch</span><span class="p">(</span><span class="n">margins</span><span class="p">,</span> <span class="n">vine</span><span class="p">,</span> <span class="n">innovations</span><span class="o">=</span><span class="s2">"parametric"</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">forecast_risk</span><span class="p">(</span><span class="n">weights</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">200_000</span><span class="p">)</span>
+<span class="c1"># {'var': 0.0203, 'expected_shortfall': 0.0271, ...}   Gaussian copula: 0.0186 and 0.0240</span>
+</code></pre></div>
+<p><strong>6. Ask how often they crash together.</strong> Simulate from the vine and count the
+days when SPY, QQQ and IWM all have a 1-in-50 bad day at once.</p>
+<div class="highlight"><pre><span></span><code><span class="n">sims</span> <span class="o">=</span> <span class="n">vine</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400_000</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">sims</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+<span class="c1"># vine 1.13%   data 1.04%   Gaussian copula 0.48%   independent 0.0008%</span>
+</code></pre></div>
+<p><strong>7. Stress test.</strong> Keep only the simulated days when SPY has a 1-in-100 loss,
+and look at everything else on those days.</p>
+<div class="highlight"><pre><span></span><code><span class="n">crash_days</span> <span class="o">=</span> <span class="n">sims</span><span class="p">[</span><span class="n">sims</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">]</span>
+<span class="p">(</span><span class="n">crash_days</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># chance each asset has its own worst-5% day</span>
+<span class="c1"># QQQ 93%   IWM 99%   HYG 92%   TLT 2%</span>
+</code></pre></div>
+<p><strong>8. Build a crash-aware portfolio.</strong> Feed simulated days to an optimiser that
+minimises expected shortfall (the average loss on the worst 1% of days), capped at
+40% per fund. Because the scenarios come from the vine, the optimiser knows which
+assets fail together.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.portfolio</span><span class="w"> </span><span class="kn">import</span> <span class="n">mean_cvar_weights</span>
+
+<span class="n">scenarios</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">forecast</span><span class="p">(</span><span class="n">horizon</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">5_000</span><span class="p">)</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">mean_cvar_weights</span><span class="p">(</span><span class="n">scenarios</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.40</span><span class="p">))</span>
+</code></pre></div>
+<p>Optimised on Gaussian-copula scenarios instead, the portfolio holds less of the
+TLT hedge, and its real bad-day loss comes out a little higher. That gain is
+modest. Most of what a vine adds is in steps 5–7: knowing <em>before</em> the bad day
+that the risk number is too low, and by how much.</p>
+<p><strong>Which vine?</strong> Use a <strong>C-vine</strong> when one asset or factor drives the rest (an
+index, a sector ETF, oil for energy names). Use a <strong>D-vine</strong> (<code>structure="D"</code>) for a
+chain, such as points on a yield curve or futures expiries. For 20+ assets, add
+<code>truncate=2</code> to model only the first two trees and treat the rest as independent.
+The <a href="../vines/">vine tutorial</a> has the
+theory, and <code>rc.statarb.select_partners</code> picks which assets to group together.</p>
+<h2 id="risk-management-for-a-trading-book">Risk management for a trading book<a class="headerlink" href="#risk-management-for-a-trading-book" title="Permanent link">&para;</a></h2>
+<p>Five desks, one book, and the questions a risk manager gets every morning. The
+dependence model is where most risk systems quietly go wrong: a correlation
+matrix (a Gaussian copula) says desks have their worst days independently. Eight
+steps; the runnable version, with simulated data so it works offline, is
+<a href="https://github.com/Chrisebell24/python-copula/blob/main/examples/29_risk_management_howto.py"><code>examples/29_risk_management_howto.py</code></a>.</p>
+<p><strong>1. Get each desk's daily returns.</strong> One column per desk, and the dollar exposure in each.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+
+<span class="n">desks</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"US equity"</span><span class="p">,</span> <span class="s2">"EU equity"</span><span class="p">,</span> <span class="s2">"Credit"</span><span class="p">,</span> <span class="s2">"Rates"</span><span class="p">,</span> <span class="s2">"Commodities"</span><span class="p">]</span>
+<span class="n">exposure</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">40.0</span><span class="p">,</span> <span class="mf">30.0</span><span class="p">,</span> <span class="mf">25.0</span><span class="p">,</span> <span class="mf">40.0</span><span class="p">,</span> <span class="mf">15.0</span><span class="p">])</span>  <span class="c1"># $ millions</span>
+<span class="n">returns</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># DataFrame of daily desk returns, columns = desks</span>
+</code></pre></div>
+<p><strong>2. Fit volatility per desk, then dependence between desks.</strong> GARCH answers "how
+volatile is each desk right now"; the copula answers "how do desks move together
+once that is accounted for". Fit a Gaussian copula and a Student-t, which lets
+desks crash together. Its degrees of freedom say how often: the lower, the more.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.garch</span><span class="w"> </span><span class="kn">import</span> <span class="n">fit_garch</span>
+
+<span class="n">margins</span> <span class="o">=</span> <span class="p">[</span><span class="n">fit_garch</span><span class="p">(</span><span class="n">returns</span><span class="p">[</span><span class="n">d</span><span class="p">],</span> <span class="n">dist</span><span class="o">=</span><span class="s2">"t"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">desks</span><span class="p">]</span>
+<span class="n">u</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">pseudo_obs</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="n">m</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">m</span><span class="o">.</span><span class="n">resid</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">margins</span><span class="p">}))</span>
+
+<span class="n">gauss</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">"un"</span><span class="p">),</span> <span class="n">u</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"itau"</span><span class="p">)</span><span class="o">.</span><span class="n">copula</span>
+<span class="n">student</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">StudentCopula</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">"un"</span><span class="p">),</span> <span class="n">u</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"itau.mpl"</span><span class="p">)</span><span class="o">.</span><span class="n">copula</span>
+<span class="c1"># df = 3.05; log-likelihood 616 points better than the Gaussian</span>
+</code></pre></div>
+<p><strong>3. Today's VaR and expected shortfall, in dollars.</strong> VaR 99% is the loss you
+should exceed on 1 day in 100; expected shortfall (ES) is the average loss on
+those days. The forecast starts from today's volatility.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.garch</span><span class="w"> </span><span class="kn">import</span> <span class="n">CopulaGarch</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">CopulaGarch</span><span class="p">(</span><span class="n">margins</span><span class="p">,</span> <span class="n">student</span><span class="p">,</span> <span class="n">innovations</span><span class="o">=</span><span class="s2">"parametric"</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">forecast_risk</span><span class="p">(</span><span class="n">exposure</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">200_000</span><span class="p">)</span>
+<span class="c1"># Student-t:  VaR $1.84m   ES $2.43m</span>
+<span class="c1"># Gaussian:   VaR $1.76m   ES $2.23m    &lt;- understates the bad-day loss by ~8%</span>
+</code></pre></div>
+<p><strong>4. Backtest: was each day's VaR right?</strong> Walk forward through days the model
+never saw. Each morning compute VaR, each evening check whether the loss broke
+through it. A 99% VaR should break on about 1% of days, and Kupiec's test asks
+whether the count is too far off to be bad luck.</p>
+<div class="highlight"><pre><span></span><code><span class="n">breaks</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="n">pnl</span> <span class="o">&gt;</span> <span class="n">var_each_day</span><span class="p">))</span>  <span class="c1"># see the example for the walk-forward loop</span>
+<span class="c1"># 4,000 days, expect 40:   Gaussian 51 (p = 0.09)   Student-t 45 (p = 0.44)</span>
+</code></pre></div>
+<p>The Gaussian breaks more often, but only by a handful of days, and on other
+simulated histories either model can fail the test. Daily VaR is driven mostly by
+volatility, which GARCH handles for both. The copula matters most deeper in the
+tail, in the steps below.</p>
+<p><strong>5. Which desk is the risk coming from?</strong> Euler allocation gives each desk's
+share of ES: its average loss on the book's worst days. The shares add up to the
+total, so they can be used to charge capital.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.risk</span><span class="w"> </span><span class="kn">import</span> <span class="n">risk_contributions</span>
+
+<span class="n">risk_contributions</span><span class="p">(</span><span class="n">student</span><span class="p">,</span> <span class="n">loss_margins</span><span class="p">,</span> <span class="n">exposure</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.99</span><span class="p">)</span>
+<span class="c1">#              exposure %   ES share %</span>
+<span class="c1"># US equity        26.7        34.1</span>
+<span class="c1"># EU equity        20.0        40.0</span>
+<span class="c1"># Credit           16.7         9.3</span>
+<span class="c1"># Rates            26.7        -0.5     &lt;- a quarter of the capital, none of the risk</span>
+<span class="c1"># Commodities      10.0        17.1</span>
+</code></pre></div>
+<p><strong>6. How much does diversification actually buy?</strong> Compare the book's ES with the
+worst case, where every desk has its bad day at once.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.risk</span><span class="w"> </span><span class="kn">import</span> <span class="n">diversification_benefit</span>
+
+<span class="n">diversification_benefit</span><span class="p">(</span><span class="n">student</span><span class="p">,</span> <span class="n">loss_margins</span><span class="p">,</span> <span class="mf">0.99</span><span class="p">,</span> <span class="n">exposure</span><span class="p">)[</span><span class="s2">"benefit_pct"</span><span class="p">]</span>
+<span class="c1"># Student-t 27.9%   Gaussian 33.4%   &lt;- the correlation matrix promises benefit that isn't there</span>
+</code></pre></div>
+<p><strong>7. If one desk is in trouble, what happens to the rest?</strong> Delta-CoVaR measures
+how much the rest of the book's VaR rises when one desk has a 1-in-20 bad day. It
+measures contagion, not size.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.risk</span><span class="w"> </span><span class="kn">import</span> <span class="n">delta_covar</span>
+
+<span class="n">delta_covar</span><span class="p">(</span><span class="n">rest_of_book</span><span class="p">,</span> <span class="n">desk_losses</span><span class="p">)</span>
+<span class="c1">#              Student-t   Gaussian      ($m)</span>
+<span class="c1"># Credit          1.23       0.98</span>
+<span class="c1"># US equity       1.04       0.87</span>
+<span class="c1"># Rates           0.38      -0.30    &lt;- the hedge that stops working in a crisis</span>
+</code></pre></div>
+<p>Under a Gaussian copula, a bad day for rates is a good day for the equity-heavy
+rest of the book. Under the Student-t it is not: a 1-in-20 move anywhere means a
+turbulent day everywhere. A hedge that works on average does not necessarily work
+in a crisis.</p>
+<p><strong>8. Reverse stress test: what does a disaster look like?</strong> Rather than guessing a
+scenario, ask the model what typically happens on days worse than the
+1-in-1,000-day loss (about once every four years).</p>
+<div class="highlight"><pre><span></span><code><span class="n">book</span> <span class="o">=</span> <span class="n">sims</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">worst</span> <span class="o">=</span> <span class="n">sims</span><span class="p">[</span><span class="n">book</span> <span class="o">&gt;</span> <span class="n">rc</span><span class="o">.</span><span class="n">risk</span><span class="o">.</span><span class="n">value_at_risk</span><span class="p">(</span><span class="n">book</span><span class="p">,</span> <span class="mf">0.999</span><span class="p">)]</span>
+<span class="n">worst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="c1"># threshold $3.22m, average loss $4.01m:  EU equity 1.55  US equity 1.33</span>
+<span class="c1">#   Commodities 0.75  Credit 0.38  Rates 0.00</span>
+<span class="c1"># How often is a loss that big?   Student-t: 1 day in 1,000   Gaussian: 1 in 1,794</span>
+</code></pre></div>
+<h2 id="trading-strategies-with-copulas">Trading strategies with copulas<a class="headerlink" href="#trading-strategies-with-copulas" title="Permanent link">&para;</a></h2>
+<p>A copula pairs trade asks one question every day: <em>given what stock B just did,
+how unusual was stock A's move?</em> If B jumped and A didn't, A has fallen behind and
+looks cheap. Eight steps, from a universe of stocks to knowing when to stop
+trading. The runnable version uses a simulated market with hidden pairs, so it
+runs offline and checks itself:
+<a href="https://github.com/Chrisebell24/python-copula/blob/main/examples/30_trading_strategies_howto.py"><code>examples/30_trading_strategies_howto.py</code></a>.</p>
+<p><strong>1. Get a universe of returns, and split it.</strong> Learn on the first three years and
+trade the next two. The model never sees the trading window while it is being
+fitted.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yfinance</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">yf</span>
+
+<span class="n">prices</span> <span class="o">=</span> <span class="n">yf</span><span class="o">.</span><span class="n">download</span><span class="p">(</span><span class="n">tickers</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="s2">"2019-01-01"</span><span class="p">)[</span><span class="s2">"Close"</span><span class="p">]</span>
+<span class="n">returns</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">prices</span><span class="p">)</span><span class="o">.</span><span class="n">diff</span><span class="p">()</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+<span class="n">formation</span><span class="p">,</span> <span class="n">trading</span> <span class="o">=</span> <span class="n">returns</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">750</span><span class="p">],</span> <span class="n">returns</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">750</span><span class="p">:]</span>
+</code></pre></div>
+<p><strong>2. Pick the pair.</strong> Rank every pair by Kendall's τ on the formation window. τ
+works on ranks, so a few huge days can't dominate it.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">select_pairs</span>
+
+<span class="n">select_pairs</span><span class="p">(</span><span class="n">formation</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"kendall"</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="c1">#  first second  score</span>
+<span class="c1">#   OIL1   OIL2  0.696     &lt;- the true pair, found</span>
+<span class="c1">#  BANK3  BANK1  0.609</span>
+<span class="c1">#  BANK2  BANK1  0.607</span>
+</code></pre></div>
+<p><strong>3. Fit a copula to the pair.</strong> Let AIC choose the family.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+
+<span class="n">u</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">pseudo_obs</span><span class="p">(</span><span class="n">formation</span><span class="p">[[</span><span class="s2">"OIL1"</span><span class="p">,</span> <span class="s2">"OIL2"</span><span class="p">]])</span>
+<span class="n">copula</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">select_copula</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">families</span><span class="o">=</span><span class="p">[</span><span class="s2">"gaussian"</span><span class="p">,</span> <span class="s2">"student"</span><span class="p">,</span> <span class="s2">"clayton"</span><span class="p">,</span> <span class="s2">"gumbel"</span><span class="p">,</span> <span class="s2">"frank"</span><span class="p">])</span><span class="o">.</span><span class="n">best</span>
+<span class="c1"># Student copula, rho=0.888, df=2.76   tau=0.70, chance of crashing together=0.66</span>
+</code></pre></div>
+<p><strong>4. Turn it into a signal.</strong> The <em>h-function</em> <code>h1 = P(A this low | B's move)</code> is
+the "how unusual?" number. It's uniform under the copula, so 0.05 means the same
+thing for any pair.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.portfolio</span><span class="w"> </span><span class="kn">import</span> <span class="n">mispricing_index</span>
+
+<span class="n">h1</span><span class="p">,</span> <span class="n">h2</span> <span class="o">=</span> <span class="n">mispricing_index</span><span class="p">(</span><span class="n">copula</span><span class="p">,</span> <span class="p">[[</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">]])</span>  <span class="c1"># A flat, B has a top-5% day</span>
+<span class="c1"># h1 = 0.020  -&gt; A has lagged its partner: buy A, sell B</span>
+</code></pre></div>
+<p>One day of this is mostly noise. Add the daily <code>h1 - 0.5</code> into a running <em>flag</em>
+that forgets at the rate the pair's gap closes. Enter when the flag passes a
+threshold and exit when it returns to zero.</p>
+<p><strong>5. Backtest out of sample, with costs.</strong> Tune the threshold on the formation
+window, freeze it, and charge 5 bp per leg on every trade.</p>
+<div class="highlight"><pre><span></span><code>                 total return  Sharpe  trades
+copula flag            +8.0%    0.69      12
+one-day copula         -7.0%   -1.37      19    &lt;- trading single days: costs eat it
+</code></pre></div>
+<p><strong>6. Compare with the classic z-score trade.</strong> Watch the price gap itself, and
+enter at ±k standard deviations.</p>
+<div class="highlight"><pre><span></span><code>z-score               +21.4%    1.99       7
+</code></pre></div>
+<p>The z-score wins here, and that's the honest result. These two stocks differ by
+exactly one straight-line price gap, and the z-score watches that gap directly.
+When the relationship is a simple linear spread, use the simple tool. A copula
+earns its place with more than two assets, and in knowing when to stop.</p>
+<p><strong>7. Trade one stock against three (a vine).</strong> BANK1 has no single twin: it tracks
+the average of three other banks. Find them, fit a vine with BANK1 last, and the
+vine's Rosenblatt transform gives <code>P(BANK1 this low | all three partners)</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.statarb</span><span class="w"> </span><span class="kn">import</span> <span class="n">select_partners</span>
+
+<span class="n">partners</span> <span class="o">=</span> <span class="n">select_partners</span><span class="p">(</span><span class="n">formation</span><span class="p">,</span> <span class="s2">"BANK1"</span><span class="p">)[</span><span class="s2">"partners"</span><span class="p">]</span>  <span class="c1"># ['BANK2', 'BANK3', 'BANK4']</span>
+<span class="n">vine</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_vine</span><span class="p">(</span><span class="n">formation</span><span class="p">[[</span><span class="o">*</span><span class="n">partners</span><span class="p">,</span> <span class="s2">"BANK1"</span><span class="p">]],</span> <span class="n">structure</span><span class="o">=</span><span class="s2">"D"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="n">h</span> <span class="o">=</span> <span class="n">vine</span><span class="o">.</span><span class="n">rosenblatt</span><span class="p">(</span><span class="n">u_today</span><span class="p">)[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># feed into the same flag rule</span>
+<span class="c1"># vine, BANK1 vs basket: +8.6%, Sharpe 0.82  |  gap closes ~6%/day vs ~1.5%/day for one partner</span>
+</code></pre></div>
+<p>BANK1's gap to the basket comes back. Its gap to any single bank doesn't, because
+each bank has news of its own.</p>
+<p><strong>8. Know when to stop.</strong> Pairs break, for example after a takeover. Track
+Kendall's τ over the last 60 days and stop once it falls below half the formation
+value.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+
+<span class="n">tau_now</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">kendalltau</span><span class="p">(</span><span class="n">last60</span><span class="p">[</span><span class="s2">"TECH1"</span><span class="p">],</span> <span class="n">last60</span><span class="p">[</span><span class="s2">"TECH2"</span><span class="p">])</span><span class="o">.</span><span class="n">statistic</span>
+<span class="c1"># formation tau 0.61 -&gt; 0.06; the alarm fires on day 286, 36 days after the takeover</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>               total return  Sharpe
+keep trading         +39.6%    0.93
+stop on alarm        +29.3%    1.98
+</code></pre></div>
+<p>After the break, the gap swings three times harder and never comes back. Carrying
+on is a bigger coin flip that happened to pay off this time. The alarm doesn't
+promise more money; it stops you betting on a relationship that no longer exists.</p>
+<h2 id="valuing-odd-assets">Valuing odd assets<a class="headerlink" href="#valuing-odd-assets" title="Permanent link">&para;</a></h2>
+<p>Some assets can't be priced one underlying at a time. A note paying off the
+<em>worst</em> of three stocks, a put on a whole basket, insurance on the <em>first</em> default
+in a group of bonds, a cat bond hit when two regions flood at once, a private
+stake with no market price. Their value depends on whether the pieces fail
+<em>together</em>, which a correlation number does not say. Each step prices one asset
+under copulas that agree on Kendall's τ and differ only in their tails. The
+runnable version is
+<a href="https://github.com/Chrisebell24/python-copula/blob/main/examples/31_valuing_odd_assets_howto.py"><code>examples/31_valuing_odd_assets_howto.py</code></a>.</p>
+<p><strong>1. Same correlation, different crashes.</strong> Four copulas, all at τ = 0.5:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+
+<span class="k">for</span> <span class="n">cop</span> <span class="ow">in</span> <span class="p">(</span>
+    <span class="n">rc</span><span class="o">.</span><span class="n">GaussianCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">),</span>
+    <span class="n">rc</span><span class="o">.</span><span class="n">StudentCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="mf">4.0</span><span class="p">),</span>
+    <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">),</span>
+    <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">),</span>
+<span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">cop</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">cop</span><span class="o">.</span><span class="n">lambda_</span><span class="p">())</span>
+<span class="c1"># Gaussian   crash together 0.00   rally together 0.00</span>
+<span class="c1"># Student-t  crash together 0.40   rally together 0.40</span>
+<span class="c1"># Clayton    crash together 0.71   rally together 0.00</span>
+<span class="c1"># Gumbel     crash together 0.00   rally together 0.59</span>
+</code></pre></div>
+<p><strong>2. A worst-of note on three stocks.</strong> Lend 100 for a year and earn an 8% coupon.
+If the <em>worst</em> stock ends below 70% of its start, you get back 100 × its
+performance instead of 100. To price it, simulate each stock with its own
+volatility, link them with a copula, apply the payoff and average.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.derivatives</span><span class="w"> </span><span class="kn">import</span> <span class="n">lognormal_terminal</span>
+
+<span class="n">stocks</span> <span class="o">=</span> <span class="p">[</span><span class="n">lognormal_terminal</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.30</span><span class="p">,</span> <span class="mf">0.35</span><span class="p">)]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">worst_of_note</span><span class="p">(</span><span class="n">u</span><span class="p">):</span>
+    <span class="n">worst</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">m</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="n">j</span><span class="p">])</span> <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">stocks</span><span class="p">)])</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mf">8.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">worst</span> <span class="o">&lt;</span> <span class="mf">0.70</span><span class="p">,</span> <span class="mf">100.0</span> <span class="o">*</span> <span class="n">worst</span><span class="p">,</span> <span class="mf">100.0</span><span class="p">)</span>
+
+
+<span class="n">worst_of_note</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400_000</span><span class="p">))</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="c1"># Gaussian 96.74   Student-t 97.06   Clayton 98.49   Gumbel 96.02   independent 92.30  (+/- 0.03)</span>
+</code></pre></div>
+<p>The holder loses if <em>any</em> stock breaks below 70%. When crashes cluster, the bad
+outcomes land on the same few paths, so fewer paths have a break. The holder
+benefits when stocks crash together.</p>
+<p><strong>3. A put on a basket.</strong> It pays if an equal-weight basket of the three stocks
+ends below 80%. One stock falling is diluted by the other two, so it only pays
+when they fall <em>together</em>.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># per 100 notional:  Gaussian 2.73   Student-t 2.67   Clayton 3.04   Gumbel 2.49   (+/- 0.01)</span>
+</code></pre></div>
+<p>Clayton prices this protection 11% above Gaussian at the same correlation. The
+buyer is the one exposed to joint crashes.</p>
+<p><strong>4. How accurate is the price?</strong> Every price above has a standard error, and
+halving it costs 4x the draws. Quasi-random (Sobol) points cover the space more
+evenly, so they reach the same accuracy with far fewer draws:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.sampling</span><span class="w"> </span><span class="kn">import</span> <span class="n">quasi_rvs</span><span class="p">,</span> <span class="n">variance_ratio</span>
+
+<span class="n">variance_ratio</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">basket_put</span><span class="p">,</span> <span class="mi">8192</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"sobol"</span><span class="p">)</span>
+<span class="c1"># standard error 0.0647 -&gt; 0.0014; plain draws would need ~2000x as many to match</span>
+<span class="n">price</span> <span class="o">=</span> <span class="n">basket_put</span><span class="p">(</span><span class="n">quasi_rvs</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">16</span><span class="p">))</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+</code></pre></div>
+<p>That gain is unusually large: this payoff is smooth and depends on only three
+assets. Most payoffs gain far less.</p>
+<p><strong>5. A first-to-default basket on ten bonds.</strong> Each bond has a 2% chance of
+default. A first-to-default swap pays on the first default; a fifth-to-default
+pays only if five go.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.credit</span><span class="w"> </span><span class="kn">import</span> <span class="n">nth_to_default_probability</span>
+
+<span class="mf">0.6</span> <span class="o">*</span> <span class="n">nth_to_default_probability</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span> <span class="mf">0.02</span><span class="p">,</span> <span class="n">n_th</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="c1">#                 1st-to-default   5th-to-default</span>
+<span class="c1"># Gaussian            7.59%            0.22%      premium a year</span>
+<span class="c1"># Clayton             3.82%            0.93%</span>
+</code></pre></div>
+<p>Clustered defaults make the first one <em>cheaper</em> to insure and the fifth four times
+dearer. This is the correlation trade that broke in 2008.</p>
+<p><strong>6. A catastrophe bond exposed to two regions.</strong> Florida and Texas hurricane
+losses are heavy-tailed (lognormal). There are two bonds: a near one (3–6bn) and a
+remote one (15–30bn).</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.insurance</span><span class="w"> </span><span class="kn">import</span> <span class="n">catastrophe_bond</span>
+
+<span class="n">losses</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">CopulaDistribution</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.4</span><span class="p">),</span> <span class="n">regions</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">400_000</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">catastrophe_bond</span><span class="p">(</span><span class="n">losses</span><span class="p">,</span> <span class="mf">15.0</span><span class="p">,</span> <span class="mf">30.0</span><span class="p">,</span> <span class="n">coupon</span><span class="o">=</span><span class="mf">0.06</span><span class="p">)[</span><span class="s2">"expected_loss"</span><span class="p">]</span>
+<span class="c1">#            near bond   remote bond</span>
+<span class="c1"># Gaussian     12.79%       0.65%</span>
+<span class="c1"># Gumbel       12.25%       0.75%     (0.96x and 1.16x)</span>
+</code></pre></div>
+<p>Big losses arriving together barely matter for the near bond, which any bad season
+in either region hits. The remote bond needs both regions hit hard at once, so its
+stress case is Gumbel, not Clayton.</p>
+<p><strong>7. Marking a private stake after a market crash.</strong> The stake has no market
+price, and the index just had its worst-5% quarter. Draw the private return
+<em>given</em> that move with the inverse Rosenblatt transform:</p>
+<div class="highlight"><pre><span></span><code><span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="mi">100_000</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">),</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">100_000</span><span class="p">)])</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">private</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">inverse_rosenblatt</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">),</span> <span class="n">z</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="c1">#            median mark   5-95% range</span>
+<span class="c1"># Gaussian     -14.3%         45.2%</span>
+<span class="c1"># Clayton      -20.8%         27.7%</span>
+<span class="c1"># Gumbel       -11.9%         47.5%</span>
+</code></pre></div>
+<p>Under Clayton the stake falls further and more predictably. Gaussian says it may
+well have escaped. A lender against the stake has collateral that falls hardest
+when everything falls.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
