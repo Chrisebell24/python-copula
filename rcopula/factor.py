@@ -580,7 +580,7 @@ class FactorCopula(Copula):
             x = special.ndtri(u)
             scales, log_sw = np.ones(1), np.zeros(1)
         else:
-            x = special.stdtrit(nu, u)
+            x = _stdtrit(nu, u)
             # W/2 ~ Gamma(nu/2): generalised Gauss-Laguerre in t = W/2.
             t_nodes, t_weights = special.roots_genlaguerre(_N_LAGUERRE, nu / 2.0 - 1.0)
             scales = np.sqrt(2.0 * t_nodes / nu)
@@ -985,7 +985,7 @@ def _latent(u: NDArray[np.float64], nu: float) -> NDArray[np.float64]:
     if np.isinf(nu):
         return np.asarray(special.ndtri(u))
     distinct, inverse = np.unique(u, return_inverse=True)
-    return np.asarray(special.stdtrit(nu, distinct)[inverse].reshape(u.shape))
+    return np.asarray(_stdtrit(nu, distinct)[inverse].reshape(u.shape))
 
 
 def _log_density(
@@ -1012,6 +1012,19 @@ def _log_density(
         - 0.5 * (nu + d) * np.log1p(q / nu)
         + 0.5 * (nu + 1.0) * np.sum(np.log1p(x**2 / nu), axis=1)
     )
+
+
+def _stdtrit(nu: float, u: ArrayLike) -> NDArray[np.float64]:
+    """Student-t quantile with exact endpoints: -inf at 0, +inf at 1.
+
+    ``scipy.special.stdtrit`` returns nan at 0 and 1 in SciPy < 1.16 (the
+    versions Python 3.10 installs), which turned ``C(u, 1, ..., 1)`` into 0
+    instead of ``u``. ``ndtri`` has no such problem.
+    """
+    arr = np.asarray(u, dtype=np.float64)
+    with np.errstate(invalid="ignore"):
+        out = np.asarray(special.stdtrit(nu, arr), dtype=np.float64)
+    return np.where(arr >= 1.0, np.inf, np.where(arr <= 0.0, -np.inf, out))
 
 
 def _log_conditional_cdf(
@@ -1218,7 +1231,7 @@ def fit_factor(
     inverse = inverse.reshape(u.shape)
 
     def loglik(nu: float) -> float:
-        quantiles = special.stdtrit(nu, distinct)
+        quantiles = _stdtrit(nu, distinct)
         return float(
             sum(
                 np.sum(
