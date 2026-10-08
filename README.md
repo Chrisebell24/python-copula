@@ -3,7 +3,7 @@
 **Copula modelling in Python — a full-featured replication of R's [`copula`](https://cran.r-project.org/package=copula) package, verified against it numerically.**
 
 [![CI](https://github.com/Chrisebell24/python-copula/actions/workflows/ci.yml/badge.svg)](https://github.com/Chrisebell24/python-copula/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Chrisebell24/python-copula/blob/main/LICENSE)
 
 > **Status: pre-1.0, under active development.** The API may change before 1.0.
 
@@ -105,6 +105,146 @@ x = mv.rvs(1000, random_state=0)
 rc.gof_test(rc.ClaytonCopula(dim=3), x, simulation="mult")
 ```
 
+## Tutorial: vine copulas for financial markets
+
+A correlation matrix says how assets move together *on average*. It cannot say
+that small caps crash with the S&P far more often than they rally with it, or
+that Treasuries rally in a sell-off. A **vine copula** can: it links assets in
+pairs, and every pair gets its own shape. Eight steps, from a table of returns to
+a crash-aware portfolio. The full runnable version, with the data simulated so it
+works offline, is
+[`examples/28_vine_markets_howto.py`](https://github.com/Chrisebell24/python-copula/blob/main/examples/28_vine_markets_howto.py).
+
+**1. Get daily returns.** Any `DataFrame` of returns, one column per asset.
+
+```python
+import numpy as np
+import yfinance as yf  # pip install yfinance -- or use your own data
+
+tickers = ["SPY", "QQQ", "IWM", "HYG", "TLT"]  # large caps, tech, small caps, credit, bonds
+prices = yf.download(tickers, start="2015-01-01")["Close"][tickers]
+returns = np.log(prices).diff().dropna()
+```
+
+**2. Strip out volatility.** Calm and stormy periods hit every asset at once, and
+a copula fitted to raw returns mistakes that for dependence. Fit a GARCH to each
+asset and keep the *standardised residuals*: how surprising each day was, given
+how volatile things already were. Then convert them to ranks in (0, 1), where
+0.01 means "a 1-in-100 bad day for this asset".
+
+```python
+import pandas as pd
+import rcopula as rc
+from rcopula.garch import fit_garch
+
+margins = [fit_garch(returns[t], dist="t", name=t) for t in tickers]
+u = rc.pseudo_obs(pd.DataFrame({m.name: m.resid for m in margins}))
+```
+
+**3. Fit the vine.** One line. A C-vine puts the most connected asset at the
+centre and links every other asset to it; higher trees capture what is left once
+that asset is accounted for. Each link picks its own family by AIC.
+
+```python
+vine = rc.fit_vine(u, structure="C")
+print(vine.describe())
+# C-vine copula, dim 5, order [0, 1, 2, 3, 4]       <- SPY (column 0) is the centre
+#   tree 1  0,1      Student copula, rho=0.877, df=4.06
+#   tree 1  0,2      Clayton copula, theta=2.59
+#   tree 1  0,3      Clayton copula, theta=1.32
+#   tree 1  0,4      Frank copula, theta=-1.94
+#   tree 2  1,2|0    Gaussian copula, rho=0.208      <- QQQ-IWM once SPY is known
+#   ...
+```
+
+**4. Read what it found.** Tree 1 is the part to read. Kendall's τ is the overall
+co-movement (−1 to 1); tail dependence is the chance that two assets have an
+extreme day *together* (0 to 1).
+
+```python
+for i, pair in enumerate(vine.pair_copulas[0]):
+    asset = tickers[vine.order[i + 1]]
+    tail = pair.lambda_()
+    print(
+        f"SPY-{asset}  {pair.name:<8} tau={pair.tau():+.2f}  "
+        f"crash together={tail.lower:.2f}  rally together={tail.upper:.2f}"
+    )
+# SPY-QQQ  Student  tau=+0.68  crash together=0.59  rally together=0.59
+# SPY-IWM  Clayton  tau=+0.56  crash together=0.77  rally together=0.00
+# SPY-HYG  Clayton  tau=+0.40  crash together=0.59  rally together=0.00
+# SPY-TLT  Frank    tau=-0.21  crash together=0.00  rally together=0.00
+```
+
+Small caps and credit fall with the S&P but do not rally with it; bonds move the
+other way. A Gaussian copula, which is what a correlation matrix implies, sets
+every one of those tail numbers to zero.
+
+**5. Simulate tomorrow and measure risk.** Put the GARCH margins and the vine
+back together. The forecast starts from *today's* volatility, so the risk number
+moves with the market.
+
+```python
+from rcopula.garch import CopulaGarch
+
+weights = [0.30, 0.15, 0.15, 0.10, 0.30]
+model = CopulaGarch(margins, vine, innovations="parametric")
+model.forecast_risk(weights, alpha=0.99, n=200_000)
+# {'var': 0.0203, 'expected_shortfall': 0.0271, ...}   Gaussian copula: 0.0186 and 0.0240
+```
+
+**6. Ask how often they crash together.** Simulate from the vine and count the
+days when SPY, QQQ and IWM all have a 1-in-50 bad day at once.
+
+```python
+sims = vine.rvs(400_000)
+np.mean(np.all(sims[:, :3] < 0.02, axis=1))
+# vine 1.13%   data 1.04%   Gaussian copula 0.48%   independent 0.0008%
+```
+
+**7. Stress test.** Keep only the simulated days when SPY has a 1-in-100 loss,
+and look at everything else on those days.
+
+```python
+crash_days = sims[sims[:, 0] < 0.01]
+(crash_days < 0.05).mean(axis=0)  # chance each asset has its own worst-5% day
+# QQQ 93%   IWM 99%   HYG 92%   TLT 2%
+```
+
+**8. Build a crash-aware portfolio.** Feed simulated days to an optimiser that
+minimises expected shortfall (the average loss on the worst 1% of days), capped at
+40% per fund. Because the scenarios come from the vine, the optimiser knows which
+assets fail together.
+
+```python
+from rcopula.portfolio import mean_cvar_weights
+
+scenarios = model.forecast(horizon=1, n=5_000)
+w = mean_cvar_weights(scenarios, alpha=0.99, bounds=(0.0, 0.40))
+```
+
+Optimised on Gaussian-copula scenarios instead, the portfolio holds less of the
+TLT hedge, and its real bad-day loss comes out a little higher. That gain is
+modest. Most of what a vine adds is in steps 5–7: knowing *before* the bad day
+that the risk number is too low, and by how much.
+
+**Which vine?** Use a **C-vine** when one asset or factor drives the rest (an
+index, a sector ETF, oil for energy names). Use a **D-vine** (`structure="D"`) for a
+chain, such as points on a yield curve or futures expiries. For 20+ assets, add
+`truncate=2` to model only the first two trees and treat the rest as independent.
+The [vine tutorial](https://chrisebell24.github.io/python-copula/vines/) has the
+theory, and `rc.statarb.select_partners` picks which assets to group together.
+
+### More finance tutorials
+
+Three more in the same step-by-step style, each with a runnable script that checks
+its own numbers, are on the [finance tutorials](https://chrisebell24.github.io/python-copula/finance-tutorials/) page:
+
+| | |
+|---|---|
+| [Risk management](https://chrisebell24.github.io/python-copula/finance-tutorials/#risk-management-for-a-trading-book) | VaR and expected shortfall in dollars, a VaR backtest, which desk the risk comes from, how much diversification really buys, contagion between desks, reverse stress testing — [`examples/29`](https://github.com/Chrisebell24/python-copula/blob/main/examples/29_risk_management_howto.py) |
+| [Trading strategies](https://chrisebell24.github.io/python-copula/finance-tutorials/#trading-strategies-with-copulas) | Picking pairs, a copula mispricing signal, an out-of-sample backtest with costs against the z-score trade, a vine basket trade, and an alarm for when a pair breaks — [`examples/30`](https://github.com/Chrisebell24/python-copula/blob/main/examples/30_trading_strategies_howto.py) |
+| [Valuing odd assets](https://chrisebell24.github.io/python-copula/finance-tutorials/#valuing-odd-assets) | Worst-of notes, basket puts, first-to-default baskets, catastrophe bonds and private stakes, priced at the same correlation under different tails — [`examples/31`](https://github.com/Chrisebell24/python-copula/blob/main/examples/31_valuing_odd_assets_howto.py) |
+
 ## Datasets
 
 Nothing is bundled: R `copula`'s datasets are GPL-3 and this package is MIT, so
@@ -125,7 +265,7 @@ data file is ever committed.
 
 ## Examples
 
-Twenty-seven scripts in [`examples/`](examples/), each of which **runs and asserts
+Thirty-one scripts in [`examples/`](https://github.com/Chrisebell24/python-copula/tree/main/examples/), each of which **runs and asserts
 its own claims** — so they cannot drift out of date without failing:
 
 ```bash
@@ -221,7 +361,7 @@ observed deviation.
 
 `rcopula` is MIT. R's `copula` is GPL-3. **No R source code was translated into this
 project** — every algorithm is implemented from its originating published paper, and the R
-package is used solely as a black-box test oracle. See [`NOTICE`](NOTICE) and
-[`CONTRIBUTING.md`](CONTRIBUTING.md).
+package is used solely as a black-box test oracle. See [`NOTICE`](https://github.com/Chrisebell24/python-copula/blob/main/NOTICE) and
+[`CONTRIBUTING.md`](https://github.com/Chrisebell24/python-copula/blob/main/CONTRIBUTING.md).
 
 `rcopula` is not affiliated with or endorsed by the authors of the R `copula` package.

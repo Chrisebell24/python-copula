@@ -393,7 +393,14 @@ class _ClaytonGenerator(ArchimedeanGenerator):
         """
         m = x.max(axis=1)
         bracket = np.sum(np.exp(x - m[:, None]), axis=1) - (dim - 1) * np.exp(-m)
-        return np.asarray(m + np.log(bracket))
+        large = m + np.log(bracket)
+        # Near independence (theta -> 0) every x_j is tiny and the bracket is
+        # 1 + tiny - tiny: all its digits cancel, and the density multiplies the
+        # result by 1/theta. At theta = 1e-17 that turned a log-density of ~0
+        # into +4 per observation. Writing the sum as 1 + sum(expm1(x_j)) keeps
+        # every digit; expm1 cannot overflow below the cut-off.
+        small = np.log1p(np.sum(np.expm1(np.minimum(x, 1.0)), axis=1))
+        return np.asarray(np.where(m <= 1.0, small, large))
 
     def log_pdf(self, u, theta, dim):
         r"""The Clayton density in logs.

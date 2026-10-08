@@ -72,7 +72,12 @@ __all__ = ["from_dict", "from_json", "to_dict", "to_json"]
 #: Bumped when a change to the document layout would make an old file
 #: unreadable. Separate from the package version, which moves for many reasons
 #: that have nothing to do with this format.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Schema 1 (rcopula 0.1.0) stored an unstructured elliptical copula's
+# correlations in row-by-row lower-triangle order. Schema 2 uses R's
+# column-by-column order. The two agree up to dim=3, so only dim >= 4 moves.
+_ELLIPTICAL_KINDS = ("GaussianCopula", "StudentCopula")
 
 
 def _floats(values: Any) -> list[float]:
@@ -200,7 +205,7 @@ def to_json(copula: Copula, *, indent: int | None = 2) -> str:
     >>> import rcopula as rc
     >>> from rcopula.serialize import to_json
     >>> print(to_json(rc.FrankCopula(4.0), indent=None))
-    {"rcopula": ..., "schema": 1, "copula": {"kind": "FrankCopula", ...}}
+    {"rcopula": ..., "schema": 2, "copula": {"kind": "FrankCopula", ...}}
     """
     return json.dumps(to_dict(copula), indent=indent)
 
@@ -234,6 +239,34 @@ def _families() -> dict[str, type[Copula]]:
         "TEVCopula",
     ]
     return {name: getattr(rc, name) for name in names}
+
+
+def _migrate_v1(node: Any) -> Any:
+    """Rewrite a schema-1 tree's unstructured correlations into schema-2 order."""
+    if isinstance(node, list):
+        return [_migrate_v1(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    out = {key: _migrate_v1(value) for key, value in node.items()}
+    dim = int(out.get("dim", 0) or 0)
+    if out.get("kind") in _ELLIPTICAL_KINDS and out.get("dispstr") == "un" and dim >= 4:
+        n = dim * (dim - 1) // 2
+        rows, cols = np.tril_indices(dim, -1)
+        old = dict(
+            zip(zip(rows.tolist(), cols.tolist(), strict=True), out["params"][:n], strict=True)
+        )
+        cols2, rows2 = np.triu_indices(dim, 1)
+        new = [old[(r, c)] for r, c in zip(rows2.tolist(), cols2.tolist(), strict=True)]
+        out["params"] = new + list(out["params"][n:])
+        if "free" in out and len(out["free"]) >= n:
+            free_old = dict(
+                zip(zip(rows.tolist(), cols.tolist(), strict=True), out["free"][:n], strict=True)
+            )
+            free_new = [
+                free_old[(r, c)] for r, c in zip(rows2.tolist(), cols2.tolist(), strict=True)
+            ]
+            out["free"] = free_new + list(out["free"][n:])
+    return out
 
 
 def _decode(node: dict[str, Any]) -> Copula:
@@ -337,7 +370,10 @@ def from_dict(document: dict[str, Any]) -> Copula:
         )
     if "copula" not in document:
         raise ValueError("not an rcopula document: no 'copula' field")
-    return _decode(document["copula"])
+    node = document["copula"]
+    if int(schema) < 2:
+        node = _migrate_v1(node)
+    return _decode(node)
 
 
 def from_json(text: str) -> Copula:

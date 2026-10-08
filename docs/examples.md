@@ -35,6 +35,10 @@ pytest tests/test_examples.py     # run them all
 | 10 | Pairs trading on conditional copula probabilities |
 | 11 | Copula-GARCH: volatility in time, dependence in the cross-section |
 | 12 | Operational-risk capital, reinsurance layers, cat bonds |
+| 28 | How-to: a vine copula on market returns, step by step |
+| 29 | How-to: risk management for a multi-desk book |
+| 30 | How-to: copula trading strategies, pairs to vine baskets |
+| 31 | How-to: valuing odd assets under different tails |
 
 ## Beyond finance
 

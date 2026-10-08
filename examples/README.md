@@ -37,6 +37,10 @@ sit in a comment block beside the Python so the two can be compared directly.
 | [11](11_copula_garch.py) | Volatility in time, dependence in the cross-section |
 | [12](12_operational_risk.py) | Loss-distribution approach and the Basel 99.9% capital number |
 | [19](19_time_varying_dependence.py) | Dependence that moves: Patton, GAS and DCC |
+| [28](28_vine_markets_howto.py) | How-to: a vine copula on market returns, from GARCH filtering to a crash-aware portfolio |
+| [29](29_risk_management_howto.py) | How-to: risk management for a multi-desk book — VaR backtest, Euler allocation, diversification, CoVaR contagion, reverse stress |
+| [30](30_trading_strategies_howto.py) | How-to: copula pairs trading end to end — pick, fit, signal, backtest with costs vs the z-score, a vine basket trade, and a break alarm |
+| [31](31_valuing_odd_assets_howto.py) | How-to: valuing odd assets — worst-of notes, basket puts, first-to-default, cat bonds, private stakes — at the same correlation |
 
 ## Beyond finance
 

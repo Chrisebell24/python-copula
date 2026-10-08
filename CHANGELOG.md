@@ -3,6 +3,42 @@
 Dates are ISO. Pre-1.0 the API may change; breaking changes are listed first in
 each release.
 
+## 0.2.0 — 2026-10-08
+
+### Breaking
+
+- **Unstructured correlation vectors now follow R's order from four dimensions
+  up.** `p2P`, `P2p` and the `rho.ij` parameter names filled the lower triangle
+  row by row; R fills it column by column, so for `dim >= 4` the same vector
+  meant a different matrix. Code that passes an explicit parameter list to a
+  `dispstr="un"` copula with `dim >= 4` must reorder it to
+  `(rho_12, rho_13, ..., rho_1d, rho_23, ...)`. Up to `dim = 3` nothing changes,
+  which is why the R golden fixtures (all `dim <= 3`) never caught it.
+  Saved models still load correctly: the serialization schema moves to 2, and
+  schema-1 documents are reordered on read.
+
+### Fixed
+
+- `fit(..., method="itau")`, `"irho"` and `"itau.mpl"` returned scrambled
+  correlation matrices for unstructured elliptical copulas with `dim >= 4` —
+  the pairwise statistics were in R's order and the matrix builder was not.
+- The Clayton density lost all precision near independence: at `theta = 1e-17`
+  its log-density was +4 per observation instead of 0, enough for `fit_vine` to
+  pick a "Clayton" edge that was really independence and report a
+  log-likelihood ~2,000 units too high.
+- `fit_garch` could return `alpha + beta > 1` (a non-stationary model) when the
+  optimiser stopped early near the boundary; it now refits with persistence as
+  a bounded parameter so the constraint cannot be broken.
+
+### Documentation
+
+- Four step-by-step finance tutorials — vine copulas for markets, risk
+  management, trading strategies, and valuing odd assets — in the README and on
+  a new documentation page, each backed by a runnable example (28–31) that
+  asserts every number quoted.
+- README links are absolute, so they work on PyPI; the documentation site is
+  published.
+
 ## 0.1.0
 
 The first release. All families, `CopulaDistribution`, all five fitting methods

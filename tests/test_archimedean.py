@@ -504,3 +504,17 @@ class TestNegativeDependence:
             rc.ClaytonCopula(-0.5, dim=3)
         with pytest.raises(ValueError, match="outside admissible range"):
             rc.FrankCopula(-2.0, dim=3)
+
+
+@pytest.mark.parametrize("theta", [1e-17, 1e-12, 1e-8, -1e-17])
+@pytest.mark.parametrize("dim", [2, 3])
+def test_clayton_density_is_flat_near_independence(theta: float, dim: int) -> None:
+    """The density multiplies log(sum u^-theta - (d-1)) by 1/theta, and that log
+    cancelled to nothing near theta = 0: at 1e-17 the log-density was +4 per
+    observation instead of 0, enough for a vine fit to prefer a "Clayton" that
+    is really independence by ~2000 log-likelihood units."""
+    if theta < 0 and dim > 2:
+        pytest.skip("negative Clayton is bivariate only")
+    u = np.random.default_rng(0).uniform(size=(2000, dim))
+    lp = rc.ClaytonCopula(theta, dim=dim).logpdf(u)
+    assert np.max(np.abs(lp)) < 1e3 * abs(theta) + 1e-12

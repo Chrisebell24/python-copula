@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rcopula"
-version = "0.1.0"
+version = "0.2.0"
 description = "Copula modelling in Python: a full-featured replication of R's `copula` package."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -58,8 +58,10 @@ docs = [
 
 [project.urls]
 Homepage = "https://github.com/Chrisebell24/python-copula"
+Documentation = "https://chrisebell24.github.io/python-copula/"
 Repository = "https://github.com/Chrisebell24/python-copula"
 Issues = "https://github.com/Chrisebell24/python-copula/issues"
+Changelog = "https://github.com/Chrisebell24/python-copula/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["rcopula"]
