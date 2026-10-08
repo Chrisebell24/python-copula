@@ -77,8 +77,10 @@ extreme day *together* (0 to 1).
 for i, pair in enumerate(vine.pair_copulas[0]):
     asset = tickers[vine.order[i + 1]]
     tail = pair.lambda_()
-    print(f"SPY-{asset}  {pair.name:<8} tau={pair.tau():+.2f}  "
-          f"crash together={tail.lower:.2f}  rally together={tail.upper:.2f}")
+    print(
+        f"SPY-{asset}  {pair.name:<8} tau={pair.tau():+.2f}  "
+        f"crash together={tail.lower:.2f}  rally together={tail.upper:.2f}"
+    )
 # SPY-QQQ  Student  tau=+0.68  crash together=0.59  rally together=0.59
 # SPY-IWM  Clayton  tau=+0.56  crash together=0.77  rally together=0.00
 # SPY-HYG  Clayton  tau=+0.40  crash together=0.59  rally together=0.00
@@ -400,8 +402,12 @@ runnable version is
 ```python
 import rcopula as rc
 
-for cop in (rc.GaussianCopula.from_tau(0.5), rc.StudentCopula.from_tau(0.5, df=4.0),
-            rc.ClaytonCopula.from_tau(0.5), rc.GumbelCopula.from_tau(0.5)):
+for cop in (
+    rc.GaussianCopula.from_tau(0.5),
+    rc.StudentCopula.from_tau(0.5, df=4.0),
+    rc.ClaytonCopula.from_tau(0.5),
+    rc.GumbelCopula.from_tau(0.5),
+):
     print(cop.name, cop.lambda_())
 # Gaussian   crash together 0.00   rally together 0.00
 # Student-t  crash together 0.40   rally together 0.40
@@ -420,9 +426,11 @@ from rcopula.derivatives import lognormal_terminal
 
 stocks = [lognormal_terminal(1.0, v, 1.0) for v in (0.25, 0.30, 0.35)]
 
+
 def worst_of_note(u):
     worst = np.column_stack([m.ppf(u[:, j]) for j, m in enumerate(stocks)]).min(axis=1)
     return 8.0 + np.where(worst < 0.70, 100.0 * worst, 100.0)
+
 
 worst_of_note(rc.ClaytonCopula.from_tau(0.5, dim=3).rvs(400_000)).mean()
 # Gaussian 96.74   Student-t 97.06   Clayton 98.49   Gumbel 96.02   independent 92.30  (+/- 0.03)

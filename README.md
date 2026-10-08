@@ -165,8 +165,10 @@ extreme day *together* (0 to 1).
 for i, pair in enumerate(vine.pair_copulas[0]):
     asset = tickers[vine.order[i + 1]]
     tail = pair.lambda_()
-    print(f"SPY-{asset}  {pair.name:<8} tau={pair.tau():+.2f}  "
-          f"crash together={tail.lower:.2f}  rally together={tail.upper:.2f}")
+    print(
+        f"SPY-{asset}  {pair.name:<8} tau={pair.tau():+.2f}  "
+        f"crash together={tail.lower:.2f}  rally together={tail.upper:.2f}"
+    )
 # SPY-QQQ  Student  tau=+0.68  crash together=0.59  rally together=0.59
 # SPY-IWM  Clayton  tau=+0.56  crash together=0.77  rally together=0.00
 # SPY-HYG  Clayton  tau=+0.40  crash together=0.59  rally together=0.00
