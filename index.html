@@ -910,7 +910,8 @@
 <p>Copula modelling in Python, replicating R's <code>copula</code> package and verified
 against it — every deterministic quantity is checked against fixtures generated
 by running the real R package.</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>rcopula
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>rcopula<span class="w">            </span><span class="c1"># core library</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"rcopula[plots]"</span><span class="w">   </span><span class="c1"># plus matplotlib, for rcopula.plots</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
 

@@ -1409,14 +1409,24 @@ graded on two more:</p>
 <li><strong>Factor copula.</strong> Each stock is a market loading times a market factor, plus a
   sector loading times its sector factor, plus noise of its own; given the
   factors, stocks are independent. 800 + 800 loadings + 1 tail number = <strong>1,601
-  parameters</strong> instead of 319,600. The example fits the loadings by matching
-  sample correlations (rcopula has no factor-copula class) and profiles the
-  Student-t degrees of freedom.</li>
+  parameters</strong> instead of 319,600. <code>rc.fit_factor</code> matches the loadings to the
+  correlations implied by Kendall's tau and profiles the Student-t degrees of
+  freedom, in about 4 seconds for 800 stocks. Its density uses an 11 × 11
+  matrix (Woodbury) instead of inverting an 800 × 800 one.</li>
 </ul>
+<div class="highlight"><pre><span></span><code><span class="n">sector</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span> <span class="mi">80</span><span class="p">)</span>  <span class="c1"># each stock's sector</span>
+<span class="n">factor_t</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit_factor</span><span class="p">(</span><span class="n">u_train</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="n">sector</span><span class="p">,</span> <span class="n">family</span><span class="o">=</span><span class="s2">"student"</span><span class="p">)</span>
+<span class="n">factor_t</span><span class="o">.</span><span class="n">n_params</span>  <span class="c1"># 1601</span>
+<span class="n">factor_t</span><span class="o">.</span><span class="n">df</span>  <span class="c1"># 4.06; the truth is 4</span>
+<span class="n">factor_g</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">FactorCopula</span><span class="p">(</span>
+    <span class="n">factor_t</span><span class="o">.</span><span class="n">market</span><span class="p">,</span> <span class="n">factor_t</span><span class="o">.</span><span class="n">group_loadings</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="n">sector</span><span class="p">,</span> <span class="n">family</span><span class="o">=</span><span class="s2">"gaussian"</span>
+<span class="p">)</span>
+<span class="c1"># loading errors: market 0.019, sector 0.022</span>
+</code></pre></div>
 <div class="highlight"><pre><span></span><code>held-out log-likelihood per day
 full 319,600-entry matrix   -1,763
-factor, Gaussian               233
-factor, Student-t              325     df = 4, as in the truth
+factor, Gaussian               234
+factor, Student-t              325     df = 4.06, the truth is 4
 </code></pre></div>
 <ul>
 <li><strong>Nested copula by sector.</strong> A Clayton copula inside each sector, a weaker one
@@ -1446,8 +1456,8 @@ factor, Student-t              325     df = 4, as in the truth
 (a mass crash), or best-1% day (a mass rally):</p>
 <div class="highlight"><pre><span></span><code>                   mass crash   mass rally
 truth                 3.02%        2.94%
-factor, Student-t     2.82%        2.87%    &lt;- closest overall
-factor, Gaussian      1.41%        1.24%
+factor, Student-t     2.76%        2.78%    &lt;- closest overall
+factor, Gaussian      1.34%        1.33%
 nested Clayton        2.82%        0.00%    &lt;- right on crashes, blind to rallies
 vine (index root)     1.82%        1.70%    &lt;- cannot see sectors after one tree
 </code></pre></div>
@@ -1461,19 +1471,19 @@ copula, turn each into a return through its stock's residual distribution and
 tomorrow's GARCH volatility, and sum the P&amp;L. 50,000 × 800 is 320 MB, so simulate
 in chunks of 10,000 and keep only the P&amp;L.</p>
 <div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
-    <span class="n">v</span> <span class="o">=</span> <span class="n">simulate_factor_t</span><span class="p">(</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">market_loadings</span><span class="p">,</span> <span class="n">sector_loadings</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">factor_t</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
     <span class="n">pnl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">to_returns</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">@</span> <span class="n">positions</span><span class="p">)</span>  <span class="c1"># $125,000 in each of 800 stocks</span>
 </code></pre></div>
 <p><strong>4. Read off VaR and expected shortfall.</strong></p>
 <div class="highlight"><pre><span></span><code>                     VaR 99%   ES 99%   diversification
-truth                $2.52m    $3.50m       41.7%
-factor, Student-t    $2.46m    $3.13m       42.9%
-factor, Gaussian     $2.22m    $2.63m       51.8%   &lt;- 25% too little ES
+truth                $2.52m    $3.32m       43.8%
+factor, Student-t    $2.47m    $3.22m       41.2%
+factor, Gaussian     $2.26m    $2.67m       51.1%   &lt;- 20% too little ES
 </code></pre></div>
 <p>Diversification is how far the book's ES sits below the sum of 800 standalone
-ESs. On the book's worst 1% of days, 495 of the 800 stocks are having their own
+ESs. On the book's worst 1% of days, 486 of the 800 stocks are having their own
 worst-5% day; independent failures would give 40. The Student-t factor copula
-says 483, the Gaussian 341. That gap is the diversification a correlation matrix
+says 494, the Gaussian 348. That gap is the diversification a correlation matrix
 promises and a panic takes away.</p>
 
 
