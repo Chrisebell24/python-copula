@@ -1369,8 +1369,10 @@ diverges. The grid spans <code>[margin, 1 - margin]</code> on each axis.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If the copula is not bivariate or <code>kind</code> is not one of the three
-options.</p>
+                <p>If the copula is not bivariate, <code>kind</code> is not one of the three
+options, or no grid value is finite (for example an unspecified
+parameter). Individual non-finite values -- a <code>logpdf</code> of <code>-inf</code>
+where the density underflows -- are drawn at the lowest finite level.</p>
               </div>
             </td>
           </tr>
@@ -1760,7 +1762,7 @@ panels. <code>s</code> defaults to 4 and <code>alpha</code> to 0.4.</p>
 
 
 <a href="#rcopula.plots.tail_concentration" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tail_concentration</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">Copula</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">99</span><span class="p">,</span> <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">tail_concentration</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">Copula</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">99</span><span class="p">,</span> <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">copula_kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1858,6 +1860,24 @@ one of <code>data</code> and <code>copula</code> must be given.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>copula_kwargs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Keyword-only. Passed to <code>matplotlib.axes.Axes.plot</code> for <strong>every
+copula curve</strong>, overriding their defaults (<code>linestyle="--"</code> and
+<code>label=&lt;family name&gt;</code>). For example <code>{"linewidth": 2}</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>**kwargs</code>
             </td>
             <td>
@@ -1865,7 +1885,10 @@ one of <code>data</code> and <code>copula</code> must be given.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to <code>matplotlib.axes.Axes.plot</code> for the empirical curve only.</p>
+                <p>Passed to <code>matplotlib.axes.Axes.plot</code> for the <strong>empirical curve
+only</strong>, overriding its defaults (<code>color="black"</code>,
+<code>label="empirical"</code>). Use <code>copula_kwargs</code> to style the copula
+curves.</p>
               </div>
             </td>
             <td>
@@ -2246,8 +2269,7 @@ copula, or an extreme-value :class:<code>~rcopula.structural.KhoudrajiCopula</co
 
     <div class="doc doc-contents ">
 
-        <p>Draw each tree of a vine copula, labelling every edge with its pair-copula.</p>
-<p>Each edge label shows the pair-copula's family name and parameters.</p>
+        <p>Draw each tree of a vine copula, labelling every node and edge.</p>
 <p>A vine is a sequence of trees, and the thing a reader needs to see is which
 pairs each tree joins, what it conditions on, and which family was selected
 there. Tree 1 carries most of the dependence and is where a misspecified
@@ -2324,7 +2346,9 @@ panel per tree in a row.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to <code>matplotlib.axes.Axes.plot</code> for the edges.</p>
+                <p>Passed to <code>matplotlib.axes.Axes.plot</code> for every edge line,
+overriding the defaults (<code>color="0.6"</code>, <code>linewidth=1.0</code>,
+<code>zorder=1</code>).</p>
               </div>
             </td>
             <td>
@@ -2360,9 +2384,18 @@ panel per tree in a row.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Nodes are placed on a circle. In trees after the first, node labels are
-abbreviated to <code>"&lt;variable&gt;|·"</code> to signal conditioning; the edge labels
-carry the family and parameters.</p>
+  <p>This is the standard vine picture: the nodes of tree <code>k + 1</code> are the
+edges of tree <code>k</code>. Labels use the variables' column indices (the vine's
+<code>order</code> is applied):</p>
+<ul>
+<li>tree 1's nodes are the variables, <code>"0"</code>, <code>"1"</code>, ...;</li>
+<li>a node of a later tree is labelled by the edge it stands for, as
+  <code>"a,b"</code> (from tree 1) or <code>"a,b|c,d"</code> -- the conditioned pair, then
+  the conditioning set;</li>
+<li>every edge is labelled with its pair-copula's family name and
+  parameters.</li>
+</ul>
+<p>Nodes are placed on a circle.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2377,6 +2410,8 @@ carry the family and parameters.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">grid</span> <span class="o">=</span> <span class="n">vine_trees</span><span class="p">(</span><span class="n">vine</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
 <span class="go">2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">get_text</span><span class="p">()</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">grid</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">texts</span> <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">get_text</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">isdigit</span><span class="p">())</span>
+<span class="go">['0,1', '1,2']</span>
 </code></pre></div>
 
 
@@ -2392,7 +2427,7 @@ carry the family and parameters.</p>
 
 
 <a href="#rcopula.plots.nested_tree" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">nested_tree</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">nested_tree</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">leaf_kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2449,6 +2484,24 @@ directly, since two variables meet at exactly one node.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>leaf_kwargs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Keyword-only. Passed to <code>matplotlib.axes.Axes.scatter</code> for the
+<strong>leaf</strong> markers (the variables), overriding their defaults
+(<code>s=220</code>, <code>color="white"</code>, <code>edgecolor="0.4"</code>, <code>zorder=3</code>).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>**kwargs</code>
             </td>
             <td>
@@ -2456,7 +2509,10 @@ directly, since two variables meet at exactly one node.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to <code>matplotlib.axes.Axes.scatter</code> for the internal nodes.</p>
+                <p>Passed to <code>matplotlib.axes.Axes.scatter</code> for the <strong>internal-node</strong>
+markers only (the Archimedean generators), overriding their defaults
+(<code>s=520</code>, <code>color="0.92"</code>, <code>edgecolor="0.35"</code>, <code>zorder=3</code>). Use
+<code>leaf_kwargs</code> to style the leaves.</p>
               </div>
             </td>
             <td>

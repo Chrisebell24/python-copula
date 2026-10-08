@@ -7794,7 +7794,9 @@ same in the lower and upper tail and positive for every finite <code>df</code>.<
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If the parameters are still unspecified (<code>nan</code>).</p>
+                <p>If the parameters are still unspecified (<code>nan</code>), or if
+<code>dim &gt; 2</code> and the pairs do not all share one correlation (see
+Notes).</p>
               </div>
             </td>
           </tr>
@@ -7804,10 +7806,27 @@ same in the lower and upper tail and positive for every finite <code>df</code>.<
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Only the first pairwise correlation (variables 1 and 2) is used, so
-for a non-exchangeable structure with <code>dim &gt; 2</code> the result describes
-that pair only.</p>
+  <p>Tail dependence is a pairwise quantity. It is a single number when
+<code>dim == 2</code> or when every pair has the same correlation (always so
+for <code>dispstr="ex"</code>). Otherwise each pair has its own value and no
+single answer is honest, so this raises rather than silently
+reporting one pair; take the pair you want with
+:func:<code>~rcopula.marginal_copula</code>, e.g.
+<code>marginal_copula(cop, [0, 2]).lambda_()</code>.</p>
 </details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">StudentCopula</span><span class="p">,</span> <span class="n">marginal_copula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span> <span class="o">=</span> <span class="n">StudentCopula</span><span class="p">([</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">dispstr</span><span class="o">=</span><span class="s2">"un"</span><span class="p">,</span> <span class="n">df</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cop</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="w">    </span><span class="o">...</span>
+<span class="gr">ValueError</span>: <span class="n">tail dependence differs between pairs of this 3-dimensional t copula...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pair</span> <span class="o">=</span> <span class="n">marginal_copula</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">lambda_</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
+
 
     </div>
 
@@ -7986,8 +8005,9 @@ copula; <code>df</code> does not affect tau, so set it through <code>kwargs</cod
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to the constructor, e.g. <code>df=3</code> or <code>dispstr="ar1"</code>. The
-structure must take a single correlation.</p>
+                <p>Passed to the constructor, e.g. <code>df=3</code> or <code>dispstr="ar1"</code>.
+With <code>"toep"</code> or <code>"un"</code> every pair gets the same correlation,
+as in :meth:<code>EllipticalCopula.from_tau</code>.</p>
               </div>
             </td>
             <td>
@@ -8036,7 +8056,8 @@ structure must take a single correlation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>tau</code> is not in <code>(-1, 1)</code>.</p>
+                <p>If <code>tau</code> is not in <code>(-1, 1)</code>, or the correlation is not
+admissible for <code>dim</code>.</p>
               </div>
             </td>
           </tr>
@@ -8075,8 +8096,8 @@ structure must take a single correlation.</p>
 
         <p>Build a t copula whose Spearman's rho equals the value you ask for.</p>
 <p>Because the t copula's Spearman's rho has no closed form, the
-correlation is found numerically (by bisection on :meth:<code>rho</code>), so this
-takes a few seconds.</p>
+correlation is found numerically (Brent's method on :meth:<code>rho</code>), so
+this takes around a second.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -8132,7 +8153,9 @@ takes a few seconds.</p>
             <td>
               <div class="doc-md-description">
                 <p>Passed to the constructor. <code>df</code> (default 4.0) is also used in the
-inversion, since the answer depends on it.</p>
+inversion, since the answer depends on it. With <code>"toep"</code> or
+<code>"un"</code> every pair gets the same correlation, as in
+:meth:<code>EllipticalCopula.from_tau</code>.</p>
               </div>
             </td>
             <td>
@@ -8181,7 +8204,9 @@ inversion, since the answer depends on it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>rho</code> is not in <code>(-1, 1)</code>.</p>
+                <p>If <code>rho</code> is not in <code>(-1, 1)</code>, is too close to <code>+-1</code> to be
+reached by any representable correlation, or the correlation found
+is not admissible for <code>dim</code>.</p>
               </div>
             </td>
           </tr>
@@ -8193,8 +8218,13 @@ inversion, since the answer depends on it.</p>
   <summary>Notes</summary>
   <p>The Gaussian relation :math:<code>\rho_P = 2\sin(\pi\rho_S/6)</code> -- which R
 uses, and which this method used to use -- is not valid for a t copula,
-so the inversion is done against the quadrature value instead. It starts
-from the Gaussian answer, which is close, and refines by bisection.</p>
+so the inversion is done against the quadrature value instead.
+Spearman's rho is strictly increasing in the correlation, so the root is
+bracketed by the whole half-range: <code>[0, 1)</code> for a positive target and
+<code>(-1, 0]</code> for a negative one. Brent's method then needs about ten
+quadratures, against the eighty bisection steps used before (which also
+searched only <code>+-0.2</code> around the Gaussian value and silently returned
+the edge of that window when the root lay outside it).</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -11876,8 +11906,9 @@ parameter is found numerically by root-finding on <code>tau(theta)</code>.</p>
             <td>
               <div class="doc-md-description">
                 <p>Target Kendall's tau. Must be attainable by the family; for these
-families that means strictly between 0 and 1 (and below about
-0.418 for :class:<code>TawnCopula</code>).</p>
+families that means <code>0 &lt;= tau &lt; 1</code> (and below about 0.418 for
+:class:<code>TawnCopula</code>). <code>tau = 0</code> is the independence limit and
+returns the family's independence parameter (see Notes).</p>
               </div>
             </td>
             <td>
@@ -11893,8 +11924,8 @@ families that means strictly between 0 and 1 (and below about
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Accepted for interface compatibility with :class:<code>Copula</code>; not
-used, since these copulas are always bivariate.</p>
+                <p>Number of variables; must be 2, since these copulas are always
+bivariate.</p>
               </div>
             </td>
             <td>
@@ -11911,7 +11942,8 @@ used, since these copulas are always bivariate.</p>
             <td>
               <div class="doc-md-description">
                 <p>Extra keyword arguments passed on to the constructor (for example
-<code>free</code>).</p>
+<code>free</code>). They are applied once, to the result; the root search
+itself uses plain copulas.</p>
               </div>
             </td>
             <td>
@@ -11960,7 +11992,7 @@ used, since these copulas are always bivariate.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>tau</code> cannot be reached by the family.</p>
+                <p>If <code>tau</code> cannot be reached by the family, or <code>dim != 2</code>.</p>
               </div>
             </td>
           </tr>
@@ -11968,11 +12000,25 @@ used, since these copulas are always bivariate.</p>
     </table>
 
 
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Tawn reaches independence exactly, at <code>theta = 0</code>, and is searched
+down to it, so any <code>0 &lt;= tau &lt;= 0.418</code> is matched. Galambos and
+Husler-Reiss reach it only in the limit <code>theta -&gt; 0</code> and cannot be
+evaluated at <code>theta = 0</code> itself (both divide by it), so for them
+<code>tau = 0</code> -- or any target below the tau at the bottom of the search
+range, which is zero to double precision -- returns the smallest
+parameter in that range, <code>1e-8</code>, whose copula is the independence
+copula to machine precision.</p>
+</details>
+
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">GalambosCopula</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">g</span> <span class="o">=</span> <span class="n">GalambosCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">round</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">tau</span><span class="p">(),</span> <span class="mi">6</span><span class="p">)</span>
 <span class="go">0.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">GalambosCopula</span><span class="o">.</span><span class="n">from_tau</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">tau</span><span class="p">()</span>
+<span class="go">0.0</span>
 </code></pre></div>
 
 
@@ -14097,7 +14143,7 @@ t-EV copula always has <code>tau &gt; 0</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Accepted for interface compatibility; not used (always bivariate).</p>
+                <p>Number of variables; must be 2 (always bivariate).</p>
               </div>
             </td>
             <td>
@@ -14163,7 +14209,9 @@ keyword (for example <code>free</code>) goes to the constructor.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>tau</code> is not attainable at that <code>df</code>.</p>
+                <p>If <code>tau</code> is not attainable at that <code>df</code> (in particular any
+<code>tau &lt;= 0</code>: the t-EV copula is never independent), or
+<code>dim != 2</code>.</p>
               </div>
             </td>
           </tr>
@@ -14981,7 +15029,7 @@ at <code>theta -&gt; 0</code> to the comonotone one at <code>theta -&gt; inf</co
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of variables. Not used: the result is always bivariate.</p>
+                <p>Number of variables; must be 2.</p>
               </div>
             </td>
             <td>
@@ -14997,7 +15045,7 @@ at <code>theta -&gt; 0</code> to the comonotone one at <code>theta -&gt; inf</co
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Accepted but not used.</p>
+                <p>Passed to the constructor, e.g. <code>free</code>.</p>
               </div>
             </td>
             <td>
@@ -15046,7 +15094,17 @@ at <code>theta -&gt; 0</code> to the comonotone one at <code>theta -&gt; inf</co
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>rho</code> is not in <code>(-1, 1)</code>.</p>
+                <p>If <code>rho</code> is not in <code>(-1, 1)</code>, or <code>dim != 2</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>kwargs</code> holds a keyword the constructor does not take.</p>
               </div>
             </td>
           </tr>
@@ -15581,7 +15639,7 @@ during fitting. <code>None</code> means free.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of variables. Not used: the result is always bivariate.</p>
+                <p>Number of variables; must be 2.</p>
               </div>
             </td>
             <td>
@@ -15597,7 +15655,7 @@ during fitting. <code>None</code> means free.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Accepted but not used.</p>
+                <p>Passed to the constructor, e.g. <code>free</code>.</p>
               </div>
             </td>
             <td>
@@ -15646,7 +15704,17 @@ during fitting. <code>None</code> means free.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>tau</code> is outside <code>[-2/9, 2/9]</code>.</p>
+                <p>If <code>tau</code> is outside <code>[-2/9, 2/9]</code>, or <code>dim != 2</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>kwargs</code> holds a keyword the constructor does not take.</p>
               </div>
             </td>
           </tr>
@@ -15722,7 +15790,7 @@ during fitting. <code>None</code> means free.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of variables. Not used: the result is always bivariate.</p>
+                <p>Number of variables; must be 2.</p>
               </div>
             </td>
             <td>
@@ -15738,7 +15806,7 @@ during fitting. <code>None</code> means free.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Accepted but not used.</p>
+                <p>Passed to the constructor, e.g. <code>free</code>.</p>
               </div>
             </td>
             <td>
@@ -15787,7 +15855,17 @@ during fitting. <code>None</code> means free.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>rho</code> is outside <code>[-1/3, 1/3]</code>.</p>
+                <p>If <code>rho</code> is outside <code>[-1/3, 1/3]</code>, or <code>dim != 2</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>kwargs</code> holds a keyword the constructor does not take.</p>
               </div>
             </td>
           </tr>
@@ -15864,8 +15942,8 @@ only the continuous part and is undefined there. Asymmetric unless
               <div class="doc-md-description">
                 <p>Share of the first component's failures caused by the common shock,
 in <code>[0, 1]</code>. May instead be both parameters at once,
-<code>[alpha1, alpha2]</code>, in which case <code>alpha2</code> is ignored. <code>nan</code>
-leaves it unspecified, to be estimated by fitting.</p>
+<code>[alpha1, alpha2]</code>, in which case <code>alpha2</code> must be left out.
+<code>nan</code> leaves it unspecified, to be estimated by fitting.</p>
               </div>
             </td>
             <td>
@@ -15970,7 +16048,10 @@ leaves it unspecified, to be estimated by fitting.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>dim != 2</code> or either parameter is outside <code>[0, 1]</code>.</p>
+                <p>If <code>dim != 2</code>, either parameter is outside <code>[0, 1]</code>, <code>alpha1</code>
+has a length other than 1 or 2, or <code>alpha1</code> holds both parameters
+and <code>alpha2</code> is given as well (it would otherwise be silently
+ignored).</p>
               </div>
             </td>
           </tr>
@@ -16331,7 +16412,7 @@ taken as 0 when both parameters are 0.</p>
 
 
 <a href="#rcopula.core.other.IndependenceCopula" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">IndependenceCopula</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">IndependenceCopula</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -16375,23 +16456,6 @@ parameters.</p>
                   <code>2</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>**kwargs</code>
-            </td>
-            <td>
-                  <code><span title="object">object</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Accepted and ignored, so generic code can pass the same keywords to
-every family.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -16412,6 +16476,17 @@ every family.</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>dim &lt; 2</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If given any keyword other than <code>dim</code> -- a misspelled keyword is an
+error rather than being silently ignored.</p>
               </div>
             </td>
           </tr>
@@ -16647,7 +16722,7 @@ so both coefficients are zero.</p>
 
 
 <a href="#rcopula.core.other.FrechetUpperCopula" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">FrechetUpperCopula</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">FrechetUpperCopula</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -16693,23 +16768,6 @@ density exists -- all the mass sits on the diagonal -- so :meth:<code>pdf</code>
                   <code>2</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>**kwargs</code>
-            </td>
-            <td>
-                  <code><span title="object">object</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Accepted and ignored, so generic code can pass the same keywords to
-every family.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -16730,6 +16788,17 @@ every family.</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>dim &lt; 2</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If given any keyword other than <code>dim</code> -- a misspelled keyword is an
+error rather than being silently ignored.</p>
               </div>
             </td>
           </tr>
@@ -16981,7 +17050,7 @@ extreme in the others: both coefficients are one.</p>
 
 
 <a href="#rcopula.core.other.FrechetLowerCopula" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">FrechetLowerCopula</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">FrechetLowerCopula</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -17027,23 +17096,6 @@ why R restricts <code>lowfhCopula</code> the same way. Singular, so no density.<
                   <code>2</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>**kwargs</code>
-            </td>
-            <td>
-                  <code><span title="object">object</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Accepted and ignored, so generic code can pass the same keywords to
-every family.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -17064,6 +17116,17 @@ every family.</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>dim != 2</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If given any keyword other than <code>dim</code> -- a misspelled keyword is an
+error rather than being silently ignored.</p>
               </div>
             </td>
           </tr>
@@ -17323,7 +17386,7 @@ are zero.</p>
 
 
 <a href="#rcopula.core.empirical.EmpiricalCopula" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">EmpiricalCopula</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">smoothing</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'none'</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">EmpiricalCopula</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">smoothing</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'none'</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">ties_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'average'</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -17413,27 +17476,15 @@ estimator, as in R's <code>empCopula</code>. Rarely needed.</p>
             <td>
               <div class="doc-md-description">
                 <p>Keyword-only. How tied values are ranked; passed to
-:func:<code>~rcopula.dependence.pseudo_obs</code>.</p>
+:func:<code>~rcopula.dependence.pseudo_obs</code>. Methods that keep ties
+(<code>"average"</code>, <code>"min"</code>, <code>"max"</code>) make the smoothed estimators
+spread each tied group over the block of ranks it occupies (see
+Notes); <code>"first"</code> and <code>"random"</code> break ties, so every observation
+keeps a rank of its own.</p>
               </div>
             </td>
             <td>
                   <code>&#34;average&#34;</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>**kwargs</code>
-            </td>
-            <td>
-                  <code><span title="object">object</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Accepted and ignored.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
             </td>
           </tr>
       </tbody>
@@ -17534,14 +17585,38 @@ estimator, as in R's <code>empCopula</code>. Rarely needed.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>smoothing</code> is not one of the three options, there are fewer than
-two observations, or the data has fewer than two columns.</p>
+                <p>If <code>smoothing</code> is not one of the three options, <code>data</code> is not a
+2-D array, there are fewer than two observations, or the data has
+fewer than two columns.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If given an unknown keyword argument (they used to be silently
+ignored, so a misspelling such as <code>smothing=</code> went unnoticed).</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p><strong>Ties.</strong> The beta and checkerboard estimators are indexed by ranks
+<code>1..n</code>. When <code>k</code> observations tie in a column they jointly occupy
+the ranks <code>r, ..., r + k - 1</code>; each of them is given the <em>average</em> of
+the <code>k</code> beta distributions (beta smoothing) or the union of the <code>k</code>
+grid cells (checkerboard) for those ranks, rather than one rank rounded
+from the mid-rank. This keeps the margins exactly uniform, so both
+smoothings remain genuine copulas with ties. Without ties it is the usual
+estimator.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -18143,7 +18218,7 @@ precise.</p>
 
 
 <a href="#rcopula.distribution.CopulaDistribution" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">CopulaDistribution</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">margins</span><span class="p">:</span> <span class="n">Margin</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">Margin</span><span class="p">],</span> <span class="n">names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">CopulaDistribution</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">margins</span><span class="p">:</span> <span class="n">Margin</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Margin</span><span class="p">]</span> <span class="o">|</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -18191,14 +18266,15 @@ fully specified (no <code>nan</code> parameters) before evaluating or sampling.<
                 <code>margins</code>
             </td>
             <td>
-                  <code>Margin or list of Margin</code>
+                  <code>Margin or sequence of Margin</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>One distribution per variable, in column order, typically scipy frozen
-distributions such as <code>stats.norm(loc=1, scale=2)</code>. A list or tuple
-must have exactly <code>copula.dim</code> entries; a single distribution is used
-for every variable. Each margin needs <code>cdf</code>, <code>ppf</code> and either
+distributions such as <code>stats.norm(loc=1, scale=2)</code>. Any sequence --
+a list, a tuple, a 1-D object <code>numpy.ndarray</code>, a <code>pandas.Series</code>
+-- must have exactly <code>copula.dim</code> entries; a single distribution is
+used for every variable. Each margin needs <code>cdf</code>, <code>ppf</code> and either
 <code>pdf</code> (continuous) or <code>pmf</code> (discrete).</p>
               </div>
             </td>
@@ -18216,7 +18292,10 @@ for every variable. Each margin needs <code>cdf</code>, <code>ppf</code> and eit
             <td>
               <div class="doc-md-description">
                 <p>Column names, length <code>copula.dim</code>. When given, :meth:<code>rvs</code> returns a
-<code>pandas.DataFrame</code> with these columns instead of an array.</p>
+<code>pandas.DataFrame</code> with these columns instead of an array, and a
+<code>DataFrame</code> passed to :meth:<code>cdf</code>, :meth:<code>pdf</code>, :meth:<code>logpdf</code> or
+:meth:<code>marginal_cdf</code> is read by these column labels (so its columns
+may be in any order, and extra columns are ignored).</p>
               </div>
             </td>
             <td>
@@ -18335,6 +18414,13 @@ lacks the required methods.</p>
       </tbody>
     </table>
 
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>How a <code>pandas.DataFrame</code> input is read: with <code>names</code> set, columns are
+selected by label and a missing label is an error; without <code>names</code>,
+columns are taken by position.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -18478,8 +18564,9 @@ function :math:<code>C(F_1(x_1), \dots, F_d(x_d))</code>.</p>
             <td>
               <div class="doc-md-description">
                 <p>Points on the original scale of the variables, one row per point.
-A 1-D input is treated as a single point. A DataFrame is used by
-column position, not by name.</p>
+A 1-D input is treated as a single point. A DataFrame is read by
+the column labels in :attr:<code>names</code> when those are set, otherwise by
+column position.</p>
               </div>
             </td>
             <td>
@@ -18528,7 +18615,8 @@ column position, not by name.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>x</code> does not have <code>d</code> columns, or the copula is unfitted.</p>
+                <p>If <code>x</code> does not have <code>d</code> columns, a DataFrame lacks one of
+:attr:<code>names</code>, or the copula is unfitted.</p>
               </div>
             </td>
           </tr>
@@ -18579,7 +18667,8 @@ when the density is extremely small.</p>
             <td>
               <div class="doc-md-description">
                 <p>Points on the original scale of the variables, one row per point.
-A 1-D input is treated as a single point.</p>
+A 1-D input is treated as a single point. DataFrames are read as
+for :meth:<code>cdf</code>.</p>
               </div>
             </td>
             <td>
@@ -18691,7 +18780,8 @@ back to <code>log(pdf(x))</code> and inherits its underflow behaviour.</p>
             <td>
               <div class="doc-md-description">
                 <p>Points on the original scale of the variables, one row per point.
-A 1-D input is treated as a single point.</p>
+A 1-D input is treated as a single point. DataFrames are read as
+for :meth:<code>cdf</code>.</p>
               </div>
             </td>
             <td>
@@ -18922,7 +19012,8 @@ corresponding marginal quantile function.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Points on the original scale, one row per point.</p>
+                <p>Points on the original scale, one row per point. DataFrames are
+read as for :meth:<code>cdf</code>.</p>
               </div>
             </td>
             <td>
@@ -19408,7 +19499,9 @@ preserved. Must have at least one row.</p>
               <div class="doc-md-description">
                 <p>How to rank tied values: one of <code>"average"</code>, <code>"min"</code>, <code>"max"</code>,
 <code>"dense"</code>, <code>"ordinal"</code>, <code>"random"</code>. <code>"average"</code> gives tied
-values the mean of the ranks they span, as in R. <code>"random"</code> breaks ties at random.</p>
+values the mean of the ranks they span, as in R. <code>"random"</code> puts each
+group of tied values in a uniformly random order (distinct values keep
+their order), whatever the magnitude of the data.</p>
               </div>
             </td>
             <td>
@@ -19605,13 +19698,49 @@ parameter (see <code>from_tau</code> on the copula classes).</p>
             <td>
               <div class="doc-md-description">
                 <p>Symmetric matrix with ones on the diagonal; entry <code>[i, j]</code> is
-Kendall's tau between columns <code>i</code> and <code>j</code>, in <code>[-1, 1]</code>.</p>
+Kendall's tau between columns <code>i</code> and <code>j</code>, in <code>[-1, 1]</code>. Ties
+are handled as tau-b, exactly as :func:<code>scipy.stats.kendalltau</code>; a
+pair involving a constant column or a missing value is NaN.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>x</code> is not 2-D.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The result is identical, to the last bit, to calling
+:func:<code>scipy.stats.kendalltau</code> on every pair of columns. For many columns
+and a moderate number of rows the whole matrix is computed at once from
+blocked products of pairwise-sign matrices (<code>O(n^2 d^2)</code> work, but in
+BLAS), which is hundreds of times faster than <code>d(d-1)/2</code> separate scipy
+calls -- 800 columns of 1000 rows take seconds rather than minutes. For long
+series with few columns the per-pair <code>O(n log n)</code> scipy route is used.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -20350,9 +20479,12 @@ The class is a frozen (read-only) dataclass.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Digest of the raw bytes, checked on every fetch. <code>None</code> means the
-upstream file is not byte-stable (a live query endpoint), in which case
-the shape is checked instead.</p>
+                <p>Digest of the raw bytes, checked on every download <em>and</em> every time
+the cached copy is read (a cached file that no longer matches is
+re-downloaded, or refused when <code>download=False</code>). <code>None</code> means the
+upstream file is not byte-stable (a live query endpoint), so no byte
+check is possible; only the parsed table's structure is checked -- every
+column in <code>columns</code> must be present, or :func:<code>load</code> raises.</p>
               </div>
             </td>
           </tr>
@@ -20592,8 +20724,12 @@ alone.</p>
 
         <p>Load one of the example datasets as a pandas DataFrame, downloading it the first time.</p>
 <p>The raw file is saved in :func:<code>cache_dir</code>, so later calls work offline.
-Files with a recorded SHA-256 digest are checked when downloaded, so a
-silently changed upstream file is caught rather than used.</p>
+Files with a recorded SHA-256 digest are checked when downloaded and again
+whenever the cached copy is read, so a silently changed upstream file -- or
+a cache file that was corrupted or edited -- is caught rather than used. A
+cached copy that fails the check is downloaded afresh (and the fresh copy
+checked); with <code>download=False</code> it raises instead. Datasets without a
+digest are checked only for having the expected columns.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -20729,7 +20865,8 @@ index reset. <code>frame.attrs</code> holds <code>"dataset"</code>, <code>"licen
               <div class="doc-md-description">
                 <p>If the download fails its digest check, the file cannot be parsed
 into the expected columns, or a download is needed and
-<code>download=False</code>. Network failures surface as
+<code>download=False</code> (including a cached copy that fails its digest
+check). Network failures surface as
 :class:<code>urllib.error.URLError</code>, itself a subclass of <code>OSError</code>.</p>
               </div>
             </td>

@@ -1833,7 +1833,8 @@ the first.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>copula</code> is not bivariate or <code>given</code> is not 0 or 1 (raised by
+                <p>If any <code>w</code> or <code>cond</code> lies outside :math:<code>[0, 1]</code>, if <code>given</code> is
+not 0 or 1, or if <code>copula</code> is not bivariate (raised by
 :func:<code>conditional_cdf</code>).</p>
               </div>
             </td>
@@ -1846,8 +1847,9 @@ the first.</p>
   <summary>Notes</summary>
   <p>Solved by 60 steps of vectorised bisection on <code>[1e-12, 1 - 1e-12]</code>, which
 handles every family uniformly and takes the bracket below double precision.
-Targets outside :math:<code>[0, 1]</code> are not rejected; they simply converge to the
-nearest end of the bracket.</p>
+Out-of-range targets are rejected rather than quietly converging to the
+nearest end of the bracket, which used to return a plausible-looking but
+meaningless value. NaN in <code>w</code> or <code>cond</code> gives NaN in that position.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2293,7 +2295,13 @@ must equal <code>copula.dim</code>. A 1-D input is treated as a single row.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>:math:<code>S</code>, whose rows sum to one. NaN in rows where :math:<code>R = 0</code>.</p>
+                <p>:math:<code>S</code>, whose rows sum to one. Where :math:<code>R = 0</code> (every
+coordinate at 1, or so close that :math:<code>\psi^{-1}</code> underflows to 0)
+the direction is undefined -- <code>0/0</code> -- and is set to the simplex's
+barycentre, :math:<code>1/d</code> in every coordinate: the mean of the uniform
+angular law and the limit along the diagonal. Where :math:<code>R = \infty</code>
+(a coordinate at 0) the weight is shared equally among the infinite
+coordinates.</p>
               </div>
             </td>
           </tr>
@@ -3732,7 +3740,7 @@ river flow and rainfall, or losses on several assets).</p>
             <td>
               <div class="doc-md-description">
                 <p>Critical level, in copula units: the value of :math:<code>C(\mathbf u)</code> at
-the event of interest, between 0 and 1.</p>
+the event of interest, in :math:<code>[0, 1]</code>.</p>
               </div>
             </td>
             <td>
@@ -3776,7 +3784,11 @@ in -- 1 for annual maxima. Must be positive.</p>
             <td>
               <div class="doc-md-description">
                 <p>Return periods in the units of <code>interval</code>, one per element of <code>t</code>
-(flattened to 1-D). Infinite where :math:<code>K(t) = 1</code>, e.g. at <code>t &gt;= 1</code>.</p>
+(flattened to 1-D). Exactly <code>inf</code> where :math:<code>K(t) = 1</code> -- always
+at <code>t = 1</code>, an event that never happens, and possibly just below it
+once :math:<code>K(t)</code> rounds to 1 in floating point. This is the
+mathematically correct value, returned deliberately (no
+divide-by-zero warning is raised for it).</p>
               </div>
             </td>
           </tr>
@@ -3799,7 +3811,9 @@ in -- 1 for annual maxima. Must be positive.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>interval</code> is not positive.</p>
+                <p>If <code>interval</code> is not positive, or any <code>t</code> lies outside
+:math:<code>[0, 1]</code> (or is NaN): no copula takes such a value, so there is
+no return period to report.</p>
               </div>
             </td>
           </tr>
@@ -3914,8 +3928,9 @@ that goes with it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Target return periods, in the units of <code>interval</code>. Each must be
-positive and at least <code>interval</code>.</p>
+                <p>Target return periods, in the units of <code>interval</code>. Each must be at
+least <code>interval</code>: no event recurs, on average, more often than
+observations arrive. <code>inf</code> gives <code>t = 1</code>.</p>
               </div>
             </td>
             <td>
@@ -3931,7 +3946,8 @@ positive and at least <code>interval</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Mean time between observations -- 1 for annual maxima.</p>
+                <p>Mean time between observations -- 1 for annual maxima. Must be
+positive.</p>
               </div>
             </td>
             <td>
@@ -3981,9 +3997,9 @@ positive and at least <code>interval</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If any <code>period</code> is not positive, or is shorter than <code>interval</code>
-(which would need a probability below zero; the message then reads
-"p must lie in [0, 1]").</p>
+                <p>If <code>interval</code> is not positive, any <code>period</code> is not positive, or
+any <code>period</code> is shorter than <code>interval</code> (or is NaN).
+<code>period == interval</code> gives <code>t = 0</code>.</p>
               </div>
             </td>
           </tr>
@@ -4896,12 +4912,12 @@ each other, so with <code>m = len(u) // 2</code> row <code>u[i]</code> pairs wit
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>numpy.ndarray of float, shape (size, d)</code>
+                  <code>numpy.ndarray of float, shape (2 * ceil(size / 2), d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Draws from the copula. When <code>size</code> is odd the array has <code>size + 1</code>
-rows, so that every draw keeps its partner.</p>
+                <p>Draws from the copula: <code>size</code> rows when <code>size</code> is even, and
+<code>size + 1</code> rows when it is odd, so that every draw keeps its partner.</p>
               </div>
             </td>
           </tr>

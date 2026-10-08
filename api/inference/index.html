@@ -2608,9 +2608,13 @@ treated as a single column.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Starting parameters for <code>"mpl"</code> and <code>"ml"</code> (full vector, in the
-order of <code>copula.param_names</code>). <code>None</code> uses the inversion-of-tau
-estimate, as in R. Ignored by the other methods.</p>
+                <p>Starting parameters (full vector, in the order of
+<code>copula.param_names</code>; entries of fixed parameters are ignored).
+For <code>"mpl"</code> and <code>"ml"</code>, <code>None</code> uses the inversion-of-tau
+estimate, as in R. For <code>"itau.mpl"</code> only the last element -- the
+starting <code>df</code> -- is used, since the correlations come from tau
+(a scalar is accepted too). Ignored by <code>"itau"</code> and <code>"irho"</code>,
+which have nothing to start.</p>
               </div>
             </td>
             <td>
@@ -2628,7 +2632,11 @@ estimate, as in R. Ignored by the other methods.</p>
               <div class="doc-md-description">
                 <p>A <code>scipy.optimize.minimize</code> method name, e.g. <code>"BFGS"</code>. <code>None</code>
 uses <code>L-BFGS-B</code> for multi-parameter problems and <code>Nelder-Mead</code>
-for one. Used by <code>"mpl"</code> and <code>"ml"</code> only.</p>
+for one. Used by <code>"mpl"</code> and <code>"ml"</code>, and by <code>"itau.mpl"</code> for
+its search over <code>df</code> (where <code>None</code> together with <code>start=None</code>
+means R's bounded Brent search on <code>(0.2, 200)</code>; giving either one
+switches to <code>minimize</code> with those bounds, <code>Nelder-Mead</code> by
+default). Ignored by <code>"itau"</code> and <code>"irho"</code>.</p>
               </div>
             </td>
             <td>
@@ -2645,7 +2653,9 @@ for one. Used by <code>"mpl"</code> and <code>"ml"</code> only.</p>
             <td>
               <div class="doc-md-description">
                 <p>Whether to compute the asymptotic covariance matrix (and therefore
-standard errors). Set to <code>False</code> to save time.</p>
+standard errors). Set to <code>False</code> to save time. For <code>"itau.mpl"</code>
+the correlations get their inversion covariance and the <code>df</code>
+entries are <code>nan</code> (see Notes).</p>
               </div>
             </td>
             <td>
@@ -2689,7 +2699,12 @@ standard errors). Set to <code>False</code> to save time.</p>
             <td>
               <div class="doc-md-description">
                 <p>Fitted copula, estimates of the free parameters, standard errors
-(<code>bse</code>), log-likelihood, AIC/BIC and a printable <code>summary()</code>.</p>
+(<code>bse</code>), log-likelihood, AIC/BIC and a printable <code>summary()</code>.
+Whatever the method, <code>params</code> and <code>param_names</code> (plain <code>str</code>)
+list the <em>estimated</em> parameters only -- those free in
+<code>copula.free</code> -- as R's <code>fitCopula</code> does; parameters pinned with
+<code>fix_params</code> appear only in <code>result.copula.params</code>, which is
+always the full vector.</p>
               </div>
             </td>
           </tr>
@@ -2715,8 +2730,38 @@ standard errors). Set to <code>False</code> to save time.</p>
                 <p>If <code>method</code> is not one of the five listed; if the number of data
 columns differs from <code>copula.dim</code>; if <code>"itau"</code>/<code>"irho"</code> cannot
 invert the sample measure for this family (e.g. negative tau for a
-Gumbel copula); or if <code>"itau.mpl"</code> is used with anything other than
-a Student-t copula with <code>dispstr="un"</code>.</p>
+Gumbel copula), or the parameter tau/rho determines is fixed while
+another one is free; if correlations pinned with <code>fix_params</code>
+cannot be completed to a valid correlation matrix; or if
+<code>"itau.mpl"</code> is used with anything other than a Student-t copula
+with <code>dispstr="un"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Warns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="UserWarning">UserWarning</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>For <code>"itau"</code>/<code>"irho"</code> when a free parameter does not enter
+tau/rho at all -- a t copula's <code>df</code> -- and so cannot be estimated
+by inversion. It is held at its current value (<code>df=4</code> by default)
+and left out of <code>params</code>. Pin it with <code>fix_params</code> (or
+<code>df_fixed=True</code>) to silence the warning, or use <code>"itau.mpl"</code>.</p>
               </div>
             </td>
           </tr>
@@ -2733,10 +2778,17 @@ rcopula.select_copula : Fit several families and rank them.</p>
 <details class="note" open>
   <summary>Notes</summary>
   <p><code>"mpl"</code> and <code>"ml"</code> produce the same point estimate and differ only
-in the variance. <code>"itau.mpl"</code> does not compute a covariance matrix,
-whatever <code>estimate_variance</code> says. A copula with no free parameters is
-not optimised; its log-likelihood is still reported so it can take part
-in AIC/BIC comparisons.</p>
+in the variance. Every method respects parameters pinned with
+<code>fix_params</code>: inversion keeps pinned correlations (repairing the matrix
+around them when needed) and <code>"itau.mpl"</code> skips the <code>df</code> search when
+<code>df</code> is pinned. For <code>"itau.mpl"</code> the correlations' standard errors are
+those of the inversion estimator -- the correlations <em>are</em> the <code>"itau"</code>
+estimates -- while the <code>df</code> row and column of <code>cov_params</code> are
+<code>nan</code>: a variance for the second stage would have to account for the
+first, which is not standard, and R reports no variance for this method
+at all. A copula with no free parameters is not optimised; its
+log-likelihood is still reported so it can take part in AIC/BIC
+comparisons.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2875,7 +2927,7 @@ Genest, C., Ghoudi, K. and Rivest, L.-P. (1995). A semiparametric estimation
   </span>
 
 <a href="#rcopula.fit.mvdc.JointFitResult" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">JointFitResult</span><span class="p">(</span><span class="n">distribution</span><span class="p">:</span> <span class="n">CopulaDistribution</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">margin_params</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span> <span class="n">loglik</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">n_obs</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">converged</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">''</span><span class="p">,</span> <span class="n">marginal_loglik</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">n_at_boundary</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">_x</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))())</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">JointFitResult</span><span class="p">(</span><span class="n">distribution</span><span class="p">:</span> <span class="n">CopulaDistribution</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">margin_params</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span> <span class="n">loglik</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">n_obs</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">converged</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">''</span><span class="p">,</span> <span class="n">marginal_loglik</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">n_at_boundary</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">margin_fixed</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">_x</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))())</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -3063,6 +3115,24 @@ landed on 0 or 1.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>margin_fixed</code>
+            </td>
+            <td>
+                  <code>list of tuple of bool or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>For each margin, which entries of <code>margin_params</code> were pinned
+through <code>margin_kwargs</code> (<code>floc=0</code> and the like) rather than
+estimated. <code>None</code> means nothing was pinned.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>_x</code>
             </td>
             <td>
@@ -3207,6 +3277,18 @@ count reports how many were patched.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.fit.mvdc.JointFitResult.margin_fixed">margin_fixed</span></code></td>
+            <td>
+                  <code>list of tuple of bool or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per margin, <code>True</code> where the parameter was pinned rather than
+estimated; <code>None</code> when nothing was pinned.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -3264,8 +3346,11 @@ count reports how many were patched.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Sum of the lengths of <code>margin_params</code> plus the number of free
-copula parameters.</p>
+                <p>The number of estimated margin parameters -- the lengths of
+<code>margin_params</code> minus any pinned through <code>margin_kwargs</code> (see
+:attr:<code>margin_fixed</code>) -- plus the number of free copula
+parameters. Pinned values were not estimated, so counting them
+would overstate AIC and BIC.</p>
               </div>
             </td>
           </tr>
@@ -3596,6 +3681,9 @@ from the IFM answer. See the module docstring.</p>
                 <p>One dict per margin (length <code>d</code>) of extra arguments for <code>scipy</code>'s
 <code>fit</code> -- most usefully <code>{"floc": 0}</code> to pin a location that the
 family requires to be zero. Use <code>{}</code> for margins that need nothing.
+Parameters pinned this way (<code>f0</code>, <code>f&lt;shape&gt;</code>, <code>fix_&lt;shape&gt;</code>,
+<code>floc</code>, <code>fscale</code>) stay pinned under <code>method="ml"</code> too, and are
+not counted in :attr:<code>JointFitResult.n_params</code> (so not in AIC/BIC).
 Getting this wrong is the commonest cause of an implausible fit: a
 Gamma fitted with a free location will happily slide it to just below
 the sample minimum.</p>
@@ -3843,7 +3931,8 @@ length-1 array.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Names matching <code>params</code>, in the same order.</p>
+                <p>Names matching <code>params</code>, in the same order; converted to plain
+<code>str</code>.</p>
               </div>
             </td>
             <td>
@@ -4058,6 +4147,29 @@ computed.</p>
             <td>
               <div class="doc-md-description">
                 <p>Optimiser message, or a note for closed-form estimators.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>param_names</code> and <code>params</code> differ in length.</p>
               </div>
             </td>
           </tr>
@@ -6680,7 +6792,12 @@ faster. Adds <code>gof_statistic</code> and <code>gof_pvalue</code> columns.</p>
             <td>
               <div class="doc-md-description">
                 <p>Seed for the cross-validation folds and the goodness-of-fit bootstrap.
-Pass an int for reproducible results.</p>
+Every family gets the <em>same</em> folds and the same bootstrap stream, so
+the comparison is not confounded by random draws: an int is used as
+the seed for each family, and a Generator (or <code>None</code>) is reduced to
+a single int seed drawn once (one draw from the Generator, and only
+when <code>criterion="xv"</code> or <code>gof</code> is requested). Pass an int for
+reproducible results.</p>
               </div>
             </td>
             <td>
@@ -6780,7 +6897,9 @@ that is neither.</p>
 the error message, <code>NaN</code> scores and <code>converged=False</code>, and it is
 ranked last. A fit that runs but whose optimiser reports non-convergence
 keeps its score and is ranked by it, with <code>converged=False</code> in its
-row. Silently dropping either would misrepresent the comparison.</p>
+row. Silently dropping either would misrepresent the comparison. If both
+the cross-validation and the goodness-of-fit run fail for a family, the
+<code>message</code> column carries both errors, separated by <code>"; "</code>.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -6972,12 +7091,13 @@ whole sampling distribution.</p>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.estimate">estimate</span></code></td>
             <td>
-                  <code>float or numpy.ndarray of float, shape (k,)</code>
+                  <code>float or numpy.ndarray of float</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>The statistic on the original data. A float for a scalar statistic,
-an array of the statistic's <code>k</code> values otherwise.</p>
+otherwise an array with the statistic's own shape (<code>(k,)</code> for a
+vector, <code>(d, d)</code> for a matrix, ...).</p>
               </div>
             </td>
           </tr>
@@ -6988,27 +7108,28 @@ an array of the statistic's <code>k</code> values otherwise.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(lower, upper)</code>. Scalars for a scalar statistic, arrays of shape
-<code>(k,)</code> otherwise.</p>
+                <p><code>(lower, upper)</code>. Scalars for a scalar statistic, arrays shaped like
+<code>estimate</code> otherwise.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.standard_error">standard_error</span></code></td>
             <td>
-                  <code>float or numpy.ndarray of float, shape (k,)</code>
+                  <code>float or numpy.ndarray of float</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Standard deviation of the replicates. Note this is a bootstrap estimate
-of the standard error, not the asymptotic one.</p>
+                <p>Standard deviation of the replicates, shaped like <code>estimate</code>. Note
+this is a bootstrap estimate of the standard error, not the asymptotic
+one.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.replicates">replicates</span></code></td>
             <td>
-                  <code>numpy.ndarray of float, shape (n_kept,) or (n_kept, k)</code>
+                  <code>numpy.ndarray of float, shape (n_kept,) or (n_kept, *estimate.shape)</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7093,7 +7214,8 @@ non-finite value).</p>
 
         <p>How far the resampled values sit from the original estimate, on average.</p>
 <p>Returns <code>mean(replicates) - estimate</code>: the bootstrap estimate of
-bias, a float for a scalar statistic or an array of shape <code>(k,)</code>.</p>
+bias, a float for a scalar statistic or an array shaped like
+<code>estimate</code>.</p>
 <p>A bias comparable to the standard error is a warning that the statistic
 is not well behaved at this sample size, whatever the interval says.</p>
 
@@ -7135,7 +7257,8 @@ is not well behaved at this sample size, whatever the interval says.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>One row per component of the statistic, with columns estimate,
+                <p>One row per component of the statistic (flattened in C order for
+a matrix-valued statistic), with columns estimate,
 SE, bias and the lower and upper interval limits, followed by a
 note of how many resamples were refused, if any.</p>
               </div>
@@ -7166,7 +7289,7 @@ note of how many resamples were refused, if any.</p>
 
 
 <a href="#rcopula.bootstrap.bootstrap" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">bootstrap</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">statistic</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">NDArray</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_resamples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">999</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">Method</span> <span class="o">=</span> <span class="s1">'bca'</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BootstrapResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">bootstrap</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">statistic</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">NDArray</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_resamples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">999</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">Method</span> <span class="o">=</span> <span class="s1">'bca'</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BootstrapResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -7216,8 +7339,11 @@ between columns is kept.</p>
             <td>
               <div class="doc-md-description">
                 <p>Function <code>statistic(sample)</code> taking a <code>numpy.ndarray</code> of shape
-<code>(n, d)</code> and returning a float or a 1-D array of floats.
-Raising is allowed and is treated as refusing that resample.</p>
+<code>(n, d)</code> and returning a float or an array of floats of any fixed
+shape (a vector, a <code>(d, d)</code> matrix, ...). The estimate, interval
+limits, standard error and replicates keep that shape. Raising, or
+returning a value of a different shape, is allowed and is treated as
+refusing that resample.</p>
               </div>
             </td>
             <td>
@@ -7296,12 +7422,13 @@ convention: the percentile of <code>B</code> replicates is exact when
                 <code>n_jobs</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> or None</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Processes to spread the resamples over. <code>1</code> stays in this process;
-a negative value uses all cores. Anything other than <code>1</code> needs
+a negative value (conventionally <code>-1</code>) or <code>None</code> uses all cores.
+<code>0</code> is rejected. Anything other than <code>1</code> needs
 <code>statistic</code> to be picklable, which rules out
 lambdas and closures -- use a module-level function or
 :func:<code>functools.partial</code>.</p>
@@ -7368,7 +7495,8 @@ Kendall's tau the process startup costs more than it saves.</p>
               <div class="doc-md-description">
                 <p>If <code>x</code> has fewer than 2 rows, <code>level</code> is not strictly between 0
 and 1, <code>n_resamples</code> is below 2, <code>method</code> is not one of the three
-names, or <code>statistic</code> fails on the original data.</p>
+names, <code>n_jobs</code> is 0 or not an integer, or <code>statistic</code> fails on
+the original data.</p>
               </div>
             </td>
           </tr>
@@ -7412,7 +7540,7 @@ names, or <code>statistic</code> fails on the original data.</p>
 
 
 <a href="#rcopula.bootstrap.bootstrap_measure" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">bootstrap_measure</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">measure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'tau'</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_resamples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">999</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">Method</span> <span class="o">=</span> <span class="s1">'bca'</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BootstrapResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">bootstrap_measure</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">measure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'tau'</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_resamples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">999</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">Method</span> <span class="o">=</span> <span class="s1">'bca'</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BootstrapResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -7537,12 +7665,13 @@ points with both ranks above 0.95, resp. below 0.05, divided by 0.05).</p>
                 <code>n_jobs</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> or None</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Number of worker processes. <code>1</code> stays in this process; a negative
-value uses all cores. See :func:<code>bootstrap</code> for when parallelism pays.</p>
+value or <code>None</code> uses all cores; <code>0</code> is rejected. See
+:func:<code>bootstrap</code> for when parallelism pays.</p>
               </div>
             </td>
             <td>
@@ -7631,7 +7760,7 @@ symmetric asymptotic interval would show.</p>
 
 
 <a href="#rcopula.bootstrap.bootstrap_fit" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">bootstrap_fit</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fit_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'mpl'</span><span class="p">,</span> <span class="n">n_resamples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">499</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">Method</span> <span class="o">=</span> <span class="s1">'bca'</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BootstrapResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">bootstrap_fit</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fit_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'mpl'</span><span class="p">,</span> <span class="n">n_resamples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">499</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">Method</span> <span class="o">=</span> <span class="s1">'bca'</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BootstrapResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -7775,12 +7904,13 @@ statistic, because each one is a full fit.</p>
                 <code>n_jobs</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> or None</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Number of worker processes. <code>1</code> stays in this process; a negative
-value uses all cores. See :func:<code>bootstrap</code> for when parallelism pays.</p>
+value or <code>None</code> uses all cores; <code>0</code> is rejected. See
+:func:<code>bootstrap</code> for when parallelism pays.</p>
               </div>
             </td>
             <td>
@@ -7936,6 +8066,18 @@ to exactly that shape, and comes back as the same tree.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">from_json</span><span class="p">(</span><span class="n">to_json</span><span class="p">(</span><span class="n">original</span><span class="p">))</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span> <span class="o">==</span> <span class="n">original</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span>
 <span class="go">True</span>
 </code></pre></div>
+    <p>A fit result (anything with a <code>.copula</code> attribute, such as the
+:class:<code>~rcopula.fit.results.CopulaFitResult</code> from :func:<code>rcopula.fit</code>) can be
+passed directly. The <em>fitted copula</em> is what gets saved and what comes back;
+the fit's summary numbers ride along under a <code>"fit"</code> key for the record:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ClaytonCopula</span><span class="p">(),</span> <span class="n">u</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">document</span> <span class="o">=</span> <span class="n">to_dict</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">document</span><span class="p">[</span><span class="s2">"fit"</span><span class="p">])</span>
+<span class="go">['converged', 'cov_params', 'loglik', 'method', 'n_obs', 'param_names', 'params', 'result']</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">from_dict</span><span class="p">(</span><span class="n">document</span><span class="p">)</span> <span class="o">==</span> <span class="n">result</span><span class="o">.</span><span class="n">copula</span>
+<span class="go">True</span>
+</code></pre></div>
 
 
 <details class="note" open>
@@ -7976,7 +8118,7 @@ consequences that carries. Save the data yourself and rebuild it.</p>
 
 
 <a href="#rcopula.serialize.to_dict" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_dict</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_dict</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -8004,7 +8146,7 @@ turn the dictionary back into a copula.</p>
                 <code>copula</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+                  <code>Copula or fit result</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8012,6 +8154,13 @@ turn the dictionary back into a copula.</p>
 construction (rotated, outer power, Khoudraji, mixture, nested
 Archimedean, vine) built from them. Not an
 :class:<code>~rcopula.core.empirical.EmpiricalCopula</code>.</p>
+<p>A fit result -- any object whose <code>.copula</code> attribute is a
+:class:<code>~rcopula.core.base.Copula</code>, such as the result of
+:func:<code>rcopula.fit</code> or :func:<code>rcopula.discrete.fit_discrete</code> -- is
+accepted too: its fitted copula is saved, and its summary numbers are
+added under <code>"fit"</code>. Only the copula is restored by
+:func:<code>from_dict</code>; the <code>"fit"</code> entry is a record, not a way to
+rebuild the result object.</p>
               </div>
             </td>
             <td>
@@ -8046,7 +8195,12 @@ Archimedean, vine) built from them. Not an
     A plain family also has <code>"dim"</code> (int), <code>"params"</code> (list of
     float) and <code>"free"</code> (list of bool), plus <code>"dispstr"</code> for the
     elliptical families and <code>"df_fixed"</code> for the Student t. A
-    structural copula instead holds its components as nested nodes.</p>
+    structural copula instead holds its components as nested nodes.
+<code>"fit"</code> : dict, only when a fit result was passed
+    <code>"result"</code> (the result's class name) and whichever of
+    <code>"params"</code>, <code>"param_names"</code>, <code>"loglik"</code>, <code>"n_obs"</code>,
+    <code>"method"</code>, <code>"converged"</code> and <code>"cov_params"</code> the result
+    has. Non-finite numbers are stored as <code>None</code>.</p>
               </div>
             </td>
           </tr>
@@ -8071,7 +8225,8 @@ Archimedean, vine) built from them. Not an
               <div class="doc-md-description">
                 <p>If the copula is (or contains) an
 :class:<code>~rcopula.core.empirical.EmpiricalCopula</code>, which is
-deliberately not serialisable.</p>
+deliberately not serialisable, or if <code>copula</code> is neither a copula
+nor an object with a <code>.copula</code> attribute holding one.</p>
               </div>
             </td>
           </tr>
@@ -8100,7 +8255,7 @@ deliberately not serialisable.</p>
 
 
 <a href="#rcopula.serialize.to_json" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_json</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">indent</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_json</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">indent</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -8126,11 +8281,12 @@ with :func:<code>from_json</code>; the reloaded copula is bit-identical.</p>
                 <code>copula</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+                  <code>Copula or fit result</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The copula to save; see :func:<code>to_dict</code> for what is accepted.</p>
+                <p>The copula to save, or a fit result whose fitted copula is saved;
+see :func:<code>to_dict</code> for what is accepted and what is kept.</p>
               </div>
             </td>
             <td>
@@ -8197,7 +8353,8 @@ the compact single-line form.</p>
             <td>
               <div class="doc-md-description">
                 <p>If the copula is (or contains) an
-:class:<code>~rcopula.core.empirical.EmpiricalCopula</code>.</p>
+:class:<code>~rcopula.core.empirical.EmpiricalCopula</code>, or <code>copula</code> is
+neither a copula nor a fit result.</p>
               </div>
             </td>
           </tr>

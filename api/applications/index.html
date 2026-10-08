@@ -1256,6 +1256,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rcopula.portfolio.EfficientFrontier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EfficientFrontier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#rcopula.portfolio.mispricing_index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2774,6 +2785,17 @@
     <span class="md-ellipsis">
       
         BacktestResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.portfolio.EfficientFrontier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EfficientFrontier
       
     </span>
   </a>
@@ -4978,7 +5000,8 @@ The entries sum to the portfolio's expected shortfall.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>alpha</code> is outside <code>(0, 1)</code>.</p>
+                <p>If <code>alpha</code> is outside <code>(0, 1)</code>, or <code>weights</code> does not have
+exactly <code>d</code> entries.</p>
               </div>
             </td>
           </tr>
@@ -5202,8 +5225,10 @@ unconditional VaR; an unrelated firm does not:</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.risk</span><span class="w"> </span><span class="kn">import</span> <span class="n">covar</span><span class="p">,</span> <span class="n">value_at_risk</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">tied</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">6.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">60_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">free</span> <span class="o">=</span> <span class="n">IndependenceCopula</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">60_000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">base</span> <span class="o">=</span> <span class="n">value_at_risk</span><span class="p">(</span><span class="n">free</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="mf">0.95</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">covar</span><span class="p">(</span><span class="n">tied</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">tied</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="mf">0.95</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">covar</span><span class="p">(</span><span class="n">free</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">free</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="mf">0.95</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">var</span> <span class="o">=</span> <span class="n">value_at_risk</span><span class="p">(</span><span class="n">tied</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="mf">0.95</span><span class="p">)</span>          <span class="c1"># unconditional system VaR</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">covar</span><span class="p">(</span><span class="n">tied</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">tied</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="mf">0.95</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">var</span> <span class="o">+</span> <span class="mf">0.02</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">covar</span><span class="p">(</span><span class="n">free</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">free</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="mf">0.95</span><span class="p">)</span> <span class="o">-</span> <span class="n">var</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.02</span><span class="p">)</span>
 <span class="go">True</span>
 </code></pre></div>
 
@@ -5809,7 +5834,7 @@ the most useful thing this module does.</p>
 <p>.. warning::</p>
 <p>These are <strong>reference implementations for analysis and teaching</strong>, not a
    production pricing library. Spreads use a flat-hazard, single-period
-   approximation with no discounting curve, no accrual on default and no
+   approximation with a flat discount rate, no accrual on default and no
    counterparty adjustment.</p>
 
 
@@ -6275,7 +6300,7 @@ single number applies to every name.</p>
             <td>
               <div class="doc-md-description">
                 <p>Loss given default, as a fraction of exposure (<code>0.6</code> means 40%
-recovery). A single number applies to every name.</p>
+recovery), each in <code>[0, 1]</code>. A single number applies to every name.</p>
               </div>
             </td>
             <td>
@@ -6291,9 +6316,10 @@ recovery). A single number applies to every name.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Per-name exposure (notional), in any currency unit. Defaults to equal.
-Only relative sizes matter: losses are returned as a fraction of total
-exposure, so the result always lies in <code>[0, 1]</code> when <code>lgd</code> does.</p>
+                <p>Per-name exposure (notional), in any currency unit, each finite and
+<code>&gt;= 0</code> with a positive total. Defaults to equal. Only relative sizes
+matter: losses are returned as a fraction of total exposure, so the
+result always lies in <code>[0, 1]</code>.</p>
               </div>
             </td>
             <td>
@@ -6374,8 +6400,9 @@ exposure, so the result always lies in <code>[0, 1]</code> when <code>lgd</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If any default probability lies outside <code>[0, 1]</code>, or a per-name
-input has a length other than 1 or <code>d</code>.</p>
+                <p>If any default probability or LGD lies outside <code>[0, 1]</code>, any
+exposure is negative or not finite, the exposures sum to zero, or a
+per-name input has a length other than 1 or <code>d</code>.</p>
               </div>
             </td>
           </tr>
@@ -6806,8 +6833,11 @@ satisfy <code>0 &lt;= attachment &lt; detachment &lt;= 1</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Continuously compounded annual rate (<code>0.03</code> for 3%). Zero means no
-discounting.</p>
+                <p>Continuously compounded annual rate (<code>0.03</code> for 3%), applied to
+<strong>both</strong> legs. Zero means no discounting. Because both legs are
+discounted on the same schedule the rate only has a second-order
+effect: a higher rate slightly <em>tightens</em> the spread (it down-weights
+the late, amortised premium payments).</p>
               </div>
             </td>
             <td>
@@ -6868,11 +6898,18 @@ are invalid.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Equates the protection leg to the premium leg under a <strong>single-period,
-flat-curve</strong> approximation:</p>
-<p>.. math::  s \approx \frac{\mathrm{EL}}{T \cdot (1 - \mathrm{EL}/2)}</p>
-<p>with the second factor a crude adjustment for notional amortising as losses
-accrue. Real pricing integrates over a default-time distribution with a
+  <p>Equates the protection leg to the premium leg assuming the tranche
+loss accrues <strong>linearly</strong> over <code>[0, T]</code> on a flat discount curve
+:math:<code>e^{-rt}</code>. The protection leg pays :math:<code>\mathrm{EL}/T</code> per year;
+the premium leg pays :math:<code>s</code> on the outstanding notional
+:math:<code>1 - \mathrm{EL}\,t/T</code>. Both are discounted with the same curve:</p>
+<p>.. math::</p>
+<pre><code>s = \frac{(\mathrm{EL}/T)\,A_0}{A_0 - (\mathrm{EL}/T)\,A_1},\qquad
+A_0 = \int_0^T e^{-rt}\,dt,\quad A_1 = \int_0^T t\,e^{-rt}\,dt,
+</code></pre>
+<p>which reduces to :math:<code>s = \mathrm{EL} / (T (1 - \mathrm{EL}/2))</code> at
+:math:<code>r = 0</code> (the second factor is the adjustment for notional
+amortising as losses accrue). Real pricing integrates over a default-time distribution with a
 discount curve and premium accruals; this is for comparing <em>models</em>, not
 for quoting.</p>
 </details>
@@ -7398,9 +7435,11 @@ satisfy <code>0 &lt;= attachment &lt; detachment &lt;= 1</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Seed or generator. Pass an <code>int</code> so every trial correlation reuses
-the same random numbers; with <code>None</code> or a <code>Generator</code> each trial
-sees fresh noise and the root search can be erratic.</p>
+                <p>Seed or generator for reproducible results. Whatever is passed, every
+trial correlation reuses the <strong>same</strong> random numbers (common random
+numbers): a <code>Generator</code> or <code>None</code> is used once to draw a seed,
+which is then reused for every trial, so the Monte Carlo mismatch is
+a smooth function of the correlation and the root search is stable.</p>
               </div>
             </td>
             <td>
@@ -7449,9 +7488,8 @@ sees fresh noise and the root search can be erratic.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If the target is unattainable over <code>correlation</code> in <code>(0, 1)</code>
-(in practice, the search range <code>[1e-4, 0.95]</code>), or the tranche
-bounds are invalid.</p>
+                <p>If the target is unattainable for any correlation in the search
+range <code>[0, 0.999]</code>, or the tranche bounds are invalid.</p>
               </div>
             </td>
           </tr>
@@ -7461,8 +7499,10 @@ bounds are invalid.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>The correlation is found by root search on a Monte Carlo estimate, so it
-carries simulation error, and each call runs dozens of full simulations.</p>
+  <p>The correlation is found by Brent root search over <code>[0, 0.999]</code> on a
+Monte Carlo estimate, so it carries simulation error, and each call runs
+dozens of full simulations. (Exactly 1 is excluded because the
+equicorrelation matrix is singular there.)</p>
 <p>Inverting the one-factor Gaussian model until it reproduces an observed
 tranche price, tranche by tranche on the same pool, produces the
 <strong>correlation skew</strong> -- different tranches implying different
@@ -7688,7 +7728,7 @@ simulation noise only, not model error.</p>
 
 
 <a href="#rcopula.derivatives.SmileMargin" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">SmileMargin</span><span class="p">(</span><span class="n">strikes</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">vols</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">forward</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">maturity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">SmileMargin</span><span class="p">(</span><span class="n">strikes</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">vols</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">forward</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">maturity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">tails</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'lognormal'</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -7726,8 +7766,8 @@ and friends.</p>
             <td>
               <div class="doc-md-description">
                 <p>Strikes at which the smile is quoted, strictly increasing, in the same
-currency units as <code>forward</code>. At least four are needed. Cover the
-range you care about: outside it the distribution is flat (see Notes).</p>
+currency units as <code>forward</code>. At least four are needed. Outside the
+quoted range the tails are extrapolated (see <code>tails</code> and Notes).</p>
               </div>
             </td>
             <td>
@@ -7797,6 +7837,27 @@ for 25%).</p>
             </td>
             <td>
                   <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>tails</code>
+            </td>
+            <td>
+                  <code>(&#39;lognormal&#39;, &#39;flat&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How to extend the distribution beyond the quoted strikes.
+<code>"lognormal"</code> attaches lognormal tails using the implied vol at the
+nearest end strike, so quantiles can fall outside the quoted range.
+<code>"flat"</code> holds the CDF constant outside the range (the behaviour
+of earlier versions): all tail mass sits on the end strikes and
+:meth:<code>ppf</code> never leaves <code>[strikes[0], strikes[-1]]</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;lognormal&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -7888,7 +7949,8 @@ for 25%).</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>strikes</code> and <code>vols</code> differ in length, fewer than four strikes
-are given, or the strikes are not strictly increasing.</p>
+are given, the strikes are not strictly increasing, <code>forward</code> or
+<code>maturity</code> is not positive, or <code>tails</code> is unknown.</p>
               </div>
             </td>
           </tr>
@@ -7908,9 +7970,17 @@ and the copula supplies the dependence -- which a single correlation number
 cannot do once the marginals are non-lognormal.</p>
 <p>The derivative is taken numerically on the quoted grid and the result is
 clipped to [0, 1] and forced to be non-decreasing. Between strikes the CDF
-is linearly interpolated; below the lowest and above the highest strike it
-is held constant, so any probability the smile assigns beyond the quoted
-range is concentrated at the end strikes.</p>
+is linearly interpolated.</p>
+<p>Beyond the quoted range (<code>tails="lognormal"</code>), the left tail is a
+lognormal with the forward and the implied vol of the lowest strike,
+rescaled so the CDF is continuous there:
+:math:<code>F(x) = F(K_1)\,G_L(x)/G_L(K_1)</code> for :math:<code>x &lt; K_1</code>. The right tail
+is the mirror image using the highest strike's vol:
+:math:<code>1 - F(x) = (1 - F(K_k))\,\bar G_R(x)/\bar G_R(K_k)</code>. Holding the
+end-strike vol flat in the wings is the usual simple extrapolation; it
+keeps the CDF continuous and monotone and puts no mass on the end strikes
+themselves. With <code>tails="flat"</code> the CDF is held constant outside the
+range instead.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -8090,7 +8160,10 @@ uniform draws into prices.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Price levels, always within <code>[strikes[0], strikes[-1]]</code>.</p>
+                <p>Price levels. With <code>tails="lognormal"</code> these extend below
+<code>strikes[0]</code> (towards 0 as <code>q -&gt; 0</code>) and above <code>strikes[-1]</code>
+(to <code>inf</code> at <code>q = 1</code>); with <code>tails="flat"</code> they stay within
+<code>[strikes[0], strikes[-1]]</code>.</p>
               </div>
             </td>
           </tr>
@@ -9234,8 +9307,9 @@ price is at or below discounted intrinsic value.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If no volatility in (1e-8, 10] reproduces <code>price</code> -- typically
-because the price exceeds the no-arbitrage upper bound.</p>
+                <p>If <code>kind</code> is not <code>"call"</code> or <code>"put"</code>, or no volatility in
+(1e-8, 10] reproduces <code>price</code> -- typically because the price exceeds
+the no-arbitrage upper bound.</p>
               </div>
             </td>
           </tr>
@@ -9793,16 +9867,16 @@ directions: a best-of is worth most when the assets are <em>independent</em>
 
 
 <a href="#rcopula.derivatives.spread_option" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">spread_option</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">margins</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Margin</span><span class="p">],</span> <span class="n">strike</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">maturity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MonteCarloPrice</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">spread_option</span><span class="p">(</span><span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">margins</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Margin</span><span class="p">],</span> <span class="n">strike</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">maturity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200000</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Generator</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'call'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MonteCarloPrice</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Monte-Carlo price of a call on the spread between two assets.</p>
-<p>Payoff :math:<code>\max(S_1 - S_2 - K, 0)</code>: pays when asset 1 beats asset 2 by
-more than the strike (e.g. a crack or spark spread). Unlike
-:func:<code>kirk_spread</code>, any margins and any copula can be used. Only calls
-are supported.</p>
+        <p>Monte-Carlo price of a call or put on the spread between two assets.</p>
+<p>Call payoff :math:<code>\max(S_1 - S_2 - K, 0)</code>: pays when asset 1 beats asset
+2 by more than the strike (e.g. a crack or spark spread). Put payoff
+:math:<code>\max(K - (S_1 - S_2), 0)</code>. Unlike :func:<code>kirk_spread</code>, any margins
+and any copula can be used.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9928,6 +10002,22 @@ are supported.</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>kind</code>
+            </td>
+            <td>
+                  <code>(&#39;call&#39;, &#39;put&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Option type.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;call&#34;</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -9970,7 +10060,8 @@ are supported.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If the copula is not bivariate.</p>
+                <p>If the copula is not bivariate, or <code>kind</code> is not <code>"call"</code> or
+<code>"put"</code>.</p>
               </div>
             </td>
           </tr>
@@ -9980,7 +10071,9 @@ are supported.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>At :math:<code>K = 0</code> with a Gaussian copula and lognormal margins this is the
+  <p>Put-call parity holds scenario by scenario:
+:math:<code>C - P = e^{-rT}(\mathbb{E}[S_1 - S_2] - K)</code>.</p>
+<p>At :math:<code>K = 0</code> with a Gaussian copula and lognormal margins this is the
 Margrabe exchange option, which has an exact price -- so
 :func:<code>margrabe</code> is the check that this simulation is right.</p>
 </details>
@@ -10290,8 +10383,8 @@ what :func:<code>cms_spread_option</code> does for each leg.</p>
             <td>
               <div class="doc-md-description">
                 <p>Volatility of the rate: lognormal (decimal) for <code>model="lognormal"</code>,
-absolute (rate units) for <code>model="normal"</code>. Must be positive for the
-lognormal model.</p>
+absolute (rate units) for <code>model="normal"</code>. Must be positive for
+either model.</p>
               </div>
             </td>
             <td>
@@ -10307,7 +10400,7 @@ lognormal model.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Time to the fixing, in years.</p>
+                <p>Time to the fixing, in years. Must be positive.</p>
               </div>
             </td>
             <td>
@@ -10406,8 +10499,10 @@ cms_convexity_adjustment(...)</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As :func:<code>cms_convexity_adjustment</code>; and, for the lognormal model, if
-<code>vol</code> or <code>maturity</code> is not positive.</p>
+                <p>As :func:<code>cms_convexity_adjustment</code>; and, for either model, if
+<code>vol</code> or <code>maturity</code> is not positive. A zero vol or zero time to
+fixing would make the rate a known constant (a point mass), which
+is not a continuous margin a copula can use.</p>
               </div>
             </td>
           </tr>
@@ -10918,8 +11013,8 @@ with quoted index options.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If a simulated price cannot be inverted to a volatility (see
-:func:<code>implied_volatility</code>).</p>
+                <p>If <code>weights</code> does not have length <code>d</code>, or a simulated price cannot
+be inverted to a volatility (see :func:<code>implied_volatility</code>).</p>
               </div>
             </td>
           </tr>
@@ -11093,9 +11188,11 @@ fraction (0.05 means +5%).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Mean over standard deviation of the per-period strategy return,
-computed over the periods in which a position was held only, scaled
-by <code>sqrt(periods_per_year)</code>. <code>0.0</code> if fewer than two such periods.</p>
+                <p>Mean over standard deviation (<code>ddof=1</code>) of the per-period strategy
+return over <strong>every live period</strong> -- all periods after the first
+<code>train + 1</code> warm-up rows, flat periods counting as a zero return --
+scaled by <code>sqrt(periods_per_year)</code>. <code>0.0</code> if the returns have zero
+variance.</p>
               </div>
             </td>
           </tr>
@@ -11106,8 +11203,9 @@ by <code>sqrt(periods_per_year)</code>. <code>0.0</code> if fewer than two such 
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of times the position changed from one period to the next.
-Opening and later closing a position counts as two.</p>
+                <p>Number of trades <strong>opened</strong>: each move from flat into a position, and
+each direct flip from long to short or back, counts once. Closing a
+position does not count, so this is the number of round trips.</p>
               </div>
             </td>
           </tr>
@@ -11143,6 +11241,107 @@ between 0 and 1. <code>0.0</code> if no position was ever held.</p>
               <div class="doc-md-description">
                 <p>Position held in each period: <code>+1</code>, <code>-1</code> or <code>0</code>. The first
 <code>train + 1</code> entries are always <code>0</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="rcopula.portfolio.EfficientFrontier" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">EfficientFrontier</span>
+
+
+<a href="#rcopula.portfolio.EfficientFrontier" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.NamedTuple">NamedTuple</span></code></p>
+
+
+
+        <p>Points on the mean-CVaR frontier, as returned by :func:<code>efficient_frontier</code>.</p>
+<p>A named tuple, so it unpacks like the plain 3-tuple returned by earlier
+versions: <code>mu, cvar, w = efficient_frontier(r)</code>.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.portfolio.EfficientFrontier.achieved_returns">achieved_returns</span></code></td>
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Mean portfolio return <strong>achieved</strong> by the optimal weights at each
+point, <code>weights @ scenarios.mean(axis=0)</code>. It is at least the target
+return that was asked for, and can exceed it where the return
+constraint does not bind.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.portfolio.EfficientFrontier.cvars">cvars</span></code></td>
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>CVaR (expected shortfall of the portfolio loss) at each point, as a
+positive loss.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.portfolio.EfficientFrontier.weights">weights</span></code></td>
+            <td>
+                  <code>numpy.ndarray of float, shape (m, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Portfolio weights at each point; each row sums to one.</p>
               </div>
             </td>
           </tr>
@@ -11355,11 +11554,26 @@ give you.</p>
         <p>Long, short or flat for a pair, based on how mispriced one leg looks.</p>
 <p>Returns <code>+1</code> to go long the spread (long asset 1, short asset 2), <code>-1</code>
 for the reverse, and <code>0</code> to stand aside, one value per row of <code>u</code>.</p>
-<p>A position opens when <strong>both</strong> legs agree that one asset is mispriced
-relative to the other -- <code>h1</code> at or below <code>entry</code> <em>and</em> <code>h2</code> at or
-above <code>1 - entry</code> (see :func:<code>mispricing_index</code>). Requiring both is what
-distinguishes relative mispricing from a common move: if the whole market
-falls, both conditionals stay near 0.5 and no signal fires.</p>
+<p>The rows of <code>u</code> are read <strong>in time order</strong> and the signal has memory:</p>
+<ul>
+<li><strong>Entry.</strong> From flat, a long position (<code>+1</code>) opens when <strong>both</strong> legs
+  agree that asset 1 is cheap relative to asset 2 -- <code>h1</code> at or below
+  <code>entry</code> <em>and</em> <code>h2</code> at or above <code>1 - entry</code> (see
+  :func:<code>mispricing_index</code>); a short position (<code>-1</code>) opens on the mirror
+  condition. Requiring both is what distinguishes relative mispricing from
+  a common move: if the whole market falls, both conditionals stay near
+  0.5 and no signal fires.</li>
+<li><strong>Hold.</strong> An open position is kept on later rows until the mispricing
+  has reverted: a long closes once <code>h1 &gt;= 0.5 - exit_band</code> or
+  <code>h2 &lt;= 0.5 + exit_band</code> (either leg is back inside the band
+  <code>[0.5 - exit_band, 0.5 + exit_band]</code> or beyond it); a short closes on
+  the mirror condition.</li>
+<li><strong>Flip.</strong> An opposite entry signal while a position is open reverses it
+  directly.</li>
+</ul>
+<p>With the default <code>exit_band=0.5</code> the band is all of <code>[0, 1]</code>, so every
+position closes on the next row unless the entry condition still holds:
+a memoryless, one-row signal.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -11433,10 +11647,12 @@ Smaller means rarer, higher-conviction trades.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Intended to close positions once the conditional returns within
-<code>exit_band</code> of 0.5. <strong>Currently not used</strong>: the signal is computed
-row by row with no memory of earlier positions, so any row that does
-not meet the entry rule returns <code>0</code>.</p>
+                <p>Half-width of the exit band around 0.5, in <code>[0, 0.5]</code>. A position is
+held until the conditional probability that triggered it crosses back
+inside <code>[0.5 - exit_band, 0.5 + exit_band]</code>. <code>0.0</code> holds until the
+conditional crosses 0.5 itself (full reversion); <code>0.5</code> (the default)
+closes on the next row unless the entry rule fires again. Values
+between <code>0.5 - entry</code> and <code>0.5</code> behave like <code>0.5</code>.</p>
               </div>
             </td>
             <td>
@@ -11486,8 +11702,8 @@ asset 2) or <code>0</code> (no position) for each row.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>entry</code> is not strictly between 0 and 0.5, or <code>u</code> does not have
-two columns.</p>
+                <p>If <code>entry</code> is not strictly between 0 and 0.5, <code>exit_band</code> is not
+in <code>[0, 0.5]</code>, or <code>u</code> does not have two columns.</p>
               </div>
             </td>
           </tr>
@@ -11503,6 +11719,12 @@ two columns.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.02</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.95</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">]])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">pairs_signal</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">u</span><span class="p">)</span>
 <span class="go">array([ 1, -1,  0])</span>
+</code></pre></div>
+    <p>With a narrower exit band the long is held while asset 1 is still cheap
+(row 2) and closed once it has reverted (row 3):</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.02</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.20</span><span class="p">,</span> <span class="mf">0.80</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.60</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pairs_signal</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">exit_band</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="go">array([1, 1, 0])</span>
 </code></pre></div>
     <p>Signals are rare by construction -- a few percent of observations:</p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">signals</span> <span class="o">=</span> <span class="n">pairs_signal</span><span class="p">(</span><span class="n">cop</span><span class="p">,</span> <span class="n">cop</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">5000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
@@ -11523,7 +11745,7 @@ two columns.</p>
 
 
 <a href="#rcopula.portfolio.backtest_pairs" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">backtest_pairs</span><span class="p">(</span><span class="n">returns</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">train</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">250</span><span class="p">,</span> <span class="n">entry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">periods_per_year</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">252</span><span class="p">,</span> <span class="n">refit_every</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BacktestResult</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">backtest_pairs</span><span class="p">(</span><span class="n">returns</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">copula</span><span class="p">:</span> <span class="n">Copula</span><span class="p">,</span> <span class="n">train</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">250</span><span class="p">,</span> <span class="n">entry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">periods_per_year</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">252</span><span class="p">,</span> <span class="n">refit_every</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">exit_band</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BacktestResult</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -11532,8 +11754,9 @@ two columns.</p>
 <p>Use it to see how often :func:<code>pairs_signal</code> would have fired on a real
 pair and whether the trades made money before costs.</p>
 <p>At each period <code>t</code> the copula is fitted on the trailing <code>train</code>
-returns, today's return is ranked within that window, and the resulting
-signal is held for the <em>next</em> period only (<code>t + 1</code>). The position earned
+returns, today's return is ranked within that window, and the
+:func:<code>pairs_signal</code> entry/exit rule (with <code>entry</code> and <code>exit_band</code>)
+updates the position, which is earned in the <em>next</em> period (<code>t + 1</code>). The position earned
 in period <code>t + 1</code> therefore never depends on the return of period
 <code>t + 1</code>, which is the part most easily got wrong.</p>
 
@@ -11650,6 +11873,25 @@ faster and make the position depend on a slightly staler model.</p>
                   <code>0</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>exit_band</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Exit band passed to the :func:<code>pairs_signal</code> rule; in <code>[0, 0.5]</code>.
+The default closes every position after one period unless the entry
+rule fires again; smaller values hold positions until the pair has
+reverted.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.5</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -11694,7 +11936,8 @@ faster and make the position depend on a slightly staler model.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>returns</code> is not two-column, or has <code>train + 1</code> rows or fewer.</p>
+                <p>If <code>returns</code> is not two-column, has <code>train + 1</code> rows or fewer, or
+<code>entry</code> / <code>exit_band</code> are out of range.</p>
               </div>
             </td>
           </tr>
@@ -12028,9 +12271,10 @@ a <code>target_return</code> above what any allowed portfolio can earn).</p>
 <p>is a linear program in :math:<code>(w, z, s)</code> once returns are given as
 scenarios. That makes it exact and fast -- no gradient descent, no local
 optima -- and it is why scenario-based CVaR optimisation is practical at all.</p>
-<p>The program has one auxiliary variable per scenario, and its constraint
-matrix is built densely, so memory grows with the square of <code>n</code>. A few
-thousand scenarios is comfortable; tens of thousands may not be.</p>
+<p>The program has one auxiliary variable per scenario. Its constraint
+matrix is built as a <code>scipy.sparse</code> matrix (<code>n * (d + 2)</code> non-zeros)
+and solved with HiGHS, so memory grows linearly in <code>n</code>: tens of
+thousands of scenarios are routine.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -12191,7 +12435,7 @@ shorting.</p>
 
 
 <a href="#rcopula.portfolio.efficient_frontier" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">efficient_frontier</span><span class="p">(</span><span class="n">scenarios</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">n_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span> <span class="n">bounds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]]</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">efficient_frontier</span><span class="p">(</span><span class="n">scenarios</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">n_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span> <span class="n">bounds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="n">EfficientFrontier</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -12199,9 +12443,10 @@ shorting.</p>
         <p>The best tail risk achievable at each level of expected return.</p>
 <p>Solves :func:<code>mean_cvar_weights</code> for a ladder of target returns, from the
 minimum-CVaR portfolio's mean up to the highest single-asset mean, and
-reports the return, CVaR and weights at each point -- the mean-CVaR
-efficient frontier. Plot <code>cvars</code> against <code>returns</code> to see how much
-extra tail loss each step of extra return costs.</p>
+reports the <strong>achieved</strong> mean return, CVaR and weights at each point --
+the mean-CVaR efficient frontier. Plot <code>cvars</code> against
+<code>achieved_returns</code> to see how much extra tail loss each step of extra
+return costs.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -12289,50 +12534,27 @@ shorting.</p>
     <table>
       <thead>
         <tr>
-<th>Name</th>          <th>Type</th>
+          <th>Type</th>
           <th>Description</th>
         </tr>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-<td><code>returns</code></td>            <td>
-                  <code>numpy.ndarray of float, shape (m,)</code>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="EfficientFrontier (rcopula.portfolio.EfficientFrontier)" href="#rcopula.portfolio.EfficientFrontier">EfficientFrontier</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Mean portfolio return achieved at each frontier point (at least the
-target), in the units of <code>scenarios</code>.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-<td><code>cvars</code></td>            <td>
-                  <code>numpy.ndarray of float, shape (m,)</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>CVaR (expected shortfall of the portfolio loss) at each point, as a
-positive loss.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-<td><code>weights</code></td>            <td>
-                  <code>numpy.ndarray of float, shape (m, d)</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Portfolio weights at each point; each row sums to one.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-<td></td>            <td>
-                  <code>``m &lt;= n_points``: infeasible targets are dropped rather than raising.</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                
+                <p>Named tuple <code>(achieved_returns, cvars, weights)</code>:</p>
+<p><code>achieved_returns</code> : numpy.ndarray of float, shape (m,)
+    Mean portfolio return <strong>achieved</strong> at each point (not the target
+    that was requested; it is at least the target), in the units of
+    <code>scenarios</code>.
+<code>cvars</code> : numpy.ndarray of float, shape (m,)
+    CVaR at each point, as a positive loss.
+<code>weights</code> : numpy.ndarray of float, shape (m, d)
+    Portfolio weights at each point; each row sums to one.</p>
+<p><code>m &lt;= n_points</code>: infeasible targets are dropped rather than raising.</p>
               </div>
             </td>
           </tr>
@@ -12372,6 +12594,9 @@ positive loss.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">mu</span><span class="p">,</span> <span class="n">cvar</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">efficient_frontier</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">cvar</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="o">-</span><span class="mf">1e-9</span><span class="p">))</span>     <span class="c1"># more return costs more risk</span>
 <span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">front</span> <span class="o">=</span> <span class="n">efficient_frontier</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">n_points</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">front</span><span class="o">.</span><span class="n">achieved_returns</span><span class="p">,</span> <span class="n">front</span><span class="o">.</span><span class="n">weights</span> <span class="o">@</span> <span class="n">r</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)))</span>
+<span class="go">True</span>
 </code></pre></div>
 
 
@@ -12407,10 +12632,12 @@ rule is not a preliminary to the strategy -- for a copula strategy it largely
 <p><strong>Pairs.</strong> Six rules, of which the last two are the copula-specific ones:</p>
 <p>===================  =========================================================
 <code>distance</code>         Sum of squared deviations between normalised cumulative
-                     returns. The classic (Gatev et al.), and it selects for
-                     <em>level</em> agreement, which is not what a copula uses.
-<code>pearson</code>          Linear correlation. Included to be argued with: it is not
-                     invariant to the marginal transforms a copula discards.
+                     returns (raw values, not ranks). The classic (Gatev et
+                     al.), and it selects for <em>level</em> agreement, which is not
+                     what a copula uses.
+<code>pearson</code>          Linear correlation of the raw values. Included to be
+                     argued with: it is not invariant to the marginal
+                     transforms a copula discards.
 <code>spearman</code>         Rank correlation. Cheap, and close to <code>kendall</code>.
 <code>kendall</code>          Rank correlation, concordance-based.
 <code>tail</code>             Lower-tail dependence, estimated nonparametrically. Picks
@@ -12438,8 +12665,16 @@ set first, exactly as Stübinger, Mangold and Krauss do.</p>
                      chi-squared test targets -- see the note under
                      :func:<code>select_partners</code> about what this is and is not.
 ===================  =========================================================</p>
-<p>Everything here works on <strong>ranks</strong>, which is the point: a copula does not see
-the margins, so neither should the rule that chooses its inputs.</p>
+<p>Almost everything here works on <strong>ranks</strong>, which is the point: a copula does
+not see the margins, so neither should the rule that chooses its inputs. The
+two exceptions are deliberate and are the conventional definitions of those
+rules: <code>distance</code> works on the raw values (it treats each column as a
+return series, cumulates it into a price path and normalises that path, as
+Gatev et al. do with normalised prices), and <code>pearson</code> is the linear
+correlation of the raw values. Ranking first would turn them into different
+rules -- <code>pearson</code> on ranks <em>is</em> <code>spearman</code> -- so they are kept as the
+literature defines them, as baselines to compare the rank-based rules with.
+Every partner-selection rule uses ranks.</p>
 <p>============================  ================================================
 :func:<code>select_pairs</code>          Rank every pair by one of six criteria.
 :func:<code>select_partners</code>       Find the best quadruple for a target.
@@ -12982,7 +13217,8 @@ others use ranks.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Keep only the best <code>top</code> pairs. <code>None</code> (or 0) keeps all
+                <p>Keep only the best <code>top</code> pairs (a non-negative integer; <code>0</code>
+returns an empty frame with the usual columns). <code>None</code> keeps all
 <code>k(k-1)/2</code>.</p>
               </div>
             </td>
@@ -13058,8 +13294,8 @@ Ignored for a DataFrame. <code>None</code> names the columns <code>x0, x1, ...</
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>method</code> is not one of the six names, or <code>data</code> has fewer than
-two columns.</p>
+                <p>If <code>method</code> is not one of the six names, <code>data</code> has fewer than
+two columns, or <code>top</code> is negative or not an integer.</p>
               </div>
             </td>
           </tr>
@@ -13069,10 +13305,10 @@ two columns.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Cost is :math:<code>O(k^2)</code> pairs, each :math:<code>O(n\log n)</code> for <code>kendall</code> and
-:math:<code>O(n)</code> otherwise. Five hundred names is 124,750 pairs and takes a
-couple of minutes on <code>kendall</code>; screen with <code>spearman</code> first if that
-matters, since the two rank nearly the same candidates.</p>
+  <p>Cost is :math:<code>O(k^2)</code> pairs, each :math:<code>O(n)</code> for most rules. For
+<code>kendall</code> the whole matrix is computed at once by
+:func:<code>~rcopula.cor_kendall</code>, which for hundreds of names is seconds rather
+than the minutes that separate pairwise calls would take.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -13159,13 +13395,14 @@ least <code>n_partners + 1</code> columns.</p>
                 <code>target</code>
             </td>
             <td>
-                  <code><span title="str">str</span> or <span title="int">int</span></code>
+                  <code>str, int or other column label</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The column to find partners for: a column label, or (if an <code>int</code>)
-its position. Note that a Python <code>int</code> is always read as a
-position, even if the DataFrame has integer column labels.</p>
+                <p>The column to find partners for. It is first looked up as a column
+label -- so with integer column labels an <code>int</code> names the label --
+and only if it is not a label is an integer (Python or NumPy) read as
+a position, <code>0 &lt;= target &lt; k</code>.</p>
               </div>
             </td>
             <td>
@@ -13298,9 +13535,9 @@ DataFrame. <code>None</code> names the columns <code>x0, x1, ...</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>method</code> is not one of the four names, <code>target</code> is not a
-column, <code>n_partners &lt; 1</code>, or there are fewer than <code>n_partners</code>
-columns besides the target.</p>
+                <p>If <code>method</code> is not one of the four names, <code>target</code> is neither a
+column label nor a valid position, <code>n_partners &lt; 1</code>, or there are
+fewer than <code>n_partners</code> columns besides the target.</p>
               </div>
             </td>
           </tr>
@@ -13465,7 +13702,7 @@ Barone-Adesi, G., Giannopoulos, K. and Vosper, L. (1999). VaR without
 
 
 
-        <p>One asset's fitted volatility model: parameters, daily volatility, forecasts.</p>
+        <p>One asset's fitted volatility model: parameters, per-period volatility, forecasts.</p>
 <p>This is what :func:<code>fit_garch</code> returns. It tells you how volatile the
 asset is today, how volatile it is on average, how quickly a volatility
 spike fades, and it holds the "de-volatilised" returns (the standardised
@@ -13529,7 +13766,7 @@ and :math:<code>\varepsilon_t = r_t - \mu</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Reaction to yesterday's shock (ARCH coefficient), between 0 and 1.</p>
+                <p>Reaction to the previous period's shock (ARCH coefficient), between 0 and 1.</p>
               </div>
             </td>
             <td>
@@ -13545,7 +13782,7 @@ and :math:<code>\varepsilon_t = r_t - \mu</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Weight on yesterday's variance (GARCH coefficient), between 0 and 1.</p>
+                <p>Weight on the previous period's variance (GARCH coefficient), between 0 and 1.</p>
               </div>
             </td>
             <td>
@@ -13706,8 +13943,8 @@ units of the input returns (e.g. daily volatility for daily returns).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Standardised residuals :math:<code>z_t = (r_t - \mu)/\sigma_t</code>: each day's
-return divided by that day's volatility. These are the input to the
+                <p>Standardised residuals :math:<code>z_t = (r_t - \mu)/\sigma_t</code>: each period's
+return divided by that period's volatility. These are the input to the
 copula step.</p>
               </div>
             </td>
@@ -13788,7 +14025,7 @@ if none was given.</p>
         <p>How long volatility shocks linger: :math:<code>\alpha + \beta</code>.</p>
 <p>Values near 1 (typical for daily equity returns: 0.97-0.99) mean a
 volatility spike fades slowly; values well below 1 mean it dies out
-within days.</p>
+within a few periods.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>
@@ -13888,7 +14125,9 @@ the horizon grows.</p>
     <div class="doc doc-contents ">
 
         <p>Number of periods for a volatility shock to fade by half.</p>
-<p>Computed as <code>log(0.5) / log(persistence)</code>.</p>
+<p>Computed as <code>log(0.5) / log(persistence)</code>. The unit is one period of
+the input data: days for daily returns, weeks for weekly returns, and
+so on.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>
@@ -13906,7 +14145,9 @@ the horizon grows.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Half-life in periods of the input data (days for daily returns).</p>
+                <p>Half-life in periods of the input data. <code>0.0</code> when
+<code>persistence == 0</code> (no persistence: a shock is gone by the next
+period), and <code>inf</code> when <code>persistence &gt;= 1</code> (shocks never fade).</p>
               </div>
             </td>
           </tr>
@@ -14127,7 +14368,7 @@ distribution, so it plugs straight into
 
         <p>Forecast the variance (volatility squared) for each of the next periods.</p>
 <p>Use it to see how today's elevated (or depressed) volatility is
-expected to drift back to its long-run level over the coming days.</p>
+expected to drift back to its long-run level over the coming periods.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -14966,7 +15207,7 @@ of path <code>i</code>, in the units of the input returns.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>horizon &lt; 1</code>.</p>
+                <p>If <code>horizon &lt; 1</code> or <code>n &lt; 1</code>.</p>
               </div>
             </td>
           </tr>
@@ -15116,7 +15357,7 @@ simple returns compound them instead (simulate and use
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>horizon &lt; 1</code>.</p>
+                <p>If <code>horizon &lt; 1</code> or <code>n &lt; 1</code>.</p>
               </div>
             </td>
           </tr>
@@ -15180,8 +15421,12 @@ Estimated by Monte Carlo from :meth:<code>forecast</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Portfolio weights, one per asset in column order (e.g. <code>[0.6,
-0.4]</code>); not rescaled. Equal-weighted if omitted.</p>
+                <p>Portfolio exposures, one per asset in column order (e.g. <code>[0.6,
+0.4]</code>). They are used <strong>as given and not rescaled</strong> to sum to 1,
+so they can describe a leveraged, long-short or partly invested
+book: the portfolio return is <code>asset_returns @ weights</code>, and
+doubling the weights doubles every statistic. Equal-weighted
+(<code>1 / d</code> each) if omitted.</p>
               </div>
             </td>
             <td>
@@ -15280,7 +15525,8 @@ the input returns:</p>
 <li><code>"expected_shortfall"</code> -- average loss given the VaR is
   exceeded, as a <strong>loss</strong>.</li>
 <li><code>"mean"</code> -- mean portfolio return (a return, not a loss).</li>
-<li><code>"volatility"</code> -- standard deviation of the portfolio return.</li>
+<li><code>"volatility"</code> -- sample standard deviation (<code>ddof=1</code>) of
+  the simulated portfolio return.</li>
 </ul>
               </div>
             </td>
@@ -15304,7 +15550,8 @@ the input returns:</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>weights</code> does not have length <code>d</code> or <code>horizon &lt; 1</code>.</p>
+                <p>If <code>weights</code> does not have length <code>d</code>, <code>horizon &lt; 1</code> or
+<code>n &lt; 2</code>.</p>
               </div>
             </td>
           </tr>
@@ -16041,7 +16288,9 @@ on the linked (unconstrained) scale, so any real numbers are valid.</p>
               <div class="doc-md-description">
                 <p>Patton's forcing term. <code>"auto"</code> picks the normal product for
 elliptical families and the absolute difference otherwise, which is what
-Patton did. Ignored by the GAS driver, which needs no such choice.</p>
+Patton did. The GAS driver needs no such choice: passing anything other
+than <code>"auto"</code> with <code>driver="gas"</code> has no effect and issues a
+<code>UserWarning</code>.</p>
               </div>
             </td>
             <td>
@@ -16156,7 +16405,7 @@ such as Clayton's, <code>(-40, 40)</code> for Frank's).</p>
             <td>
               <div class="doc-md-description">
                 <p>The resolved forcing term, <code>"normal-product"</code> or
-<code>"abs-difference"</code> (never <code>"auto"</code>).</p>
+<code>"abs-difference"</code> (never <code>"auto"</code>). Unused by the GAS driver.</p>
               </div>
             </td>
           </tr>
@@ -16214,8 +16463,33 @@ such as Clayton's, <code>(-40, 40)</code> for Frank's).</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>family</code> is not bivariate, <code>coefficients</code> does not have exactly
-three entries, <code>driver</code> is not <code>"patton"</code> or <code>"gas"</code>, or
-<code>bounds</code> is not increasing.</p>
+three entries, <code>driver</code> is not <code>"patton"</code> or <code>"gas"</code>,
+<code>forcing</code> is not one of the listed names, <code>lags</code> is not a whole
+number of at least 1, or <code>bounds</code> is not increasing.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Warns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="UserWarning">UserWarning</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>forcing</code> is set explicitly with <code>driver="gas"</code>, where it is
+ignored.</p>
               </div>
             </td>
           </tr>
@@ -16730,6 +17004,12 @@ simulated from its last state. The recursion is driven by future
 observations, so beyond one step ahead the parameter is a random
 variable rather than a number; this returns a summary of its
 distribution at each step.</p>
+<p>Step 1 is not random: it is the filter's own one-step-ahead parameter,
+determined by the observations in <code>u</code> (for the GAS driver this
+includes the score of the last row), so all four summaries coincide
+there and equal what :meth:<code>filter</code> would assign to the next
+observation. Each later step uses the observation simulated at the
+step before, with its score taken at the state it was drawn from.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -19131,10 +19411,13 @@ for joining a discrete choice to a continuous response.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Finite-difference step for the continuous derivatives, on the copula
-scale. Only used when the copula has no analytic conditional CDF.
-Currently ignored: every family goes through an analytic conditional
-CDF, and the argument is kept for API stability.</p>
+                <p>Finite-difference step, on the copula scale, for the derivative along
+the continuous coordinate. Used whenever that derivative has no closed
+form: for every copula with <code>dim &gt; 2</code>, and for bivariate families
+other than the Archimedean, Gaussian and Student t ones (whose
+conditional CDFs are analytic, so <code>step</code> does not affect them). The
+step is shrunk near the edges of the unit interval so the difference
+stays inside it. Must be in <code>(0, 0.5)</code>.</p>
               </div>
             </td>
             <td>
@@ -19183,7 +19466,8 @@ CDF, and the argument is kept for API stability.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>discrete</code>, <code>x</code> or <code>margins</code> does not match <code>copula.dim</code>.</p>
+                <p>If <code>discrete</code>, <code>x</code> or <code>margins</code> does not match <code>copula.dim</code>,
+or <code>step</code> is not in <code>(0, 0.5)</code>.</p>
               </div>
             </td>
           </tr>
@@ -19206,8 +19490,12 @@ discrete.</p>
   <summary>Notes</summary>
   <p>With no discrete coordinates this is the ordinary copula density times the
 marginal densities, and with all of them it is :func:<code>discrete_pmf</code>; both
-limits are checked in the test suite. The continuous derivatives go through
-:func:<code>~rcopula.conditional_cdf</code>, which is analytic for most families.</p>
+limits are checked in the test suite. For a bivariate Archimedean,
+Gaussian or t copula the continuous derivative goes through the analytic
+:func:<code>~rcopula.conditional_cdf</code>; otherwise it is a central difference of
+the copula CDF with step <code>step</code>, which is only as accurate as that CDF
+(in <code>d &gt; 2</code> the elliptical CDFs are themselves numerical integrals, so a
+larger step than the default can be the more accurate choice there).</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -19469,7 +19757,8 @@ starting point, and any parameters it marks as fixed stay fixed.</p>
             <td>
               <div class="doc-md-description">
                 <p>Starting values for the <em>free</em> parameters only, overriding the
-copula's current ones. <code>None</code> uses the copula's current values.</p>
+copula's current ones: exactly one finite value per free parameter.
+<code>None</code> uses the copula's current values.</p>
               </div>
             </td>
             <td>
@@ -19501,7 +19790,11 @@ copula's current ones. <code>None</code> uses the copula's current values.</p>
             <td>
               <div class="doc-md-description">
                 <p>The fitted copula, its parameters, log-likelihood, convergence flag
-and the log-likelihood under independence.</p>
+and the log-likelihood of the same margins under independence. If the
+copula has no free parameters nothing is optimised: the result holds
+the copula as given and its log-likelihood, and <code>independent_loglik</code>
+is still the independence copula's, so the likelihood ratio compares
+the given copula with independence.</p>
               </div>
             </td>
           </tr>
@@ -19524,7 +19817,8 @@ and the log-likelihood under independence.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>x</code> or <code>margins</code> does not match <code>copula.dim</code>.</p>
+                <p>If <code>x</code> or <code>margins</code> does not match <code>copula.dim</code>, or <code>start</code>
+does not have one finite value per free parameter.</p>
               </div>
             </td>
           </tr>
@@ -19848,7 +20142,9 @@ if either margin puts all its mass on one value.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>margins</code> does not have exactly two entries.</p>
+                <p>If <code>margins</code> does not have exactly two entries, <code>support</code> is not a
+non-negative integer, or a margin puts mass on negative or non-integer
+values (which the lattice <code>0, ..., support</code> would silently miss).</p>
               </div>
             </td>
           </tr>
@@ -20002,7 +20298,9 @@ They sum to one up to the tail truncation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If the copula is not bivariate.</p>
+                <p>If the copula is not bivariate, <code>margins</code> does not have two entries,
+<code>support</code> is not a non-negative integer, or a margin puts mass on
+negative or non-integer values.</p>
               </div>
             </td>
           </tr>
@@ -20293,6 +20591,12 @@ the usual way layers of different size are compared.</p>
       </tbody>
     </table>
 
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The <code>repr</code> follows the market convention <code>"&lt;limit&gt; xs &lt;attachment&gt;"</code>,
+so a layer paying 5m above a 10m retention prints as <code>5e+06 xs 1e+07</code>.</p>
+</details>
 
 
 
@@ -21275,7 +21579,8 @@ compared on risk and price.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Simulated sponsor losses over the risk period, in currency units
+                <p>Simulated sponsor losses over the <strong>whole term</strong> of the bond (one
+number per scenario covering <code>maturity</code> years), in currency units
 (positive numbers are losses).</p>
               </div>
             </td>
@@ -21359,7 +21664,9 @@ discounting.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Term in years. Used only in <code>"fair_price"</code>.</p>
+                <p>Term in years, <code>&gt; 0</code>. The whole-term expected loss is divided by
+<code>maturity</code> to annualise it before it is compared with the annual
+spread.</p>
               </div>
             </td>
             <td>
@@ -21387,7 +21694,10 @@ discounting.</p>
               <div class="doc-md-description">
                 <p>Rates and losses are fractions of principal (0.02 = 2%).</p>
 <p><code>"expected_loss"</code>
-    Average fraction of principal lost.
+    Average fraction of principal lost over the whole term.
+<code>"annual_expected_loss"</code>
+    <code>expected_loss / maturity</code>: the per-year expected loss the ILS
+    market quotes.
 <code>"attachment_probability"</code>
     Probability that the loss exceeds <code>attachment</code> (any principal
     lost).
@@ -21400,9 +21710,12 @@ discounting.</p>
 <code>"spread"</code>
     <code>coupon - risk_free</code>.
 <code>"multiple"</code>
-    <code>spread / expected_loss</code> (<code>inf</code> if the expected loss is 0).
+    <code>spread / annual_expected_loss</code> (<code>inf</code> if the expected loss is
+    0). Both numbers are per year, so the ratio does not depend on
+    the term.
 <code>"expected_return"</code>
-    <code>spread - expected_loss</code>: excess return net of expected losses.
+    <code>spread - annual_expected_loss</code>: annual excess return net of
+    expected losses.
 <code>"fair_price"</code>
     <code>exp(-risk_free * maturity) * (1 + coupon * maturity -
     expected_loss)</code>, per unit of principal.</p>
@@ -21428,7 +21741,7 @@ discounting.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Unless <code>0 &lt;= attachment &lt; exhaustion</code>.</p>
+                <p>Unless <code>0 &lt;= attachment &lt; exhaustion</code> and <code>maturity &gt; 0</code>.</p>
               </div>
             </td>
           </tr>
@@ -21444,7 +21757,10 @@ loss -- the mirror image of :func:<code>excess_of_loss</code>.</p>
 <p>Returns the three numbers the ILS market quotes: <strong>expected loss</strong> (the
 fraction of principal expected to be lost), <strong>attachment probability</strong>, and
 the <strong>multiple</strong> -- spread divided by expected loss -- which is how relative
-value is judged across deals.</p>
+value is judged across deals. The spread is an annual rate while
+<code>losses</code> cover the whole term, so the expected loss is annualised
+(divided by <code>maturity</code>) before the multiple and expected return are
+formed; with the default <code>maturity=1</code> the two coincide.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>

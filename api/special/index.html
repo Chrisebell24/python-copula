@@ -3137,7 +3137,8 @@ restrict it, and t copulas are routinely fitted with fractional <code>df</code>.
   <summary>Notes</summary>
   <p>Accuracy is about 1e-14 for <code>d &lt;= 3</code> and <code>df &gt;= 2</code>, about 1e-7 for
 <code>df &lt; 2</code> with extreme limits, and limited by the QMC error (roughly
-1e-7) for <code>d &gt;= 4</code>. Very small <code>df</code> (around 0.02) holds only ~4e-4.</p>
+1e-7) for <code>d &gt;= 4</code>. Very small <code>df</code> degrades gracefully rather than
+failing: about 4e-4 at <code>df = 0.02</code> and 4e-3 at <code>df = 0.01</code>.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>

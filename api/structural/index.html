@@ -1456,6 +1456,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.truncation_level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        truncation_level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#rcopula.vine.VineCopula.is_gaussian" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2617,6 +2628,17 @@
     <span class="md-ellipsis">
       
         param_bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.vine.VineCopula.truncation_level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        truncation_level
       
     </span>
   </a>
@@ -6782,8 +6804,7 @@ parameter alone sets their dependence.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The deepest node whose leaves include both <code>i</code> and <code>j</code>. If
-either index is not in the tree, this node is returned.</p>
+                <p>The deepest node whose leaves include both <code>i</code> and <code>j</code>.</p>
               </div>
             </td>
           </tr>
@@ -6806,12 +6827,25 @@ either index is not in the tree, this node is returned.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>i == j</code>.</p>
+                <p>If <code>i == j</code>, or if <code>i</code> or <code>j</code> is not a variable of this
+(sub-)tree.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.structural</span><span class="w"> </span><span class="kn">import</span> <span class="n">NestedArchimedean</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inner</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tree</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">1.5</span><span class="p">),</span> <span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="n">inner</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tree</span><span class="o">.</span><span class="n">lowest_common_ancestor</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">is</span> <span class="n">tree</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tree</span><span class="o">.</span><span class="n">lowest_common_ancestor</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="ow">is</span> <span class="n">tree</span>
+<span class="go">True</span>
+</code></pre></div>
 
 
     </div>
@@ -7220,9 +7254,28 @@ natural estimator averages the sample tau over exactly those pairs and
 inverts the generator's own tau function. That is Okhrin, Okhrin &amp; Schmid's
 estimator and R's <code>etau</code>, and it needs no density -- which matters here,
 because the nested density is not available.</p>
-<p>The estimates are then made to respect the nesting condition by taking a
-running maximum down the tree. Sampling noise can otherwise leave a child
-below its parent, which would not be a copula.</p>
+<p>Two constraints are then imposed, root first:</p>
+<ul>
+<li><strong>The family's attainable range.</strong> A node's averaged tau is clipped to
+  the Kendall's tau its family can reach. For a genuinely nested tree
+  (depth at least 2) that is <code>[0, 1)</code> for every family -- Gumbel and Joe
+  cannot go below independence at all, and Clayton, Frank and AMH reach
+  negative tau only as bivariate copulas, while the nesting condition is
+  only known to hold for generators that are completely monotone -- capped
+  at <code>1/3</code> for AMH. A flat tree (one node) gets the family's range in
+  <code>structure.dim</code> dimensions, so a bivariate Clayton or Frank can still
+  be negatively dependent. Near <code>+-1</code> the clip is <code>+-0.999</code> for families
+  whose parameter is unbounded there. A weakly dependent block whose sample
+  tau is slightly negative therefore fits as (near-)independence instead of
+  raising.</li>
+<li><strong>The nesting condition.</strong> A child's parameter is raised to its parent's
+  if sampling noise left it below (a running maximum down the tree);
+  otherwise the result would not be a copula.</li>
+</ul>
+<p>Either adjustment is silent when it moves a node's tau by at most
+<code>0.05</code> -- ordinary sampling noise -- and emits a :class:<code>UserWarning</code>
+naming the node when it moves it further, since the tree shape or the
+family is then probably wrong for the data.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7312,8 +7365,31 @@ satisfying the nesting condition.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>data</code> does not have <code>d</code> columns, or if a node's average tau is
-outside its family's range (for example negative tau with Gumbel).</p>
+                <p>If <code>data</code> does not have <code>d</code> columns.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Warns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="UserWarning">UserWarning</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If clipping to the family's range or enforcing the nesting condition
+changes a node's Kendall's tau by more than <code>0.05</code>.</p>
               </div>
             </td>
           </tr>
@@ -7332,6 +7408,17 @@ outside its family's range (for example negative tau with Gumbel).</p>
 <span class="go">True</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">theta</span> <span class="o">-</span> <span class="mf">4.0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.4</span><span class="p">)</span>
 <span class="go">True</span>
+</code></pre></div>
+    <p>A block that is independent of the rest fits as independence, even when
+its sample tau comes out slightly negative:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">block</span> <span class="o">=</span> <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">noise</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">shape</span> <span class="o">=</span> <span class="n">NestedArchimedean</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">1.5</span><span class="p">),</span> <span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="n">NestedArchimedean</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">GumbelCopula</span><span class="p">(</span><span class="mf">3.0</span><span class="p">),</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])]</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_nested</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">block</span><span class="p">,</span> <span class="n">noise</span><span class="p">]))</span><span class="o">.</span><span class="n">theta</span>
+<span class="go">1.0</span>
 </code></pre></div>
 
 
@@ -8300,7 +8387,8 @@ says about two of the assets, or to run a bivariate-only diagnostic (a
 Pickands plot, a K-plot, a tail-concentration plot) on a pair taken from a
 larger fitted model. Nothing is re-estimated: the result is read off the
 existing parameters.</p>
-<p>Supported inputs: Archimedean families (same parameter, fewer
+<p>Supported inputs: Archimedean families (same parameters -- all of them,
+for a multi-parameter subclass -- and the same class, fewer
 dimensions), Gaussian and Student-t copulas (the sub-matrix of the
 correlation), independence and comonotonicity, and the structural
 wrappers -- :class:<code>~rcopula.structural.RotatedCopula</code>,
@@ -8760,6 +8848,23 @@ normally left as <code>None</code>.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="truncation_level
+
+
+  
+      property
+   (rcopula.vine.VineCopula.truncation_level)" href="#rcopula.vine.VineCopula.truncation_level">truncation_level</a></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of leading trees that carry dependence; every tree after it is
+all independence copulas.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -8792,8 +8897,12 @@ bivariate, or if <code>order</code> is not a permutation of <code>0..d-1</code>.
 <details class="note" open>
   <summary>Notes</summary>
   <p>The density, the sampler (:meth:<code>rvs</code>) and the Rosenblatt transform are
-exact. There is no closed-form distribution function, so :meth:<code>cdf</code>
-raises :class:<code>NotImplementedError</code>; neither are there single-number
+exact. All three stop at :attr:<code>truncation_level</code>: trees made entirely of
+independence copulas after it are skipped, so a vine truncated after one
+tree samples in time linear in <code>d</code> (an 801-variable C-vine with one
+Student-t tree draws 50,000 rows in well under a minute).</p>
+<p>There is no closed-form distribution function, so :meth:<code>cdf</code> raises
+:class:<code>NotImplementedError</code>; neither are there single-number
 <code>tau</code>/<code>rho</code>/<code>lambda_</code> summaries, since every pair has its own.</p>
 </details>
 
@@ -8935,6 +9044,59 @@ this level to bound.</p>
             <td>
               <div class="doc-md-description">
                 <p>Always <code>[]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="rcopula.vine.VineCopula.truncation_level" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">truncation_level</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#rcopula.vine.VineCopula.truncation_level" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">truncation_level</span><span class="p">:</span> <span class="nb">int</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>How many trees carry dependence: the last tree with a non-independence pair-copula.</p>
+<p>A vine is <em>truncated</em> at level <code>t</code> when every pair-copula in trees
+<code>t + 1, ..., d - 1</code> is the independence copula, as :func:<code>fit_vine</code>
+produces with <code>truncate=t</code>. Those trees contribute nothing to the
+density and their conditional transforms are the identity, so the
+density, :meth:<code>rvs</code> and :meth:<code>rosenblatt</code> stop after tree <code>t</code>.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Between 0 (every pair-copula is independence) and <code>d - 1</code> (the
+last tree carries dependence, i.e. the vine is not truncated).</p>
               </div>
             </td>
           </tr>
@@ -9091,11 +9253,11 @@ into <code>(0, 1)</code>) first.</p>
 
         <p>Turn dependent copula data into independent uniform columns.</p>
 <p>This is the Rosenblatt transform: each column is replaced by its
-conditional probability given the columns before it in the D-vine
-path. If the vine is the right model for the data, the output columns
-are independent and uniform on <code>(0, 1)</code>, so it is the standard way to
-check a fitted vine (test the output for independence) and the inverse
-of how :meth:<code>rvs</code> samples.</p>
+conditional probability given the variables before it on the D-vine
+path (<code>order</code>). If the vine is the right model for the data, the
+output columns are independent and uniform on <code>(0, 1)</code>, so it is the
+standard way to check a fitted vine (test the output for independence)
+and the inverse of how :meth:<code>rvs</code> samples.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9146,9 +9308,14 @@ internally.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The transformed values, in the <em>structure</em> order (position <code>i</code>
-is the <code>i</code>-th variable along the D-vine path, i.e. column
-<code>order[i]</code> of the input).</p>
+                <p>The transformed values, in the <em>original</em> column order -- the same
+order as the input, :meth:<code>rvs</code> and :meth:<code>logpdf</code>. Column
+<code>order[i]</code> holds
+:math:<code>P(U_{order[i]} \le u_{order[i]} \mid U_{order[0]}, \dots,
+U_{order[i-1]})</code>, so column <code>order[0]</code> is passed through unchanged
+and column <code>order[-1]</code> is conditioned on every other variable.
+(rcopula 0.2.0 and earlier returned the columns in path order; with the
+default <code>order</code> the two agree.)</p>
               </div>
             </td>
           </tr>
@@ -9765,7 +9932,10 @@ log-likelihood, or cross-validated likelihood.</p>
                 <p>Fit only the first <code>truncate</code> trees and set every pair-copula in the
 higher trees to independence. <code>None</code> fits all <code>d - 1</code> trees.
 Higher trees usually carry little, and truncating is the standard way
-to stop a vine from spending parameters on noise.</p>
+to stop a vine from spending parameters on noise. It also keeps the
+cost linear in <code>d</code>: neither the fit nor the resulting vine's
+density, sampler or Rosenblatt transform touches the independence
+trees (see :attr:<code>VineCopula.truncation_level</code>).</p>
               </div>
             </td>
             <td>

@@ -1710,7 +1710,9 @@ fitted copula in <code>copula</code>.</p>
               <div class="doc-md-description">
                 <p>If <code>simulation</code> is not <code>"pb"</code> or <code>"mult"</code>, if
 <code>simulation="mult"</code> is combined with a <code>method</code> other than <code>"Sn"</code>,
-or if <code>method</code> is not a recognised statistic.</p>
+if <code>method</code> is not a recognised statistic, or if <code>estim_method</code> is
+not a :func:<code>~rcopula.fit</code> method. All of these are checked before
+anything is fitted.</p>
               </div>
             </td>
           </tr>
@@ -1866,8 +1868,9 @@ distribution, a positive integer.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>How tied values are ranked when computing the observed statistic;
-passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code> for
+the observed statistic and for every permutation replicate alike, so
+the null is built the same way as the statistic it calibrates.</p>
               </div>
             </td>
             <td>
@@ -1995,9 +1998,15 @@ departure they are sensitive to.</p>
     The blanket test: no tuning, good all-round power, and the one to reach for
     by default.</p>
 <p><code>Tn</code>
-    The Kolmogorov-Smirnov analogue, :math:<code>\max_i |C_n - C_{\hat\theta}|</code>.
-    Less powerful than <code>Sn</code> in nearly every published comparison, but
-    occasionally more sensitive to a single localised discrepancy.</p>
+    The Kolmogorov-Smirnov analogue,
+    :math:<code>T_n = \sqrt n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|</code>,
+    the sup-norm of the same empirical process :math:<code>\sqrt n (C_n - C_{\hat\theta})</code>
+    whose squared :math:<code>L^2</code> norm is <code>Sn</code> (Genest, Remillard and Beaudoin
+    2009). R's <code>gofCopula</code> has no <code>Tn</code>, so there is no R value to match;
+    the scaling only multiplies the statistic by a constant at fixed <code>n</code>,
+    so bootstrap p-values are unaffected by it. Less powerful than <code>Sn</code> in
+    nearly every published comparison, but occasionally more sensitive to a
+    single localised discrepancy.</p>
 <p><code>AnChisq</code> / <code>AnGamma</code>
     Anderson-Darling statistics applied after collapsing the Rosenblatt-
     transformed data to one dimension -- by a chi-squared or a gamma
@@ -2290,7 +2299,11 @@ and the same data size.</p>
 <details class="note" open>
   <summary>Notes</summary>
   <p><code>Sn</code> is :math:<code>\sum_i \{C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)\}^2</code>.
-<code>Tn</code> is computed as :math:<code>n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|</code>.
+<code>Tn</code> is :math:<code>\sqrt n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|</code>,
+the Kolmogorov-Smirnov statistic of Genest, Remillard and Beaudoin (2009).
+(Versions up to 0.2 returned <code>n</code> rather than <code>sqrt(n)</code> times the
+maximum, contradicting the documentation; the p-value of
+:func:<code>~rcopula.gof_test</code> is the same under either scaling.)
 <code>AnChisq</code> and <code>AnGamma</code> collapse each row to one number (a sum of
 squared normal quantiles, or a sum of :math:<code>-\log u</code>), map it to
 <code>(0, 1)</code> with the chi-squared or gamma distribution function, and apply
@@ -3363,8 +3376,8 @@ best read as indicative.</p>
               <div class="doc-md-description">
                 <p>Bivariate observations on any scale; they are converted to ranks first.
 Exactly two columns. Extreme-value copulas cannot be negatively
-dependent; a negative sample Kendall's tau is clipped to a tiny positive
-value when building the null.</p>
+dependent; a sample Kendall's tau at or below zero triggers a warning
+(see Warns) and the null is built at near independence.</p>
               </div>
             </td>
             <td>
@@ -3462,6 +3475,33 @@ value when building the null.</p>
             <td>
               <div class="doc-md-description">
                 <p>If <code>data</code> does not have exactly two columns.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Warns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="UserWarning">UserWarning</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the sample Kendall's tau is zero or negative. The Gumbel null is
+then built at <code>tau = 1e-6</code> (near independence -- the only
+extreme-value copula without positive dependence), so the test can
+only tell whether the data look independent; clearly negative
+dependence already rules out an extreme-value copula.</p>
               </div>
             </td>
           </tr>
