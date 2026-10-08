@@ -32,17 +32,29 @@ and volatility persistence both present, which no single correlation number can
 deliver.
 
 ============================  ================================================
-:func:`fit_garch`             GARCH(1,1) by QMLE, in pure NumPy.
+:func:`fit_garch`             GARCH(1,1) or GJR-GARCH(1,1) by QMLE, with a
+                              constant, zero, AR(1) or ARMA(1,1) mean, in pure
+                              NumPy.
 :class:`GarchResult`          A fitted margin, with forecasting.
 :class:`CopulaGarch`          The joint model: GARCH margins plus a copula.
 ============================  ================================================
 
-The GARCH implementation here is deliberately small -- constant mean, GARCH(1,1),
-normal or Student-t innovations -- because that is what the copula literature
-uses and it keeps ``rcopula`` dependency-free. For EGARCH, GJR, long-memory or
-regime-switching margins, fit them with the ``arch`` package and pass the
-standardised residuals to :func:`~rcopula.fit.fit` yourself; the second step is
-unchanged.
+The GARCH implementation here is deliberately small -- GARCH(1,1) or its
+leverage-effect variant GJR-GARCH(1,1) (Glosten, Jagannathan & Runkle 1993), a
+constant, zero, AR(1) or ARMA(1,1) mean, and normal or Student-t innovations --
+because that is what the copula literature uses and it keeps ``rcopula``
+dependency-free. With ``vol="gjr"`` the variance reacts more to bad news than
+to good,
+
+.. math::
+
+    \sigma_t^2 = \omega + (\alpha + \gamma\,\mathbf{1}[\varepsilon_{t-1} < 0])
+                 \,\varepsilon_{t-1}^2 + \beta\sigma_{t-1}^2,
+
+which is the asymmetry almost every equity index shows. For EGARCH,
+long-memory or regime-switching margins, fit them with the ``arch`` package and
+pass the standardised residuals to :func:`~rcopula.fit.fit` yourself; the
+second step is unchanged.
 
 References
 ----------
@@ -54,6 +66,10 @@ Jondeau, E. and Rockinger, M. (2006). The copula-GARCH model of conditional
     *Journal of International Money and Finance* 25(5), 827-853.
 Bollerslev, T. (1986). Generalized autoregressive conditional
     heteroskedasticity. *Journal of Econometrics* 31(3), 307-327.
+Glosten, L. R., Jagannathan, R. and Runkle, D. E. (1993). On the relation
+    between the expected value and the volatility of the nominal excess return
+    on stocks. *Journal of Finance* 48(5), 1779-1801.
+    The GJR (threshold) GARCH model, ``vol="gjr"``.
 Bollerslev, T. and Wooldridge, J. M. (1992). Quasi-maximum likelihood estimation
     and inference in dynamic models with time-varying covariances.
     *Econometric Reviews* 11(2), 143-172.
@@ -69,7 +85,8 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Literal
+from functools import cached_property
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -92,21 +109,133 @@ _MAX_PERSISTENCE = 0.9999
 _MIN_DF = 2.05
 _MAX_DF = 200.0
 
+#: Largest absolute AR or MA coefficient. At 1 the AR part has a unit root
+#: (no long-run mean) and the MA part is no longer invertible (the residuals
+#: cannot be recovered from the returns).
+_MAX_ARMA = 0.999
+
+_VOLS = ("garch", "gjr")
+_MEANS = ("constant", "zero", "ar1", "arma11")
+
+
+class _Params(NamedTuple):
+    """Every model parameter by name, with the ones a model lacks set to 0."""
+
+    mu: float
+    phi: float
+    theta: float
+    omega: float
+    alpha: float
+    beta: float
+    gamma: float
+    df: float
+
+
+@dataclass(frozen=True)
+class _Layout:
+    """Where each parameter sits in the optimiser's flat vector.
+
+    The order is ``[mu, phi, theta, omega, alpha, beta, gamma, df]`` with the
+    entries a model does not have left out. For the default model (constant
+    mean, plain GARCH) that is ``[mu, omega, alpha, beta(, df)]`` -- the layout
+    the package has always used, which keeps default fits bit-for-bit
+    unchanged.
+    """
+
+    vol: str
+    mean: str
+    dist: str
+
+    @cached_property
+    def names(self) -> tuple[str, ...]:
+        out = []
+        if self.mean != "zero":
+            out.append("mu")
+        if self.mean in ("ar1", "arma11"):
+            out.append("phi")
+        if self.mean == "arma11":
+            out.append("theta")
+        out += ["omega", "alpha", "beta"]
+        if self.vol == "gjr":
+            out.append("gamma")
+        if self.dist == "t":
+            out.append("df")
+        return tuple(out)
+
+    @cached_property
+    def _positions(self) -> dict[str, int]:
+        return {name: i for i, name in enumerate(self.names)}
+
+    def index(self, name: str) -> int | None:
+        """Position of ``name`` in the flat vector, or ``None`` if absent."""
+        return self._positions.get(name)
+
+    def unpack(self, params: NDArray[np.float64]) -> _Params:
+        pos = self._positions
+        values = {name: params[i] for name, i in pos.items()}
+        return _Params(
+            mu=values.get("mu", 0.0),
+            phi=values.get("phi", 0.0),
+            theta=values.get("theta", 0.0),
+            omega=values["omega"],
+            alpha=values["alpha"],
+            beta=values["beta"],
+            gamma=values.get("gamma", 0.0),
+            df=values.get("df", 0.0),
+        )
+
+    def persistence(self, params: NDArray[np.float64]) -> float:
+        """``alpha + gamma/2 + beta`` read off a flat vector."""
+        p = self.unpack(params)
+        if self.vol == "gjr":
+            return float(p.alpha + 0.5 * p.gamma + p.beta)
+        return float(p.alpha + p.beta)
+
 
 def _filter_variance(
-    eps: NDArray[np.float64], omega: float, alpha: float, beta: float, sigma2_0: float
+    eps: NDArray[np.float64],
+    omega: float,
+    alpha: float,
+    beta: float,
+    sigma2_0: float,
+    gamma: float = 0.0,
 ) -> NDArray[np.float64]:
-    r"""Conditional variances from the GARCH recursion.
+    r"""Conditional variances from the GARCH (or GJR-GARCH) recursion.
 
-    The recursion :math:`\sigma_t^2 = (\omega + \alpha\varepsilon_{t-1}^2)
+    The recursion :math:`\sigma_t^2 = (\omega + \alpha\varepsilon_{t-1}^2
+    + \gamma\mathbf{1}[\varepsilon_{t-1}<0]\varepsilon_{t-1}^2)
     + \beta\sigma_{t-1}^2` is a first-order linear filter in :math:`\sigma^2`
     driven by a known series, so it runs as one ``lfilter`` call rather than a
     Python loop -- roughly 100x faster, which matters because the optimiser
-    evaluates it hundreds of times.
+    evaluates it hundreds of times. ``gamma=0`` is plain GARCH.
     """
-    drive = omega + alpha * eps[:-1] ** 2
+    lagged = eps[:-1]
+    if gamma == 0.0:
+        drive = omega + alpha * lagged**2
+    else:
+        drive = omega + (alpha + gamma * (lagged < 0.0)) * lagged**2
     tail = signal.lfilter([1.0], [1.0, -beta], drive, zi=np.array([beta * sigma2_0]))[0]
     return np.concatenate([[sigma2_0], tail])
+
+
+def _mean_residuals(
+    x: NDArray[np.float64], mu: float, phi: float, theta: float
+) -> NDArray[np.float64]:
+    r"""Shocks :math:`\varepsilon_t = r_t - \mu - \phi r_{t-1} - \theta\varepsilon_{t-1}`.
+
+    The pre-sample return is set to the long-run mean :math:`\mu/(1-\phi)` and
+    the pre-sample shock to 0, so :math:`\varepsilon_0 = r_0 - \mu/(1-\phi)`
+    (the convention ``rugarch`` uses). The MA part is again a first-order
+    linear filter and runs through ``lfilter``.
+    """
+    if phi == 0.0 and theta == 0.0:
+        return x - mu
+    drive = np.empty_like(x)
+    drive[0] = x[0] - mu / (1.0 - phi)
+    drive[1:] = x[1:] - mu - phi * x[:-1]
+    if theta == 0.0:
+        return drive
+    return np.asarray(signal.lfilter([1.0], [1.0, theta], drive))
 
 
 def _standardised_t(df: float) -> Any:
@@ -115,11 +244,16 @@ def _standardised_t(df: float) -> Any:
 
 
 def _neg_loglik(
-    theta: NDArray[np.float64], x: NDArray[np.float64], dist: str, sigma2_0: float
+    params: NDArray[np.float64],
+    x: NDArray[np.float64],
+    dist: str,
+    sigma2_0: float,
+    layout: _Layout | None = None,
 ) -> float:
-    mu, omega, alpha, beta = theta[:4]
-    eps = x - mu
-    sigma2 = _filter_variance(eps, omega, alpha, beta, sigma2_0)
+    lay = layout if layout is not None else _Layout("garch", "constant", dist)
+    p = lay.unpack(params)
+    eps = _mean_residuals(x, p.mu, p.phi, p.theta)
+    sigma2 = _filter_variance(eps, p.omega, p.alpha, p.beta, sigma2_0, p.gamma)
     if not np.all(np.isfinite(sigma2)) or np.any(sigma2 <= 0.0):
         return np.inf
 
@@ -127,7 +261,7 @@ def _neg_loglik(
     if dist == "normal":
         ll = -0.5 * np.sum(np.log(2.0 * np.pi) + np.log(sigma2) + z2)
     else:
-        nu = theta[4]
+        nu = p.df
         const = (
             special.gammaln(0.5 * (nu + 1.0))
             - special.gammaln(0.5 * nu)
@@ -147,15 +281,21 @@ class GarchResult:
     residuals) that the copula step is fitted to. You normally get one from
     :func:`fit_garch` rather than building it yourself.
 
-    The model is a constant-mean GARCH(1,1):
-    :math:`r_t = \mu + \sigma_t z_t`, with
-    :math:`\sigma_t^2 = \omega + \alpha\varepsilon_{t-1}^2 + \beta\sigma_{t-1}^2`
-    and :math:`\varepsilon_t = r_t - \mu`.
+    The model is
+    :math:`r_t = m_t + \varepsilon_t`, :math:`\varepsilon_t = \sigma_t z_t`,
+    with conditional mean
+    :math:`m_t = \mu + \phi r_{t-1} + \theta\varepsilon_{t-1}` and variance
+    :math:`\sigma_t^2 = \omega + (\alpha + \gamma\mathbf{1}[\varepsilon_{t-1}<0])
+    \varepsilon_{t-1}^2 + \beta\sigma_{t-1}^2`. The default model has
+    :math:`\phi = \theta = \gamma = 0`: a constant-mean GARCH(1,1).
 
     Parameters
     ----------
     mu : float
-        Constant mean return per period, in the units of the input returns.
+        Intercept of the mean equation per period, in the units of the input
+        returns. For the constant-mean model it is the mean return; with an AR
+        term the long-run mean is ``mu / (1 - phi)`` (see
+        :attr:`unconditional_mean`). ``0.0`` for ``mean="zero"``.
     omega : float
         Variance intercept :math:`\omega`, in squared return units.
     alpha : float
@@ -175,22 +315,40 @@ class GarchResult:
         ``"normal"`` or ``"t"``.
     name : str, default ""
         Series label.
+    gamma : float, default 0.0
+        Extra reaction to a *negative* previous shock (the GJR leverage
+        coefficient). ``0.0`` for plain GARCH.
+    phi : float, default 0.0
+        AR(1) coefficient on the previous return, between -1 and 1.
+    theta : float, default 0.0
+        MA(1) coefficient on the previous shock, between -1 and 1.
+    vol : str, default "garch"
+        Variance model: ``"garch"`` or ``"gjr"``.
+    mean : str, default "constant"
+        Mean model: ``"constant"``, ``"zero"``, ``"ar1"`` or ``"arma11"``.
+    cond_mean : numpy.ndarray of float, shape (n,), optional
+        Fitted conditional mean :math:`m_t` for each observation. Needed to
+        forecast an AR/ARMA mean; when omitted it is taken to be ``mu``
+        throughout.
 
     Attributes
     ----------
-    mu, omega, alpha, beta : float
-        Constant mean and variance-equation parameters, on the **original**
+    mu, omega, alpha, beta, gamma : float
+        Mean intercept and variance-equation parameters, on the **original**
         scale of the data (``mu`` in return units, ``omega`` in squared return
-        units; ``alpha`` and ``beta`` are unitless).
+        units; ``alpha``, ``beta`` and ``gamma`` are unitless).
+    phi, theta : float
+        AR(1) and MA(1) coefficients of the mean, unitless; ``0.0`` when the
+        mean model does not have them.
     df : float or None
         Innovation degrees of freedom; ``None`` for normal innovations.
     sigma : numpy.ndarray of float, shape (n,)
         Fitted conditional standard deviations, one per observation, in the
         units of the input returns (e.g. daily volatility for daily returns).
     resid : numpy.ndarray of float, shape (n,)
-        Standardised residuals :math:`z_t = (r_t - \mu)/\sigma_t`: each period's
-        return divided by that period's volatility. These are the input to the
-        copula step.
+        Standardised residuals :math:`z_t = (r_t - m_t)/\sigma_t`: each period's
+        surprise divided by that period's volatility. These are the input to
+        the copula step.
     loglik : float
         Maximised log-likelihood.
     dist : str
@@ -198,6 +356,12 @@ class GarchResult:
     name : str
         Series label, carried through from a ``pandas`` column name; ``""``
         if none was given.
+    vol : str
+        ``"garch"`` or ``"gjr"``.
+    mean : str
+        ``"constant"``, ``"zero"``, ``"ar1"`` or ``"arma11"``.
+    cond_mean : numpy.ndarray of float, shape (n,), or None
+        Fitted conditional means, in the units of the input returns.
     """
 
     mu: float
@@ -210,29 +374,51 @@ class GarchResult:
     loglik: float
     dist: str
     name: str = ""
+    gamma: float = 0.0
+    phi: float = 0.0
+    theta: float = 0.0
+    vol: str = "garch"
+    mean: str = "constant"
+    cond_mean: NDArray[np.float64] | None = None
 
     @property
     def persistence(self) -> float:
-        r"""How long volatility shocks linger: :math:`\alpha + \beta`.
+        r"""How long volatility shocks linger: :math:`\alpha + \gamma/2 + \beta`.
 
         Values near 1 (typical for daily equity returns: 0.97-0.99) mean a
         volatility spike fades slowly; values well below 1 mean it dies out
-        within a few periods.
+        within a few periods. For plain GARCH (``gamma = 0``) this is
+        :math:`\alpha + \beta`. The GJR term counts half because a symmetric
+        innovation is negative half the time.
 
         Returns
         -------
         float
-            :math:`\alpha + \beta`, between 0 and 1 (capped at 0.9999 by the fit).
+            :math:`\alpha + \gamma/2 + \beta`, between 0 and 1 (capped at
+            0.9999 by the fit).
         """
-        return self.alpha + self.beta
+        return self.alpha + 0.5 * self.gamma + self.beta
+
+    @property
+    def unconditional_mean(self) -> float:
+        r"""The long-run average return the mean reverts to: :math:`\mu/(1-\phi)`.
+
+        Equal to ``mu`` unless the mean has an AR term.
+
+        Returns
+        -------
+        float
+            Per-period mean return, in the units of the input returns.
+        """
+        return float(self.mu / (1.0 - self.phi))
 
     @property
     def unconditional_vol(self) -> float:
         r"""The long-run average volatility the model reverts to.
 
-        Technically the unconditional standard deviation,
-        :math:`\sqrt{\omega/(1-\alpha-\beta)}`. Forecasts drift towards it as
-        the horizon grows.
+        Technically the unconditional standard deviation of the shocks,
+        :math:`\sqrt{\omega/(1-\alpha-\gamma/2-\beta)}`. Forecasts drift
+        towards it as the horizon grows.
 
         Returns
         -------
@@ -267,14 +453,20 @@ class GarchResult:
 
     @property
     def n_params(self) -> int:
-        """Number of estimated parameters: 4 for normal innovations, 5 for Student-t.
+        """Number of estimated parameters, as used by :attr:`aic` and :attr:`bic`.
+
+        The default model has 4 (mu, omega, alpha, beta), plus 1 for Student-t
+        ``df``. The GJR ``gamma`` adds 1; the mean adds 0 (``"zero"``), 1
+        (``"constant"``), 2 (``"ar1"``: mu, phi) or 3 (``"arma11"``: mu, phi,
+        theta) in place of the constant's 1.
 
         Returns
         -------
         int
-            ``4`` (mu, omega, alpha, beta) or ``5`` (plus df).
+            The parameter count, between 3 and 8.
         """
-        return 4 if self.df is None else 5
+        n_mean = {"zero": 0, "constant": 1, "ar1": 2, "arma11": 3}[self.mean]
+        return n_mean + 3 + int(self.vol == "gjr") + int(self.df is not None)
 
     @property
     def aic(self) -> float:
@@ -344,12 +536,17 @@ class GarchResult:
 
         Notes
         -----
-        One step ahead is exact; beyond that the forecast decays geometrically
-        towards the unconditional variance,
+        One step ahead is exact (for GJR it uses the sign of the last shock);
+        beyond that the forecast decays geometrically towards the
+        unconditional variance,
 
         .. math::
             \mathbb{E}[\sigma_{n+h}^2] = \bar\sigma^2
-                + (\alpha+\beta)^{h-1}\bigl(\sigma_{n+1}^2 - \bar\sigma^2\bigr).
+                + (\alpha+\gamma/2+\beta)^{h-1}\bigl(\sigma_{n+1}^2 - \bar\sigma^2\bigr),
+
+        because a future shock is negative with probability 1/2 whatever its
+        size, so :math:`\mathbb{E}[\mathbf{1}[\varepsilon<0]\varepsilon^2] =
+        \sigma^2/2` for normal and Student-t innovations alike.
 
         Examples
         --------
@@ -365,10 +562,68 @@ class GarchResult:
         if horizon < 1:
             raise ValueError(f"horizon must be >= 1, got {horizon}")
         eps_last = self.resid[-1] * self.sigma[-1]
-        first = self.omega + self.alpha * eps_last**2 + self.beta * self.sigma[-1] ** 2
+        arch = self.alpha + (self.gamma if eps_last < 0.0 else 0.0)
+        first = self.omega + arch * eps_last**2 + self.beta * self.sigma[-1] ** 2
         long_run = self.unconditional_vol**2
         decay = self.persistence ** np.arange(horizon)
         return long_run + decay * (first - long_run)
+
+    def forecast_mean(self, horizon: int = 1) -> NDArray[np.float64]:
+        r"""Forecast the expected return for each of the next periods.
+
+        Constant (or zero) for the constant- and zero-mean models. With an
+        AR(1) or ARMA(1,1) mean the first forecast uses the last observed
+        return and shock, and later ones decay geometrically (at rate
+        ``phi``) towards :attr:`unconditional_mean`.
+
+        Parameters
+        ----------
+        horizon : int, default 1
+            Number of periods ahead to forecast; must be at least 1.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (horizon,)
+            Element ``h - 1`` is the expected return ``h`` periods after the
+            last observation, in the units of the input returns.
+
+        Raises
+        ------
+        ValueError
+            If ``horizon < 1``.
+
+        Notes
+        -----
+        .. math::
+            \mathbb{E}[r_{n+1}] = \mu + \phi r_n + \theta\varepsilon_n, \qquad
+            \mathbb{E}[r_{n+h}] = \mu + \phi\,\mathbb{E}[r_{n+h-1}] \quad (h \ge 2).
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from rcopula.garch import fit_garch
+        >>> rng = np.random.default_rng(0)
+        >>> x = np.zeros(3000)
+        >>> for t in range(1, 3000):
+        ...     x[t] = 0.1 + 0.5 * x[t - 1] + rng.standard_normal()
+        >>> res = fit_garch(x, mean="ar1")
+        >>> m = res.forecast_mean(200)
+        >>> bool(abs(m[-1] - res.unconditional_mean) < 1e-9)
+        True
+        >>> bool(abs(res.unconditional_mean - 0.2) < 0.1)
+        True
+        """
+        if horizon < 1:
+            raise ValueError(f"horizon must be >= 1, got {horizon}")
+        if self.phi == 0.0 and self.theta == 0.0:
+            return np.full(horizon, float(self.mu))
+        eps_last = float(self.resid[-1] * self.sigma[-1])
+        m_last = float(self.mu if self.cond_mean is None else self.cond_mean[-1])
+        out = np.empty(horizon)
+        out[0] = self.mu + self.phi * (m_last + eps_last) + self.theta * eps_last
+        for h in range(1, horizon):
+            out[h] = self.mu + self.phi * out[h - 1]
+        return out
 
     def forecast_vol(self, horizon: int = 1) -> NDArray[np.float64]:
         """Forecast the volatility (standard deviation) for each of the next periods.
@@ -403,10 +658,21 @@ class GarchResult:
 
     def __repr__(self) -> str:
         label = f" {self.name}" if self.name else ""
+        model = self.dist
+        if self.vol != "garch":
+            model += f", {self.vol}"
+        if self.mean != "constant":
+            model += f", mean={self.mean}"
+        arma = ""
+        if self.mean in ("ar1", "arma11"):
+            arma += f", phi={self.phi:.4f}"
+        if self.mean == "arma11":
+            arma += f", theta={self.theta:.4f}"
+        lev = f", gamma={self.gamma:.4f}" if self.vol == "gjr" else ""
         dof = "" if self.df is None else f", df={self.df:.2f}"
         return (
-            f"GarchResult({self.dist}{label}: mu={self.mu:.4g}, omega={self.omega:.4g}, "
-            f"alpha={self.alpha:.4f}, beta={self.beta:.4f}{dof}, "
+            f"GarchResult({model}{label}: mu={self.mu:.4g}{arma}, omega={self.omega:.4g}, "
+            f"alpha={self.alpha:.4f}, beta={self.beta:.4f}{lev}{dof}, "
             f"persistence={self.persistence:.4f})"
         )
 
@@ -416,21 +682,51 @@ def _fit_reparameterised(
     dist: str,
     theta: NDArray[np.float64],
     bounds: list[tuple[float, float]],
+    layout: _Layout | None = None,
 ) -> NDArray[np.float64]:
-    """Maximise over (mu, omega, persistence, alpha share[, df]) by L-BFGS-B."""
-    persistence = min(float(theta[2] + theta[3]), _MAX_PERSISTENCE)
-    share = float(theta[2] / (theta[2] + theta[3])) if theta[2] + theta[3] > 0 else 0.1
+    """Maximise with the stationarity bound built into the parameterisation.
+
+    The variance parameters are replaced by box-bounded ones that cannot break
+    stationarity whatever their values: the persistence
+    ``p = alpha + gamma/2 + beta`` in ``[0, 0.9999]``, the share ``s`` of it that
+    is the average shock reaction ``a = alpha + gamma/2`` in ``[0, 1]``, and --
+    for GJR -- a tilt ``k`` in ``[-1, 1]`` that splits ``a`` into
+    ``alpha = a(1 - k)`` and ``gamma = 2ak`` (so ``alpha >= 0`` and
+    ``alpha + gamma >= 0``). The other parameters keep their own boxes, and
+    the whole vector is fitted by L-BFGS-B.
+    """
+    lay = layout if layout is not None else _Layout("garch", "constant", dist)
+    ia, ib, ig = lay.index("alpha"), lay.index("beta"), lay.index("gamma")
+    assert ia is not None and ib is not None
+    tilt = 0.0
+    if ig is None:
+        persistence = min(float(theta[ia] + theta[ib]), _MAX_PERSISTENCE)
+        share = float(theta[ia] / (theta[ia] + theta[ib])) if theta[ia] + theta[ib] > 0 else 0.1
+    else:
+        react = float(theta[ia] + 0.5 * theta[ig])
+        total = react + float(theta[ib])
+        persistence = min(max(total, 0.0), _MAX_PERSISTENCE)
+        share = min(max(react / total, 0.0), 1.0) if total > 0 and react > 0 else 0.1
+        tilt = min(max(float(theta[ig]) / (2.0 * react), -1.0), 1.0) if react > 0 else 0.0
 
     def unpack(z: NDArray[np.float64]) -> NDArray[np.float64]:
         out = np.array(z, dtype=float)
-        out[2], out[3] = z[2] * z[3], z[2] * (1.0 - z[3])
+        out[ia], out[ib] = z[ia] * z[ib], z[ia] * (1.0 - z[ib])
+        if ig is not None:
+            react = out[ia]
+            out[ia], out[ig] = react * (1.0 - z[ig]), 2.0 * react * z[ig]
         return out
 
     start = np.array(theta, dtype=float)
-    start[2], start[3] = persistence, share
-    box = [bounds[0], bounds[1], (0.0, _MAX_PERSISTENCE), (0.0, 1.0), *bounds[4:]]
+    start[ia], start[ib] = persistence, share
+    box = list(bounds)
+    box[ia], box[ib] = (0.0, _MAX_PERSISTENCE), (0.0, 1.0)
+    if ig is not None:
+        start[ig] = tilt
+        box[ig] = (-1.0, 1.0)
+    start = np.clip(start, [lo for lo, _ in box], [hi for _, hi in box])
     opt = optimize.minimize(
-        lambda z: _neg_loglik(unpack(z), y, dist, 1.0),
+        lambda z: _neg_loglik(unpack(z), y, dist, 1.0, lay),
         start,
         method="L-BFGS-B",
         bounds=box,
@@ -442,14 +738,18 @@ def fit_garch(
     x: ArrayLike,
     dist: Literal["normal", "t"] = "normal",
     name: str = "",
+    vol: Literal["garch", "gjr"] = "garch",
+    mean: Literal["constant", "zero", "ar1", "arma11"] = "constant",
 ) -> GarchResult:
     r"""Estimate one asset's time-varying volatility from its return history.
 
-    Fits a GARCH(1,1) model with constant mean by (quasi-)maximum likelihood.
-    Use it to measure how volatile a series is today versus on average, to
-    forecast volatility, or -- the main use in this package -- to strip
-    volatility clustering out of returns before fitting a copula (see
-    :class:`CopulaGarch`).
+    Fits a GARCH(1,1) model -- by default with a constant mean -- by
+    (quasi-)maximum likelihood. Use it to measure how volatile a series is
+    today versus on average, to forecast volatility, or -- the main use in
+    this package -- to strip volatility clustering out of returns before
+    fitting a copula (see :class:`CopulaGarch`). Options add a leverage effect
+    (GJR-GARCH) and an AR(1) or ARMA(1,1) mean; the mean and variance are
+    estimated jointly.
 
     Parameters
     ----------
@@ -467,6 +767,23 @@ def fit_garch(
     name : str, default ""
         Label stored on the result (used as a row name by
         :meth:`CopulaGarch.summary`).
+    vol : {"garch", "gjr"}, default "garch"
+        Variance model. ``"garch"`` is the symmetric GARCH(1,1).
+        ``"gjr"`` (Glosten-Jagannathan-Runkle) adds a coefficient ``gamma``
+        on squared *negative* shocks, so bad news can raise volatility more
+        than good news of the same size -- the leverage effect typical of
+        equities. It is constrained to ``alpha >= 0``, ``alpha + gamma >= 0``
+        (``gamma`` may be negative, for series where good news is the more
+        volatile) and ``alpha + gamma/2 + beta < 1`` (stationarity).
+    mean : {"constant", "zero", "ar1", "arma11"}, default "constant"
+        Mean model for :math:`m_t` in :math:`r_t = m_t + \varepsilon_t`.
+        ``"constant"``: :math:`m_t = \mu`. ``"zero"``: :math:`m_t = 0` (no
+        mean is estimated; common for daily returns whose mean is
+        indistinguishable from zero). ``"ar1"``:
+        :math:`m_t = \mu + \phi r_{t-1}`. ``"arma11"``:
+        :math:`m_t = \mu + \phi r_{t-1} + \theta\varepsilon_{t-1}`. The AR and
+        MA coefficients are kept inside ``(-1, 1)`` so the mean is stationary
+        and invertible.
 
     Returns
     -------
@@ -479,7 +796,8 @@ def fit_garch(
     ------
     ValueError
         If ``x`` has fewer than 50 observations, contains NaN or infinite
-        values, is constant, or if ``dist`` is not ``"normal"`` or ``"t"``.
+        values, is constant, or if ``dist``, ``vol`` or ``mean`` is not one of
+        the allowed strings.
 
     Notes
     -----
@@ -490,6 +808,13 @@ def fit_garch(
     but it keeps every quantity at order 1. Without it, daily returns give
     :math:`\omega \approx 10^{-6}`, which sits below the optimiser's convergence
     tolerance and produces silently unconverged fits.
+
+    The variance recursion starts from the sample variance of ``x`` and an AR
+    or ARMA mean from its long-run level (the first shock is
+    :math:`r_0 - \mu/(1-\phi)`), so every model's likelihood sums over all
+    ``n`` observations and nested models -- ``"constant"`` inside ``"ar1"``,
+    ``"garch"`` inside ``"gjr"`` -- can be compared by AIC or a
+    likelihood-ratio test.
 
     Examples
     --------
@@ -516,6 +841,20 @@ def fit_garch(
     >>> filtered = np.corrcoef(res.resid[1:] ** 2, res.resid[:-1] ** 2)[0, 1]
     >>> bool(filtered < 0.25 * raw)
     True
+
+    A leverage effect -- negative shocks raising volatility more -- is picked
+    up by ``vol="gjr"``, which then beats plain GARCH on AIC:
+
+    >>> s2, e = 1.0, 0.0
+    >>> for i in range(n):
+    ...     s2 = 0.05 + (0.03 + 0.12 * (e < 0)) * e**2 + 0.86 * s2
+    ...     e = np.sqrt(s2) * z[i]
+    ...     x[i] = e
+    >>> gjr = fit_garch(x, vol="gjr")
+    >>> bool(abs(gjr.gamma - 0.12) < 0.05 and abs(gjr.beta - 0.86) < 0.05)
+    True
+    >>> bool(gjr.aic < fit_garch(x).aic)
+    True
     """
     arr = np.asarray(x, dtype=np.float64).ravel()
     if arr.size < 50:
@@ -524,24 +863,57 @@ def fit_garch(
         raise ValueError("x contains non-finite values")
     if dist not in ("normal", "t"):
         raise ValueError(f"dist must be 'normal' or 't', got {dist!r}")
+    if vol not in _VOLS:
+        raise ValueError(f"vol must be 'garch' or 'gjr', got {vol!r}")
+    if mean not in _MEANS:
+        raise ValueError(f"mean must be one of {', '.join(map(repr, _MEANS))}, got {mean!r}")
 
     scale = float(np.std(arr))
     if scale <= 0.0:
         raise ValueError("x is constant; there is no volatility to model")
     y = arr / scale
+    lay = _Layout(vol, mean, dist)
 
     # On the rescaled series the unconditional variance is 1, so omega =
     # 1 - alpha - beta is the natural start and the pre-sample variance is 1.
-    start = [float(np.mean(y)), 0.05, 0.10, 0.85]
-    bounds: list[tuple[float, float]] = [
-        (-10.0, 10.0),
-        (1e-8, 10.0),
-        (0.0, _MAX_PERSISTENCE),
-        (0.0, _MAX_PERSISTENCE),
-    ]
+    start: list[float] = []
+    bounds: list[tuple[float, float]] = []
+    if mean in ("ar1", "arma11"):
+        # Lag-one autocorrelation: the AR(1) estimate by moments, a close start.
+        phi0 = float(np.clip(np.corrcoef(y[1:], y[:-1])[0, 1], -0.9, 0.9))
+        start += [float(np.mean(y)) * (1.0 - phi0), phi0]
+        bounds += [(-10.0, 10.0), (-_MAX_ARMA, _MAX_ARMA)]
+        if mean == "arma11":
+            start.append(0.0)
+            bounds.append((-_MAX_ARMA, _MAX_ARMA))
+    elif mean == "constant":
+        start.append(float(np.mean(y)))
+        bounds.append((-10.0, 10.0))
+    if vol == "gjr":
+        start += [0.05, 0.05, 0.85, 0.10]
+        bounds += [
+            (1e-8, 10.0),
+            (0.0, _MAX_PERSISTENCE),
+            (0.0, _MAX_PERSISTENCE),
+            (-_MAX_PERSISTENCE, 2.0 * _MAX_PERSISTENCE),
+        ]
+    else:
+        start += [0.05, 0.10, 0.85]
+        bounds += [(1e-8, 10.0), (0.0, _MAX_PERSISTENCE), (0.0, _MAX_PERSISTENCE)]
     if dist == "t":
         start.append(8.0)
         bounds.append((_MIN_DF, _MAX_DF))
+
+    ia, ib, ig = lay.index("alpha"), lay.index("beta"), lay.index("gamma")
+    assert ia is not None and ib is not None
+    constraints: list[dict[str, Any]]
+    if ig is None:
+        constraints = [{"type": "ineq", "fun": lambda t: _MAX_PERSISTENCE - t[ia] - t[ib]}]
+    else:
+        constraints = [
+            {"type": "ineq", "fun": lambda t: _MAX_PERSISTENCE - t[ia] - t[ib] - 0.5 * t[ig]},
+            {"type": "ineq", "fun": lambda t: t[ia] + t[ig]},
+        ]
 
     with warnings.catch_warnings():
         # SLSQP evaluates trial points outside the box during its line search
@@ -557,26 +929,27 @@ def fit_garch(
         opt = optimize.minimize(
             _neg_loglik,
             np.array(start),
-            args=(y, dist, 1.0),
+            args=(y, dist, 1.0, lay),
             method="SLSQP",
             bounds=bounds,
-            constraints=[
-                {"type": "ineq", "fun": lambda t: _MAX_PERSISTENCE - t[2] - t[3]},
-            ],
+            constraints=constraints,
             options={"maxiter": 500, "ftol": 1e-10},
         )
     theta = opt.x
-    if theta[2] + theta[3] > _MAX_PERSISTENCE + 1e-9:
-        # SLSQP only enforces alpha + beta < 1 at convergence; when it stops
-        # early -- typical when the truth sits on the boundary -- the point it
-        # returns can break it, giving a non-stationary model with no
-        # unconditional variance. Refit with persistence and alpha's share of
-        # it as box-bounded parameters, so the constraint cannot be broken.
-        theta = _fit_reparameterised(y, dist, theta, bounds)
-    mu, omega, alpha, beta = (float(v) for v in theta[:4])
-    df = float(theta[4]) if dist == "t" else None
+    if _breaks_constraints(theta, lay):
+        # SLSQP only enforces the inequality constraints at convergence; when
+        # it stops early -- typical when the truth sits on the boundary -- the
+        # point it returns can break them, giving a non-stationary model with
+        # no unconditional variance. Refit with persistence and alpha's share
+        # of it as box-bounded parameters, so the constraint cannot be broken.
+        theta = _fit_reparameterised(y, dist, theta, bounds, lay)
+    p = lay.unpack(theta)
+    mu, phi, ma, omega = float(p.mu), float(p.phi), float(p.theta), float(p.omega)
+    alpha, beta, gamma = float(p.alpha), float(p.beta), float(p.gamma)
+    df = float(p.df) if dist == "t" else None
 
-    sigma2 = _filter_variance(y - mu, omega, alpha, beta, 1.0)
+    eps = _mean_residuals(y, mu, phi, ma)
+    sigma2 = _filter_variance(eps, omega, alpha, beta, 1.0, gamma)
     sigma = np.sqrt(sigma2)
     return GarchResult(
         mu=mu * scale,
@@ -585,20 +958,46 @@ def fit_garch(
         beta=beta,
         df=df,
         sigma=sigma * scale,
-        resid=(y - mu) / sigma,
+        resid=eps / sigma,
         # The scaling shifts the log-likelihood by a constant Jacobian term,
         # n*log(scale); undo it so loglik/AIC/BIC refer to the original data.
-        loglik=-_neg_loglik(theta, y, dist, 1.0) - arr.size * float(np.log(scale)),
+        loglik=-_neg_loglik(theta, y, dist, 1.0, lay) - arr.size * float(np.log(scale)),
         dist=dist,
         name=name,
+        gamma=gamma,
+        phi=phi,
+        theta=ma,
+        vol=vol,
+        mean=mean,
+        cond_mean=(y - eps) * scale,
+    )
+
+
+def _breaks_constraints(theta: NDArray[np.float64], lay: _Layout) -> bool:
+    """Whether an SLSQP solution violates stationarity or positivity."""
+    ia, ib, ig = lay.index("alpha"), lay.index("beta"), lay.index("gamma")
+    assert ia is not None and ib is not None
+    if ig is None:
+        if theta[ia] + theta[ib] > _MAX_PERSISTENCE + 1e-9:
+            return True
+    elif (
+        theta[ia] + theta[ib] + 0.5 * theta[ig] > _MAX_PERSISTENCE + 1e-9
+        or theta[ia] + theta[ig] < -1e-9
+    ):
+        return True
+    return any(
+        abs(theta[i]) > _MAX_ARMA + 1e-9
+        for i in (lay.index("phi"), lay.index("theta"))
+        if i is not None
     )
 
 
 class CopulaGarch:
     """Multi-asset returns: each asset's own volatility, plus a copula linking the shocks.
 
-    Each asset gets a GARCH(1,1) model so that its volatility can rise and
-    fall over time; the copula then describes how the assets' de-volatilised
+    Each asset gets a GARCH(1,1) model -- optionally GJR, with an AR or ARMA
+    mean (see :func:`fit_garch`) -- so that its volatility can rise and fall
+    over time; the copula then describes how the assets' de-volatilised
     shocks move together, including in the tails. Use it to simulate future
     joint returns and to produce forward-looking portfolio VaR and expected
     shortfall that reflect both today's volatility and crash co-movement.
@@ -688,6 +1087,8 @@ class CopulaGarch:
         dist: Literal["normal", "t"] = "normal",
         innovations: Literal["empirical", "parametric"] = "empirical",
         method: str = "mpl",
+        vol: Literal["garch", "gjr"] = "garch",
+        mean: Literal["constant", "zero", "ar1", "arma11"] = "constant",
     ) -> CopulaGarch:
         r"""Fit the whole model to a table of asset returns.
 
@@ -714,6 +1115,11 @@ class CopulaGarch:
             The default ``"mpl"`` is the standard choice here, since the
             residuals' distribution is not being claimed to be exactly the
             fitted one.
+        vol : {"garch", "gjr"}, default "garch"
+            Variance model for every margin; ``"gjr"`` adds the leverage
+            effect. See :func:`fit_garch`.
+        mean : {"constant", "zero", "ar1", "arma11"}, default "constant"
+            Mean model for every margin. See :func:`fit_garch`.
 
         Returns
         -------
@@ -767,7 +1173,10 @@ class CopulaGarch:
             )
 
         names = list(frame.columns.astype(str)) if frame is not None else [""] * arr.shape[1]
-        margins = [fit_garch(arr[:, j], dist=dist, name=names[j]) for j in range(arr.shape[1])]
+        margins = [
+            fit_garch(arr[:, j], dist=dist, name=names[j], vol=vol, mean=mean)
+            for j in range(arr.shape[1])
+        ]
         resid = np.column_stack([m.resid for m in margins])
         fitted = fit_copula(copula, pseudo_obs(resid), method=method)
         return cls(margins, fitted.copula, innovations=innovations)
@@ -798,7 +1207,16 @@ class CopulaGarch:
         each margin's own GARCH recursion, so volatility keeps clustering along
         the path. Both effects are present simultaneously, which is the reason
         to build the model at all. Paths start from the last observed
-        volatility and shock.
+        volatility, shock and (for an AR/ARMA mean) return.
+
+        Each margin is simulated with the model it was fitted with: the GJR
+        recursion when ``vol="gjr"`` (negative shocks feed more into the next
+        period's variance) and the AR(1)/ARMA(1,1) mean recursion
+        :math:`r_t = \mu + \phi r_{t-1} + \theta\varepsilon_{t-1} + \varepsilon_t`
+        when there is one. With ``innovations="empirical"`` a GJR margin's
+        variance follows the observed residuals' own share of negative
+        squared shocks rather than exactly one half, which is the point of
+        filtered historical simulation.
 
         Parameters
         ----------
@@ -852,18 +1270,34 @@ class CopulaGarch:
         omega = np.array([m.omega for m in self.margins])
         alpha = np.array([m.alpha for m in self.margins])
         beta = np.array([m.beta for m in self.margins])
+        gamma = np.array([m.gamma for m in self.margins])
+        phi = np.array([m.phi for m in self.margins])
+        theta = np.array([m.theta for m in self.margins])
+        leverage = bool(np.any(gamma != 0.0))
+        arma = bool(np.any(phi != 0.0) or np.any(theta != 0.0))
 
         # Start each path from the end of the observed sample: the last fitted
-        # conditional variance and the last realised shock.
+        # conditional variance, the last realised shock and the last return.
         sigma2 = np.tile([m.sigma[-1] ** 2 for m in self.margins], (n, 1))
         eps = np.tile([m.resid[-1] * m.sigma[-1] for m in self.margins], (n, 1))
+        ret = eps + np.array(
+            [m.mu if m.cond_mean is None else m.cond_mean[-1] for m in self.margins]
+        )
 
         out = np.empty((n, horizon, d))
         for step in range(horizon):
             z = self._innovation_ppf(self.copula.rvs(n, random_state=rng))
-            sigma2 = omega + alpha * eps**2 + beta * sigma2
-            eps = np.sqrt(sigma2) * z
-            out[:, step, :] = mu + eps
+            if leverage:
+                sigma2 = omega + (alpha + gamma * (eps < 0.0)) * eps**2 + beta * sigma2
+            else:
+                sigma2 = omega + alpha * eps**2 + beta * sigma2
+            shock = np.sqrt(sigma2) * z
+            if arma:
+                ret = mu + phi * ret + theta * eps + shock
+                out[:, step, :] = ret
+            else:
+                out[:, step, :] = mu + shock
+            eps = shock
         return out
 
     def forecast(
@@ -1009,10 +1443,13 @@ class CopulaGarch:
 
         Returns
         -------
-        pandas.DataFrame, shape (d, 8)
+        pandas.DataFrame, shape (d, 8) to (d, 11)
             Indexed by :attr:`names`, with float columns ``mu``, ``omega``,
             ``alpha``, ``beta``, ``df`` (NaN for normal innovations),
-            ``persistence``, ``half_life`` (periods) and ``loglik``.
+            ``persistence``, ``half_life`` (periods) and ``loglik``. Columns
+            ``phi`` and ``theta`` (after ``mu``) appear when any margin has an
+            AR/ARMA mean, and ``gamma`` (after ``beta``) when any margin is
+            GJR.
 
         Examples
         --------
@@ -1025,22 +1462,24 @@ class CopulaGarch:
         >>> list(model.summary().columns)
         ['mu', 'omega', 'alpha', 'beta', 'df', 'persistence', 'half_life', 'loglik']
         """
-        return pd.DataFrame(
-            [
-                {
-                    "mu": m.mu,
-                    "omega": m.omega,
-                    "alpha": m.alpha,
-                    "beta": m.beta,
-                    "df": np.nan if m.df is None else m.df,
-                    "persistence": m.persistence,
-                    "half_life": m.half_life,
-                    "loglik": m.loglik,
-                }
-                for m in self.margins
-            ],
-            index=self.names,
-        )
+        arma = any(m.mean in ("ar1", "arma11") for m in self.margins)
+        gjr = any(m.vol == "gjr" for m in self.margins)
+        rows = []
+        for m in self.margins:
+            row: dict[str, float] = {"mu": m.mu}
+            if arma:
+                row.update(phi=m.phi, theta=m.theta)
+            row.update(omega=m.omega, alpha=m.alpha, beta=m.beta)
+            if gjr:
+                row["gamma"] = m.gamma
+            row.update(
+                df=np.nan if m.df is None else m.df,
+                persistence=m.persistence,
+                half_life=m.half_life,
+                loglik=m.loglik,
+            )
+            rows.append(row)
+        return pd.DataFrame(rows, index=self.names)
 
     def __repr__(self) -> str:
         return (

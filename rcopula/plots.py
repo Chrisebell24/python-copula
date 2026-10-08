@@ -81,14 +81,29 @@ __all__ = [
 _GRID = 60
 
 
+def _pyplot() -> Any:
+    """Import and return ``matplotlib.pyplot``, which is an optional dependency.
+
+    Imported lazily so that importing ``rcopula`` does not drag in pyplot and
+    pick a backend, and so that ``rcopula`` installs without matplotlib.
+
+    Raises
+    ------
+    ImportError
+        If matplotlib is not installed.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError as exc:
+        raise ImportError("rcopula.plots needs matplotlib: pip install 'rcopula[plots]'") from exc
+    return plt
+
+
 def _axes(ax: Any, **kwargs: Any) -> Any:
-    """Return ``ax``, or a fresh one. Imported lazily so that importing
-    ``rcopula`` does not drag in pyplot and pick a backend."""
+    """Return ``ax``, or a fresh one (pyplot is imported only in that case)."""
     if ax is not None:
         return ax
-    import matplotlib.pyplot as plt
-
-    return plt.subplots(**kwargs)[1]
+    return _pyplot().subplots(**kwargs)[1]
 
 
 def _as_list(copula: Copula | list[Copula] | None) -> list[Copula]:
@@ -260,8 +275,7 @@ def surface(
         z = _evaluate(copula, kind, uu, vv)
 
     if ax is None:
-        import matplotlib.pyplot as plt
-
+        plt = _pyplot()
         ax = plt.figure().add_subplot(projection="3d")
     kwargs.setdefault("cmap", "viridis")
     kwargs.setdefault("linewidth", 0)
@@ -329,8 +343,7 @@ def scatter_matrix(
         raise ValueError(f"got {len(labels)} names for {d} columns")
 
     if axes is None:
-        import matplotlib.pyplot as plt
-
+        plt = _pyplot()
         _, axes = plt.subplots(d, d, figsize=(2.2 * d, 2.2 * d), squeeze=False)
     tau = cor_kendall(u)
     kwargs.setdefault("s", 4)
@@ -709,8 +722,7 @@ def vine_trees(
     """
     depth = len(vine.pair_copulas) if max_trees is None else min(max_trees, len(vine.pair_copulas))
     if axes is None:
-        import matplotlib.pyplot as plt
-
+        plt = _pyplot()
         _, axes = plt.subplots(1, depth, figsize=(4.2 * depth, 3.8), squeeze=False)
         axes = axes[0]
 
@@ -1015,7 +1027,7 @@ def dependogram_plot(
     >>> ax.get_ylabel()
     'Cramer-von Mises statistic'
     """
-    import matplotlib.pyplot as plt
+    plt = _pyplot()
 
     if ax is None:
         _, ax = plt.subplots(figsize=(max(6.0, 0.6 * len(result.subsets)), 4.0))
@@ -1129,11 +1141,11 @@ def pairs_rosenblatt(
     >>> wrong.shape
     (3, 3)
     """
-    import matplotlib.pyplot as plt
     from scipy import stats as _stats
 
     from rcopula.transforms import rosenblatt
 
+    plt = _pyplot()
     arr = np.atleast_2d(np.asarray(u, dtype=float))
     z = np.asarray(rosenblatt(copula, arr), dtype=float)
     n, d = z.shape

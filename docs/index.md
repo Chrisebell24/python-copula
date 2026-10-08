@@ -5,7 +5,8 @@ against it — every deterministic quantity is checked against fixtures generate
 by running the real R package.
 
 ```bash
-pip install rcopula
+pip install rcopula            # core library
+pip install "rcopula[plots]"   # plus matplotlib, for rcopula.plots
 ```
 
 ```python

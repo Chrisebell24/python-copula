@@ -1,8 +1,10 @@
 """Tests for the copula-GARCH model.
 
 There is no R ``copula`` oracle for this -- R's copula-GARCH vignette delegates
-the marginal models to ``rugarch``. Validation is therefore against properties
-that hold exactly:
+the marginal models to ``rugarch``. The margins are checked against ``rugarch``
+itself (fixtures from ``tools/rgolden/10_garch.R``: GARCH, GJR-GARCH, an
+ARMA(1,1) mean and Student-t innovations); everything else is validated against
+properties that hold exactly:
 
 * **Parameter recovery** from series simulated with known GARCH parameters.
 * **Scale equivariance**: GARCH is exactly equivariant under ``x -> c*x``, which
@@ -15,7 +17,9 @@ that hold exactly:
 
 from __future__ import annotations
 
+import json
 from itertools import pairwise
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -23,7 +27,17 @@ import pytest
 from scipy import signal, stats
 
 import rcopula as rc
-from rcopula.garch import CopulaGarch, GarchResult, _filter_variance, fit_garch
+from rcopula.garch import (
+    _MAX_PERSISTENCE,
+    CopulaGarch,
+    GarchResult,
+    _filter_variance,
+    _fit_reparameterised,
+    _Layout,
+    _mean_residuals,
+    _neg_loglik,
+    fit_garch,
+)
 
 
 def simulate_garch(
@@ -454,8 +468,6 @@ def test_persistence_never_exceeds_one_on_near_integrated_data(seed: int) -> Non
 
 
 def test_the_reparameterised_refit_cannot_break_stationarity() -> None:
-    from rcopula.garch import _MAX_PERSISTENCE, _fit_reparameterised
-
     rng = np.random.default_rng(0)
     y = rng.standard_t(5, size=2000)
     y /= y.std()
@@ -497,3 +509,419 @@ class TestGarchRegressions:
         port = model.forecast(horizon=2, n=50, random_state=3) @ w
         assert r["volatility"] == pytest.approx(port.std(ddof=1), rel=1e-12)
         assert r["mean"] == pytest.approx(port.mean(), rel=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# GJR-GARCH and ARMA means
+# ---------------------------------------------------------------------------
+
+
+def simulate_model(
+    n: int,
+    *,
+    mu: float = 0.0,
+    phi: float = 0.0,
+    theta: float = 0.0,
+    omega: float = 0.05,
+    alpha: float = 0.05,
+    beta: float = 0.85,
+    gamma: float = 0.0,
+    df: float | None = None,
+    seed: int = 0,
+) -> np.ndarray:
+    """ARMA(1,1)-GJR-GARCH(1,1), written out as the definition."""
+    rng = np.random.default_rng(seed)
+    z = (
+        rng.standard_normal(n)
+        if df is None
+        else stats.t(df=df, scale=np.sqrt((df - 2) / df)).rvs(n, random_state=rng)
+    )
+    s2 = omega / (1.0 - alpha - gamma / 2 - beta)
+    e, r = 0.0, mu / (1.0 - phi)
+    x = np.empty(n)
+    for i in range(n):
+        s2 = omega + (alpha + gamma * (e < 0)) * e**2 + beta * s2
+        shock = np.sqrt(s2) * z[i]
+        r = mu + phi * r + theta * e + shock
+        e = shock
+        x[i] = r
+    return x
+
+
+class TestGjrFilter:
+    def test_matches_a_literal_loop(self) -> None:
+        rng = np.random.default_rng(0)
+        eps = rng.standard_normal(400)
+        omega, alpha, beta, gamma, s0 = 0.04, 0.03, 0.85, 0.15, 1.2
+        expected = np.empty(400)
+        expected[0] = s0
+        for t in range(1, 400):
+            arch = alpha + (gamma if eps[t - 1] < 0 else 0.0)
+            expected[t] = omega + arch * eps[t - 1] ** 2 + beta * expected[t - 1]
+        got = _filter_variance(eps, omega, alpha, beta, s0, gamma)
+        assert np.allclose(got, expected, rtol=1e-12)
+
+    def test_zero_gamma_is_plain_garch_bitwise(self) -> None:
+        eps = np.random.default_rng(1).standard_normal(300)
+        assert np.array_equal(
+            _filter_variance(eps, 0.05, 0.1, 0.85, 1.0, 0.0),
+            _filter_variance(eps, 0.05, 0.1, 0.85, 1.0),
+        )
+
+
+class TestGjrFit:
+    @pytest.mark.parametrize("seed", [0, 1, 2, 3])
+    def test_recovers_known_parameters(self, seed: int) -> None:
+        """n = 6000: sampling sd is about 0.01 for alpha, 0.02 for gamma and beta."""
+        x = simulate_model(6000, alpha=0.03, gamma=0.12, beta=0.87, seed=seed)
+        res = fit_garch(x, vol="gjr")
+        assert res.vol == "gjr"
+        assert res.alpha == pytest.approx(0.03, abs=0.025)
+        assert res.gamma == pytest.approx(0.12, abs=0.05)
+        assert res.beta == pytest.approx(0.87, abs=0.04)
+        assert res.persistence == pytest.approx(0.96, abs=0.02)
+        assert res.unconditional_vol == pytest.approx(1.0, rel=0.2)
+
+    @pytest.mark.parametrize("seed", [0, 1])
+    def test_recovers_parameters_with_student_t(self, seed: int) -> None:
+        x = simulate_model(6000, alpha=0.03, gamma=0.12, beta=0.87, df=6.0, seed=seed)
+        res = fit_garch(x, vol="gjr", dist="t")
+        assert res.gamma == pytest.approx(0.12, abs=0.05)
+        assert res.beta == pytest.approx(0.87, abs=0.04)
+        assert res.df is not None
+        assert res.df == pytest.approx(6.0, rel=0.25)
+
+    @pytest.mark.parametrize("seed", [0, 1, 2])
+    def test_beats_garch_on_asymmetric_data(self, seed: int) -> None:
+        x = simulate_model(5000, alpha=0.03, gamma=0.12, beta=0.87, seed=seed)
+        plain, gjr = fit_garch(x), fit_garch(x, vol="gjr")
+        # GARCH is GJR with gamma = 0, so the GJR likelihood can only be higher.
+        assert gjr.loglik >= plain.loglik - 1e-6
+        assert gjr.aic < plain.aic - 10.0
+
+    @pytest.mark.parametrize("seed", [0, 1, 2])
+    def test_finds_no_asymmetry_where_there_is_none(self, seed: int) -> None:
+        x = simulate_model(6000, alpha=0.08, gamma=0.0, beta=0.9, seed=seed)
+        res = fit_garch(x, vol="gjr")
+        assert abs(res.gamma) < 0.04
+        assert res.alpha == pytest.approx(0.08, abs=0.03)
+
+    def test_respects_the_constraints(self) -> None:
+        """alpha >= 0, alpha + gamma >= 0 and alpha + gamma/2 + beta < 1."""
+        for seed in range(4):
+            x = simulate_model(3000, alpha=0.0, gamma=0.2, beta=0.89, seed=seed)
+            res = fit_garch(x, vol="gjr")
+            assert res.alpha >= 0.0
+            assert res.alpha + res.gamma >= -1e-9
+            assert res.persistence < 1.0
+
+    def test_negative_gamma_is_allowed(self) -> None:
+        """Good news raising volatility more (seen in some commodities) is legal."""
+        x = -simulate_model(6000, alpha=0.03, gamma=0.12, beta=0.87, seed=4)
+        res = fit_garch(x, vol="gjr")
+        # Mirroring the series swaps the roles: alpha + gamma is now the small one.
+        assert res.gamma < -0.05
+        assert res.alpha + res.gamma == pytest.approx(0.03, abs=0.03)
+
+    def test_is_exactly_scale_equivariant(self) -> None:
+        x = simulate_model(3000, mu=0.1, alpha=0.03, gamma=0.12, beta=0.87, seed=5)
+        a, b = fit_garch(x, vol="gjr"), fit_garch(2.0**-7 * x, vol="gjr")
+        assert b.gamma == pytest.approx(a.gamma, rel=1e-10)
+        assert b.omega == pytest.approx(2.0**-14 * a.omega, rel=1e-10)
+        assert b.loglik == pytest.approx(a.loglik + 7 * x.size * np.log(2.0), rel=1e-10)
+
+    def test_diagnostics_count_gamma(self) -> None:
+        res = fit_garch(simulate_model(2000, gamma=0.1, seed=6), vol="gjr")
+        assert res.n_params == 5
+        assert fit_garch(simulate_model(2000, seed=6), vol="gjr", dist="t").n_params == 6
+        assert res.persistence == pytest.approx(res.alpha + res.gamma / 2 + res.beta)
+        assert res.unconditional_vol == pytest.approx(
+            np.sqrt(res.omega / (1 - res.alpha - res.gamma / 2 - res.beta))
+        )
+        assert res.half_life == pytest.approx(np.log(0.5) / np.log(res.persistence))
+        assert "gamma=" in repr(res)
+        assert "gjr" in repr(res)
+
+    def test_plain_garch_results_have_zero_gamma(self) -> None:
+        res = fit_garch(simulate_garch(1000, seed=7))
+        assert res.gamma == 0.0
+        assert res.phi == 0.0
+        assert res.theta == 0.0
+        assert res.vol == "garch"
+        assert res.mean == "constant"
+        assert "gamma" not in repr(res)
+
+    def test_the_reparameterised_refit_cannot_break_the_gjr_constraints(self) -> None:
+        rng = np.random.default_rng(0)
+        y = rng.standard_t(5, size=2000)
+        y /= y.std()
+        lay = _Layout("gjr", "constant", "normal")
+        bounds = [
+            (-10.0, 10.0),
+            (1e-8, 10.0),
+            (0.0, _MAX_PERSISTENCE),
+            (0.0, _MAX_PERSISTENCE),
+            (-_MAX_PERSISTENCE, 2 * _MAX_PERSISTENCE),
+        ]
+        # A start that violates both stationarity and alpha + gamma >= 0.
+        start = np.array([0.0, 0.05, 0.3, 0.9, -0.5])
+        t = _fit_reparameterised(y, "normal", start, bounds, lay)
+        alpha, beta, gamma = t[2], t[3], t[4]
+        assert alpha >= 0.0 and beta >= 0.0
+        assert alpha + gamma >= -1e-12
+        assert alpha + gamma / 2 + beta <= _MAX_PERSISTENCE + 1e-12
+        # And it is a genuine optimum, not just a feasible point.
+        assert _neg_loglik(t, y, "normal", 1.0, lay) < _neg_loglik(
+            np.array([0.0, 0.05, 0.05, 0.85, 0.1]), y, "normal", 1.0, lay
+        )
+
+
+class TestGjrForecast:
+    def _fit(self) -> GarchResult:
+        return fit_garch(simulate_model(3000, alpha=0.03, gamma=0.15, beta=0.85, seed=8), vol="gjr")
+
+    def test_one_step_uses_the_sign_of_the_last_shock(self) -> None:
+        import dataclasses
+
+        res = self._fit()
+        s2 = res.sigma[-1] ** 2
+        down = dataclasses.replace(res, resid=np.append(res.resid[:-1], -2.0))
+        up = dataclasses.replace(res, resid=np.append(res.resid[:-1], 2.0))
+        e2 = (2.0 * res.sigma[-1]) ** 2
+        assert down.forecast_variance(1)[0] == pytest.approx(
+            res.omega + (res.alpha + res.gamma) * e2 + res.beta * s2, rel=1e-12
+        )
+        assert up.forecast_variance(1)[0] == pytest.approx(
+            res.omega + res.alpha * e2 + res.beta * s2, rel=1e-12
+        )
+        assert down.forecast_variance(1)[0] > up.forecast_variance(1)[0]
+
+    def test_multi_step_decays_at_the_gjr_persistence(self) -> None:
+        res = self._fit()
+        v = res.forecast_variance(50)
+        gaps = v - res.unconditional_vol**2
+        assert np.allclose(gaps[1:] / gaps[:-1], res.persistence, rtol=1e-9)
+
+    def test_multi_step_matches_monte_carlo(self) -> None:
+        """E[1(eps<0) eps^2] = sigma^2 / 2: the simulated variance agrees.
+
+        Parametric normal innovations through the GJR recursion in
+        ``simulate`` must reproduce the analytic forecast at every horizon.
+        """
+        res = self._fit()
+        model = CopulaGarch([res, res], rc.IndependenceCopula(2), innovations="parametric")
+        paths = model.simulate(horizon=10, n=200_000, random_state=0)[:, :, 0]
+        simulated = paths.var(axis=0)
+        assert np.allclose(simulated, res.forecast_variance(10), rtol=0.02)
+
+
+class TestArmaMean:
+    def test_residual_filter_matches_a_literal_loop(self) -> None:
+        rng = np.random.default_rng(0)
+        x = rng.standard_normal(300)
+        mu, phi, theta = 0.1, 0.5, -0.3
+        expected = np.empty(300)
+        expected[0] = x[0] - mu / (1 - phi)
+        for t in range(1, 300):
+            expected[t] = x[t] - mu - phi * x[t - 1] - theta * expected[t - 1]
+        assert np.allclose(_mean_residuals(x, mu, phi, theta), expected, rtol=1e-12)
+        assert np.array_equal(_mean_residuals(x, mu, 0.0, 0.0), x - mu)
+
+    @pytest.mark.parametrize("seed", [0, 1, 2, 3])
+    def test_recovers_ar1(self, seed: int) -> None:
+        """n = 5000: sampling sd of phi is about 0.013."""
+        x = simulate_model(5000, mu=0.05, phi=0.4, omega=0.02, alpha=0.08, beta=0.9, seed=seed)
+        res = fit_garch(x, mean="ar1")
+        assert res.phi == pytest.approx(0.4, abs=0.05)
+        assert res.theta == 0.0
+        assert res.unconditional_mean == pytest.approx(0.05 / 0.6, abs=0.06)
+        assert res.alpha == pytest.approx(0.08, abs=0.03)
+        assert res.beta == pytest.approx(0.9, abs=0.03)
+
+    @pytest.mark.parametrize("seed", [0, 1, 2, 3])
+    def test_recovers_arma11(self, seed: int) -> None:
+        x = simulate_model(
+            5000, mu=0.05, phi=0.6, theta=-0.3, omega=0.02, alpha=0.08, beta=0.9, seed=seed
+        )
+        res = fit_garch(x, mean="arma11")
+        assert res.phi == pytest.approx(0.6, abs=0.07)
+        assert res.theta == pytest.approx(-0.3, abs=0.08)
+        assert res.alpha == pytest.approx(0.08, abs=0.03)
+        assert res.beta == pytest.approx(0.9, abs=0.03)
+
+    @pytest.mark.parametrize("seed", [0, 1])
+    def test_recovers_arma_with_gjr_and_student_t(self, seed: int) -> None:
+        x = simulate_model(
+            5000, phi=0.3, theta=0.2, alpha=0.03, gamma=0.1, beta=0.88, df=5.0, seed=seed
+        )
+        res = fit_garch(x, mean="arma11", vol="gjr", dist="t")
+        assert res.phi == pytest.approx(0.3, abs=0.1)
+        assert res.theta == pytest.approx(0.2, abs=0.1)
+        assert res.gamma == pytest.approx(0.1, abs=0.05)
+        assert res.df is not None
+        assert res.df == pytest.approx(5.0, rel=0.25)
+        assert res.n_params == 8
+
+    def test_ar1_nests_the_constant_mean(self) -> None:
+        """At phi = 0 the AR(1) likelihood is the constant-mean one, so the
+        AR(1) fit can only do better -- and on white-noise means barely does."""
+        x = simulate_garch(4000, mu=0.1, seed=30)
+        const, ar1 = fit_garch(x), fit_garch(x, mean="ar1")
+        assert ar1.loglik >= const.loglik - 1e-6
+        assert abs(ar1.phi) < 0.05
+        lay = _Layout("garch", "ar1", "normal")
+        y = x / x.std()
+        c = const
+        params = np.array([c.mu / x.std(), 0.0, c.omega / x.var(), c.alpha, c.beta])
+        nll = _neg_loglik(params, y, "normal", 1.0, lay)
+        assert -nll - x.size * np.log(x.std()) == pytest.approx(const.loglik, rel=1e-12)
+
+    def test_zero_mean_estimates_no_mean(self) -> None:
+        x = simulate_garch(3000, mu=0.0, seed=31)
+        res = fit_garch(x, mean="zero")
+        assert res.mu == 0.0
+        assert res.n_params == 3
+        assert np.allclose(res.sigma * res.resid, x, rtol=1e-10)
+        assert np.all(res.forecast_mean(5) == 0.0)
+
+    def test_residuals_reproduce_the_series(self) -> None:
+        x = simulate_model(2000, mu=0.1, phi=0.5, theta=-0.2, seed=32)
+        res = fit_garch(x, mean="arma11", vol="gjr")
+        assert res.cond_mean is not None
+        assert np.allclose(res.cond_mean + res.sigma * res.resid, x, rtol=1e-10)
+        # And the conditional mean is the ARMA recursion on the data.
+        eps = x - res.cond_mean
+        manual = res.mu + res.phi * x[:-1] + res.theta * eps[:-1]
+        assert np.allclose(res.cond_mean[1:], manual, rtol=1e-10)
+
+    def test_is_exactly_scale_equivariant(self) -> None:
+        x = simulate_model(3000, mu=0.1, phi=0.4, theta=0.1, seed=33)
+        a, b = fit_garch(x, mean="arma11"), fit_garch(2.0**5 * x, mean="arma11")
+        assert b.phi == pytest.approx(a.phi, rel=1e-10)
+        assert b.theta == pytest.approx(a.theta, rel=1e-10)
+        assert b.mu == pytest.approx(2.0**5 * a.mu, rel=1e-10)
+
+    def test_forecast_mean(self) -> None:
+        x = simulate_model(3000, mu=0.1, phi=0.5, theta=0.2, seed=34)
+        res = fit_garch(x, mean="arma11")
+        eps_n = res.resid[-1] * res.sigma[-1]
+        m = res.forecast_mean(100)
+        assert m[0] == pytest.approx(res.mu + res.phi * x[-1] + res.theta * eps_n, rel=1e-10)
+        assert m[1] == pytest.approx(res.mu + res.phi * m[0], rel=1e-12)
+        assert m[-1] == pytest.approx(res.unconditional_mean, rel=1e-10)
+        const = fit_garch(x)
+        assert np.all(const.forecast_mean(4) == const.mu)
+        with pytest.raises(ValueError, match="horizon must be"):
+            res.forecast_mean(0)
+
+    def test_simulation_follows_the_mean_forecast(self) -> None:
+        """The simulated paths' average is the ARMA mean forecast."""
+        x = simulate_model(3000, mu=0.1, phi=0.6, theta=0.2, seed=35)
+        res = fit_garch(x, mean="arma11")
+        model = CopulaGarch([res, res], rc.IndependenceCopula(2), innovations="parametric")
+        paths = model.simulate(horizon=8, n=100_000, random_state=0)[:, :, 0]
+        se = paths.std(axis=0) / np.sqrt(paths.shape[0])
+        assert np.all(np.abs(paths.mean(axis=0) - res.forecast_mean(8)) < 5 * se)
+        # The AR term makes the variance of the *return* exceed that of the shock.
+        assert paths[:, -1].var() > res.forecast_variance(8)[-1]
+
+    def test_rejects_unknown_options(self) -> None:
+        x = simulate_garch(200, seed=36)
+        with pytest.raises(ValueError, match="vol must be"):
+            fit_garch(x, vol="egarch")  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="mean must be"):
+            fit_garch(x, mean="ar2")  # type: ignore[arg-type]
+
+
+class TestCopulaGarchOptions:
+    def test_fit_passes_vol_and_mean_through(self) -> None:
+        cols = [
+            simulate_model(2500, mu=0.05, phi=0.3, alpha=0.03, gamma=0.12, beta=0.85, seed=s)
+            for s in (40, 41)
+        ]
+        model = CopulaGarch.fit(
+            np.column_stack(cols), rc.GaussianCopula(0.0, dim=2), vol="gjr", mean="ar1"
+        )
+        for m in model.margins:
+            assert m.vol == "gjr"
+            assert m.mean == "ar1"
+            assert m.gamma > 0.03
+            assert m.phi == pytest.approx(0.3, abs=0.08)
+        summary = model.summary()
+        assert list(summary.columns) == [
+            "mu",
+            "phi",
+            "theta",
+            "omega",
+            "alpha",
+            "beta",
+            "gamma",
+            "df",
+            "persistence",
+            "half_life",
+            "loglik",
+        ]
+        paths = model.simulate(horizon=3, n=200, random_state=0)
+        assert paths.shape == (200, 3, 2)
+        assert np.all(np.isfinite(paths))
+        risk = model.forecast_risk(horizon=2, n=2000, random_state=0)
+        assert risk["expected_shortfall"] > risk["var"]
+
+    def test_gjr_simulation_reacts_to_the_last_shock(self) -> None:
+        """After a fall the simulated next-day volatility is higher than after
+        a rally of the same size -- only under GJR."""
+        import dataclasses
+
+        res = fit_garch(simulate_model(3000, alpha=0.03, gamma=0.15, beta=0.85, seed=42), vol="gjr")
+        down = dataclasses.replace(res, resid=np.append(res.resid[:-1], -3.0))
+        up = dataclasses.replace(res, resid=np.append(res.resid[:-1], 3.0))
+        cop = rc.IndependenceCopula(2)
+        sd_down = CopulaGarch([down, down], cop).simulate(1, 40_000, random_state=0)[:, 0, 0].std()
+        sd_up = CopulaGarch([up, up], cop).simulate(1, 40_000, random_state=0)[:, 0, 0].std()
+        assert sd_down == pytest.approx(down.forecast_vol(1)[0], rel=0.03)
+        assert sd_up == pytest.approx(up.forecast_vol(1)[0], rel=0.03)
+        assert sd_down > 1.2 * sd_up
+
+
+# ---------------------------------------------------------------------------
+# Parity with R's rugarch
+# ---------------------------------------------------------------------------
+
+GOLDEN = Path(__file__).parent / "golden" / "garch.json"
+_GOLDEN = json.loads(GOLDEN.read_text()) if GOLDEN.exists() else {}
+_CASES = sorted(k for k in _GOLDEN if not k.startswith("_"))
+
+
+@pytest.mark.golden
+@pytest.mark.skipif(not _CASES, reason="tests/golden/garch.json not generated")
+@pytest.mark.parametrize("case", _CASES)
+def test_matches_rugarch(case: str) -> None:
+    """Same series, same model: parameters to 1e-3, log-likelihood to 0.1.
+
+    rugarch states the ARMA mean around its long-run level, so its ``mu`` maps
+    to ``mu * (1 - ar1)`` here. It starts the variance recursion at the mean
+    squared residual rather than the sample variance, which moves the
+    log-likelihood by a few hundredths at most (observed: 1e-4 to 0.05) and the
+    parameters by about 1e-4.
+    """
+    c = _GOLDEN[case]
+    x = np.asarray(c["x"], dtype=float)
+    coef = c["coef"]
+    vol = "gjr" if c["model"] == "gjrGARCH" else "garch"
+    mean = {(0, 0): "constant", (1, 0): "ar1", (1, 1): "arma11"}[tuple(c["arma"])]
+    res = fit_garch(x, dist="t" if c["dist"] == "std" else "normal", vol=vol, mean=mean)
+
+    ar = coef.get("ar1", 0.0)
+    assert res.mu == pytest.approx(coef["mu"] * (1.0 - ar), abs=1e-3)
+    assert res.unconditional_mean == pytest.approx(coef["mu"], abs=1e-3)
+    assert res.phi == pytest.approx(ar, abs=1e-3)
+    assert res.theta == pytest.approx(coef.get("ma1", 0.0), abs=1e-3)
+    assert res.omega == pytest.approx(coef["omega"], abs=1e-3)
+    assert res.alpha == pytest.approx(coef["alpha1"], abs=1e-3)
+    assert res.beta == pytest.approx(coef["beta1"], abs=1e-3)
+    assert res.gamma == pytest.approx(coef.get("gamma1", 0.0), abs=1e-3)
+    if "shape" in coef:
+        assert res.df == pytest.approx(coef["shape"], rel=1e-3)
+    assert res.loglik == pytest.approx(c["loglik"], abs=0.1)
+    # Past the start-up the filtered volatilities coincide.
+    assert np.allclose(res.sigma[-100:], c["sigma_tail"], rtol=2e-3)

@@ -718,6 +718,13 @@ def fit(
         raise ValueError(f"data has {u.shape[1]} column(s) but the copula has dim={copula.dim}")
     n = u.shape[0]
 
+    from rcopula.factor import FactorCopula, _fit_as_result
+
+    if isinstance(copula, FactorCopula):
+        # Thousands of loadings: generic optimisation is hopeless, and the
+        # structured estimator is both fast and accurate (see fit_factor).
+        return _fit_as_result(copula, u, method)
+
     if not np.any(copula.free):
         # Nothing to estimate -- either a parameter-free family such as
         # independence, or every parameter pinned by fix_params. There is still

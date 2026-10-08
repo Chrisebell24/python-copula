@@ -101,6 +101,17 @@ def _bools(values: Any) -> list[bool]:
     return [bool(v) for v in np.atleast_1d(np.asarray(values, dtype=bool))]
 
 
+def _label(value: Any) -> int | float | str:
+    """A group label JSON can carry: ints, floats and strings pass through."""
+    if isinstance(value, (bool, np.bool_)):
+        return int(value)
+    if isinstance(value, (int, np.integer)):
+        return int(value)
+    if isinstance(value, (float, np.floating)):
+        return float(value)
+    return str(value)
+
+
 # --------------------------------------------------------------------------
 # encoding
 # --------------------------------------------------------------------------
@@ -111,6 +122,7 @@ def _encode(copula: Copula) -> dict[str, Any]:
     identified by class name and rebuilt from its parameters."""
     from rcopula.core.elliptical import EllipticalCopula, StudentCopula
     from rcopula.core.empirical import EmpiricalCopula
+    from rcopula.factor import FactorCopula
     from rcopula.structural.khoudraji import KhoudrajiCopula
     from rcopula.structural.mixture import MixtureCopula
     from rcopula.structural.nested import NestedArchimedean
@@ -165,6 +177,24 @@ def _encode(copula: Copula) -> dict[str, Any]:
             "pair_copulas": [[_encode(pair) for pair in tree] for tree in copula.pair_copulas],
             "structure": str(copula.structure),
             "order": [int(i) for i in copula.order],
+        }
+
+    if isinstance(copula, FactorCopula):
+        group_loadings = copula.group_loadings
+        labels = copula.group_labels
+        codes = copula.groups
+        return {
+            "kind": kind,
+            "family": copula.family,
+            "market": _floats(copula.market),
+            "group_loadings": None if group_loadings is None else _floats(group_loadings),
+            # Labels go through JSON as they are when they are numbers or
+            # strings; anything else is stored as its code.
+            "groups": None
+            if labels is None or codes is None
+            else [_label(v) for v in labels[codes].tolist()],
+            "df": float(copula.df) if copula.family == "student" else None,
+            "free": _bools(copula.free),
         }
 
     node: dict[str, Any] = {
@@ -434,6 +464,19 @@ def _decode(node: dict[str, Any]) -> Copula:
             components=node["components"],
             children=cast("list[NestedArchimedean]", children),
         )
+    if kind == "FactorCopula":
+        family = node["family"]
+        factor = rc.FactorCopula(
+            np.asarray(node["market"], dtype=float),
+            None if node.get("group_loadings") is None else node["group_loadings"],
+            node.get("groups"),
+            family=family,
+            df=float(node["df"]) if family == "student" else None,
+        )
+        free = np.asarray(node.get("free", []), dtype=bool)
+        if free.size == factor.free.size and not free.all():
+            return factor.fix_params(free)
+        return factor
     if kind == "VineCopula":
         return rc.VineCopula(
             [[_decode(pair) for pair in tree] for tree in node["pair_copulas"]],

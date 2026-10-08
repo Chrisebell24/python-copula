@@ -52,7 +52,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,plots]"
 
       - name: Test
         run: python -m pytest -q -m "not slow"
@@ -120,3 +120,43 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Create the GitHub Release
+    # Only for a real tag, and only once the package is actually on PyPI.
+    needs: pypi
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # The release notes are this version's section of CHANGELOG.md: every
+      # line after the `## <version>` heading up to the next `## ` heading.
+      - name: Extract the release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            /^## / {
+              if (found) exit
+              h = $0; sub(/^## +\[?v?/, "", h)
+              if (index(h, ver) == 1 && substr(h, length(ver) + 1, 1) !~ /[0-9A-Za-z.]/) { found = 1; next }
+            }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no section for $version" >&2
+            exit 1
+          fi
+          cat notes.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "rcopula ${GITHUB_REF_NAME#v}" \
+            --notes-file notes.md \
+            --verify-tag

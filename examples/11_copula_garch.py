@@ -1,12 +1,15 @@
 """Volatility in time, dependence in the cross-section.
 
 Fitting a copula straight to returns confuses volatility clustering with
-dependence. This script shows the confusion, then removes it.
+dependence. This script shows the confusion, then removes it. It ends with the
+leverage effect -- volatility rising more after falls than after rallies --
+captured by GJR-GARCH margins (``vol="gjr"``).
 
     ## R (the copula_GARCH vignette uses rugarch for the margins)
     ## fit <- lapply(1:2, function(j) ugarchfit(spec, x[, j]))
     ## z   <- sapply(fit, residuals, standardize = TRUE)
     ## fitCopula(tCopula(), pobs(z), method = "mpl")
+    ## GJR margins: ugarchspec(variance.model = list(model = "gjrGARCH"))
 """
 
 from __future__ import annotations
@@ -114,3 +117,36 @@ b = student.forecast_risk(alpha=0.995, n=60_000, random_state=0)
 show("99.5% VaR, Gaussian dependence", a["var"])
 show("99.5% VaR, Student(3) dependence", b["var"])
 check("the tail-dependent copula demands more", b["var"] > a["var"])
+
+heading("The leverage effect: bad news raises volatility more (GJR-GARCH)")
+
+
+def _leverage(seed: int, n: int = 4000) -> np.ndarray:
+    """A falling market feeds 0.15 of a squared shock into next period's
+    variance, a rising one only 0.03 -- the asymmetry equity indices show."""
+    out = np.empty(n)
+    var, shock = 7e-5, 0.0
+    for i, innovation in enumerate(np.random.default_rng(seed).standard_normal(n)):
+        var = 2e-6 + (0.03 + 0.12 * (shock < 0)) * shock**2 + 0.88 * var
+        shock = np.sqrt(var) * innovation
+        out[i] = shock
+    return out
+
+
+asym = np.column_stack([_leverage(7), _leverage(8)])
+plain = fit_garch(asym[:, 0])
+gjr = fit_garch(asym[:, 0], vol="gjr")
+print(f"  {plain!r}\n  {gjr!r}")
+show("alpha (any shock), true 0.03", gjr.alpha)
+show("gamma (extra for a negative shock), true 0.12", gjr.gamma)
+show("AIC, GARCH", plain.aic)
+show("AIC, GJR-GARCH", gjr.aic)
+check("the fit finds the asymmetry", gjr.gamma > 0.05)
+check("and GJR beats plain GARCH by AIC", gjr.aic < plain.aic)
+check("persistence alpha + gamma/2 + beta stays below one", gjr.persistence < 1.0)
+
+# The same switch works for the joint model; simulation then uses the GJR
+# recursion, so a sell-off raises the simulated volatility more than a rally.
+lev_model = CopulaGarch.fit(asym, rc.StudentCopula(0.0, df=8.0, dim=2), vol="gjr")
+print(lev_model.summary()[["alpha", "gamma", "beta", "persistence"]].to_string())
+check("both margins show the leverage effect", bool((lev_model.summary()["gamma"] > 0.05).all()))

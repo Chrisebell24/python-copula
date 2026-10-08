@@ -68,6 +68,7 @@ from rcopula.dependence import (
     to_emp_margins,
 )
 from rcopula.distribution import CopulaDistribution, Margin
+from rcopula.factor import FactorCopula, fit_factor
 from rcopula.fit import CopulaFitResult, JointFitResult, fit, fit_joint, loglik_copula
 from rcopula.gof import GofResult, gof_statistic, gof_test, gof_two_sample
 from rcopula.htest import (
@@ -113,7 +114,7 @@ from rcopula.transforms import (
 )
 from rcopula.vine import VineCopula, fit_vine
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "AMHCopula",
@@ -127,6 +128,7 @@ __all__ = [
     "EmpiricalCopula",
     "ExtremeValueCopula",
     "FGMCopula",
+    "FactorCopula",
     "FrankCopula",
     "FrechetLowerCopula",
     "FrechetUpperCopula",
@@ -172,6 +174,7 @@ __all__ = [
     "ev_test",
     "exch_test",
     "fit",
+    "fit_factor",
     "fit_joint",
     "fit_lambda",
     "fit_nested",
