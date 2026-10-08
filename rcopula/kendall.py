@@ -86,8 +86,42 @@ def _archimedean_terms(
 
 
 def kendall_cdf(copula: Copula, t: ArrayLike) -> NDArray[np.float64]:
-    r"""The Kendall distribution function :math:`K(t) = P(C(\mathbf U) \le t)`.
+    r"""Probability that the copula, evaluated at a random draw from itself, is at most ``t``.
 
+    This is the Kendall distribution function
+    :math:`K(t) = P(C(\mathbf U) \le t)` (R's ``pK``). It squeezes a whole
+    multivariate dependence structure into one curve on :math:`[0, 1]`: the
+    value :math:`C(\mathbf u)` says how "jointly low" a point is, and :math:`K`
+    says how often points are at least that jointly low. Use it to compute joint
+    (Kendall) return periods, to compare a fitted family with data via
+    :func:`kendall_empirical`, or to recover Kendall's tau.
+
+    Parameters
+    ----------
+    copula : Copula
+        The dependence model, with its parameters set. Archimedean families
+        (Clayton, Gumbel, Frank, Joe, AMH, ...), :class:`IndependenceCopula` and
+        :class:`FrechetUpperCopula` work in any dimension; every other family
+        must be bivariate (``dim=2``).
+    t : float or array_like of float, any shape
+        Levels at which to evaluate :math:`K`. Values at or below 0 give 0 and
+        values at or above 1 give 1.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (m,)
+        :math:`K(t)` for each level, in :math:`[0, 1]`, where ``m`` is the
+        number of elements in ``t`` (the input is flattened to 1-D; a scalar
+        gives shape ``(1,)``). :math:`K(t) \ge t` for every copula.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``copula`` is neither Archimedean, independence nor comonotone and
+        has ``dim`` other than 2.
+
+    Notes
+    -----
     For an Archimedean copula in :math:`d` dimensions (Barbe et al. 1996),
 
     .. math::
@@ -214,8 +248,37 @@ def _kendall_cdf_generic(copula: Copula, t: NDArray[np.float64]) -> NDArray[np.f
 
 
 def kendall_pdf(copula: Copula, t: ArrayLike) -> NDArray[np.float64]:
-    r"""Density of the Kendall distribution function (R's ``dK``).
+    r"""Probability density of the Kendall distribution function (R's ``dK``).
 
+    The slope of :func:`kendall_cdf`: where it is large, many draws of the
+    copula land at that joint level. Useful for plotting the Kendall
+    distribution or building likelihoods on it.
+
+    Parameters
+    ----------
+    copula : Copula
+        The dependence model, with its parameters set. Same support as
+        :func:`kendall_cdf`: Archimedean families in any dimension (closed
+        form), other families bivariate only (numerical derivative).
+    t : float or array_like of float, any shape
+        Levels at which to evaluate the density. Points outside the open
+        interval :math:`(0, 1)` give 0.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (m,)
+        Non-negative density values, one per element of ``t`` (flattened to
+        1-D; a scalar gives shape ``(1,)``).
+
+    Raises
+    ------
+    NotImplementedError
+        If ``copula`` is not Archimedean and has ``dim`` other than 2 (raised
+        by :func:`kendall_cdf`, which the numerical route calls). Independence
+        and comonotone copulas use that numerical route.
+
+    Notes
+    -----
     Differentiating the Archimedean sum telescopes -- every term cancels against
     the next -- and only the last survives:
 
@@ -225,7 +288,7 @@ def kendall_pdf(copula: Copula, t: ArrayLike) -> NDArray[np.float64]:
         \qquad s = \psi^{-1}(t),
 
     manifestly non-negative, as a density must be. Elsewhere it is a central
-    difference of :func:`kendall_cdf`.
+    difference of :func:`kendall_cdf` with step ``1e-6``.
 
     Examples
     --------
@@ -272,7 +335,32 @@ def kendall_pdf(copula: Copula, t: ArrayLike) -> NDArray[np.float64]:
 
 
 def kendall_ppf(copula: Copula, p: ArrayLike) -> NDArray[np.float64]:
-    r"""Quantile function of :math:`K` (R's ``qK``), by bisection.
+    r"""Find the joint level ``t`` below which a given fraction of copula draws fall.
+
+    The quantile (inverse) function of the Kendall distribution, R's ``qK``:
+    returns ``t`` with :math:`K(t) = p`. Solved by 60 steps of bisection, so it
+    works for every family :func:`kendall_cdf` supports.
+
+    Parameters
+    ----------
+    copula : Copula
+        The dependence model, with its parameters set (see :func:`kendall_cdf`
+        for which families and dimensions are supported).
+    p : float or array_like of float, any shape
+        Probabilities, each in :math:`[0, 1]`.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (m,)
+        Levels ``t`` in :math:`[0, 1]`, one per element of ``p`` (flattened to
+        1-D). ``p = 0`` maps to 0 and ``p = 1`` maps to 1.
+
+    Raises
+    ------
+    ValueError
+        If any element of ``p`` lies outside :math:`[0, 1]`.
+    NotImplementedError
+        If :func:`kendall_cdf` does not support ``copula``.
 
     Examples
     --------
@@ -303,8 +391,28 @@ def kendall_rvs(
     size: int = 1,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Draw from :math:`K` (R's ``rK``), by evaluating :math:`C` at its own draws.
+    r"""Draw random values from the Kendall distribution of a copula (R's ``rK``).
 
+    It simulates points from the copula and evaluates the copula's CDF at each
+    one, so the output is a sample of :math:`C(\mathbf U)`.
+
+    Parameters
+    ----------
+    copula : Copula
+        The dependence model, with its parameters set. Must support ``rvs`` and
+        ``cdf`` (every family in the package does).
+    size : int, default 1
+        Number of draws; a positive integer.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducibility. ``None`` uses fresh entropy.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (size,)
+        Independent draws, each in :math:`[0, 1]`.
+
+    Notes
+    -----
     Exact by construction -- :math:`K` *is* the law of :math:`C(\mathbf U)` --
     and cheaper than inverting :math:`K`.
 
@@ -326,8 +434,40 @@ def kendall_rvs(
 
 
 def kendall_empirical(data: ArrayLike, t: ArrayLike | None = None) -> NDArray[np.float64]:
-    r"""The nonparametric Kendall function (R's ``Kn``).
+    r"""Estimate the Kendall distribution function straight from data, with no model.
 
+    This is the nonparametric estimator of Genest and Rivest (1993), R's
+    ``Kn``. For each observation it counts the fraction of the other
+    observations that are smaller in every coordinate, then takes the empirical
+    distribution of those fractions. It uses only ranks, so the margins do not
+    matter and no copula has to be fitted. Compare it with :func:`kendall_cdf`
+    of a fitted family to see whether the family's joint behaviour matches the
+    data.
+
+    Parameters
+    ----------
+    data : array_like of float, shape (n, d)
+        Observations, one row per observation, on any scale (raw data or
+        pseudo-observations). Needs ``n >= 2``. A 1-D input is treated as a
+        single row.
+    t : float, array_like of float or None, default None
+        Levels at which to evaluate the estimate. ``None`` returns the sorted
+        pseudo-values :math:`W_i` themselves instead.
+
+    Returns
+    -------
+    numpy.ndarray of float
+        If ``t`` is None: shape ``(n,)``, the sorted :math:`W_i`, each in
+        :math:`[0, 1]`. Otherwise: shape ``(m,)`` with ``m`` the number of
+        elements in ``t``, the estimated :math:`K` at each level.
+
+    Raises
+    ------
+    ValueError
+        If ``data`` has fewer than two rows.
+
+    Notes
+    -----
     Genest & Rivest (1993) replace :math:`C(\mathbf X_i)` by the fraction of the
     sample it dominates,
 
@@ -337,14 +477,7 @@ def kendall_empirical(data: ArrayLike, t: ArrayLike | None = None) -> NDArray[np
     and take the empirical distribution of the :math:`W_i`. Being rank-based it
     needs no margins and no fitted copula, which makes it the natural check on
     whether a family's :math:`K` matches the data -- and the basis of the
-    ``Sn^K`` goodness-of-fit statistics.
-
-    Parameters
-    ----------
-    data : array_like
-        ``(n, d)`` observations, on any scale.
-    t : array_like, optional
-        Where to evaluate. Defaults to the sorted ``W_i`` themselves.
+    ``Sn^K`` goodness-of-fit statistics. Memory and time are :math:`O(n^2)`.
 
     Examples
     --------
@@ -381,27 +514,48 @@ def kendall_empirical(data: ArrayLike, t: ArrayLike | None = None) -> NDArray[np
 def kendall_return_period(
     copula: Copula, t: ArrayLike, interval: float = 1.0
 ) -> NDArray[np.float64]:
-    r"""Kendall return period :math:`\text{interval}/(1 - K(t))`.
+    r"""How long, on average, until a joint event at least this severe happens again.
 
-    The multivariate answer to "how often is an event this severe". A univariate
-    return period asks how often *one* variable is exceeded; the joint event
-    :math:`\{C(\mathbf U) > t\}` is a region, and every point on its boundary is
-    equally extreme, so no single margin can express it.
+    This is the Kendall return period :math:`\text{interval}/(1 - K(t))`: the
+    multivariate counterpart of "the 100-year flood". Use it when an event is
+    dangerous because several variables are extreme together (for example
+    river flow and rainfall, or losses on several assets).
+
+    Parameters
+    ----------
+    copula : Copula
+        The fitted dependence structure, with its parameters set (see
+        :func:`kendall_cdf` for supported families and dimensions).
+    t : float or array_like of float, any shape
+        Critical level, in copula units: the value of :math:`C(\mathbf u)` at
+        the event of interest, between 0 and 1.
+    interval : float, default 1.0
+        Mean time between observations, in whatever unit the answer should be
+        in -- 1 for annual maxima. Must be positive.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (m,)
+        Return periods in the units of ``interval``, one per element of ``t``
+        (flattened to 1-D). Infinite where :math:`K(t) = 1`, e.g. at ``t >= 1``.
+
+    Raises
+    ------
+    ValueError
+        If ``interval`` is not positive.
+    NotImplementedError
+        If :func:`kendall_cdf` does not support ``copula``.
+
+    Notes
+    -----
+    A univariate return period asks how often *one* variable is exceeded; the
+    joint event :math:`\{C(\mathbf U) > t\}` is a region, and every point on its
+    boundary is equally extreme, so no single margin can express it.
 
     Because :math:`K(t) \ge t` for every copula, the Kendall return period is
     always **longer** than the univariate one at the same level. Reporting the
     univariate number for a compound event therefore overstates how often it
     happens.
-
-    Parameters
-    ----------
-    copula : Copula
-        The fitted dependence structure.
-    t : array_like
-        Critical level, in copula units.
-    interval : float
-        Mean time between observations, in whatever unit the answer should be
-        in -- 1 for annual maxima.
 
     Examples
     --------
@@ -438,11 +592,37 @@ def kendall_return_period(
 def return_period_level(
     copula: Copula, period: ArrayLike, interval: float = 1.0
 ) -> NDArray[np.float64]:
-    r"""The critical level :math:`t` whose Kendall return period is ``period``.
+    r"""Find the joint severity level that corresponds to a chosen return period.
 
-    The inverse of :func:`kendall_return_period`, and the quantity a design
-    standard actually specifies -- "the 100-year event" is a return period, and
-    what an engineer needs is the level that goes with it.
+    The inverse of :func:`kendall_return_period`: given "the 100-year event",
+    return the critical level :math:`t` (in copula units) whose Kendall return
+    period is ``period``. This is the quantity a design standard actually
+    specifies -- the return period is fixed and the engineer needs the level
+    that goes with it.
+
+    Parameters
+    ----------
+    copula : Copula
+        The fitted dependence structure, with its parameters set (see
+        :func:`kendall_cdf` for supported families and dimensions).
+    period : float or array_like of float, any shape
+        Target return periods, in the units of ``interval``. Each must be
+        positive and at least ``interval``.
+    interval : float, default 1.0
+        Mean time between observations -- 1 for annual maxima.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (m,)
+        Critical levels ``t`` in :math:`[0, 1]`, one per element of ``period``
+        (flattened to 1-D).
+
+    Raises
+    ------
+    ValueError
+        If any ``period`` is not positive, or is shorter than ``interval``
+        (which would need a probability below zero; the message then reads
+        "p must lie in [0, 1]").
 
     Examples
     --------

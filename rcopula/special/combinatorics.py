@@ -77,7 +77,31 @@ def _eulerian_row(n: int) -> tuple[int, ...]:
 
 
 def stirling1(n: int, k: int) -> float:
-    """Signed Stirling number of the first kind ``s(n, k)``.
+    """Return the signed Stirling number of the first kind, ``s(n, k)``.
+
+    A whole number from combinatorics. In plain terms, ``|s(n, k)|`` counts the
+    ways to arrange ``n`` labelled objects into ``k`` cycles; the sign is
+    ``(-1)**(n - k)``. Together with :func:`stirling2` it gives the polynomial
+    coefficients of the Gumbel generator's high-order derivatives, which the
+    ``d``-dimensional Gumbel density needs. You will rarely call it directly.
+
+    Parameters
+    ----------
+    n : int
+        Number of objects, ``n >= 0``.
+    k : int
+        Number of cycles, ``k >= 0``.
+
+    Returns
+    -------
+    float
+        ``s(n, k)``, computed exactly in integer arithmetic and returned as a
+        float. ``0.0`` when ``k > n``.
+
+    Raises
+    ------
+    ValueError
+        If ``n`` or ``k`` is negative.
 
     Examples
     --------
@@ -93,15 +117,56 @@ def stirling1(n: int, k: int) -> float:
 
 
 def stirling1_all(n: int) -> NDArray[np.float64]:
-    """All ``s(n, k)`` for ``k = 1..n``, as an array."""
+    """Return a whole row of signed Stirling numbers of the first kind at once.
+
+    Equivalent to ``[stirling1(n, k) for k in range(1, n + 1)]`` but taken from
+    the same cached row in one go.
+
+    Parameters
+    ----------
+    n : int
+        Number of objects, ``n >= 0``.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (n,)
+        ``s(n, k)`` for ``k = 1, ..., n``. Empty when ``n = 0``.
+
+    Examples
+    --------
+    >>> from rcopula.special.combinatorics import stirling1_all
+    >>> stirling1_all(4).tolist()
+    [-6.0, 11.0, -6.0, 1.0]
+    """
     return np.asarray(_stirling1_row(n)[1:], dtype=np.float64)
 
 
 def stirling2(n: int, k: int) -> float:
-    """Stirling number of the second kind ``S(n, k)``.
+    """Count the ways to split ``n`` labelled items into ``k`` non-empty groups.
 
-    The number of ways to partition ``n`` labelled objects into ``k`` non-empty
-    unlabelled subsets.
+    This is the Stirling number of the second kind ``S(n, k)``: the number of
+    ways to partition ``n`` labelled objects into ``k`` non-empty unlabelled
+    subsets. Together with :func:`stirling1` it gives the polynomial
+    coefficients of the Gumbel generator's high-order derivatives, which the
+    ``d``-dimensional Gumbel density needs.
+
+    Parameters
+    ----------
+    n : int
+        Number of objects, ``n >= 0``.
+    k : int
+        Number of groups, ``k >= 0``.
+
+    Returns
+    -------
+    float
+        ``S(n, k)``, computed exactly in integer arithmetic and returned as a
+        float. ``0.0`` when ``k > n``.
+
+    Raises
+    ------
+    ValueError
+        If ``n`` or ``k`` is negative.
 
     Examples
     --------
@@ -117,12 +182,57 @@ def stirling2(n: int, k: int) -> float:
 
 
 def stirling2_all(n: int) -> NDArray[np.float64]:
-    """All ``S(n, k)`` for ``k = 1..n``, as an array."""
+    """Return a whole row of Stirling numbers of the second kind at once.
+
+    Equivalent to ``[stirling2(n, k) for k in range(1, n + 1)]`` but taken from
+    the same cached row in one go.
+
+    Parameters
+    ----------
+    n : int
+        Number of objects, ``n >= 0``.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (n,)
+        ``S(n, k)`` for ``k = 1, ..., n``. Empty when ``n = 0``.
+
+    Examples
+    --------
+    >>> from rcopula.special.combinatorics import stirling2_all
+    >>> stirling2_all(4).tolist()
+    [1.0, 7.0, 6.0, 1.0]
+    """
     return np.asarray(_stirling2_row(n)[1:], dtype=np.float64)
 
 
 def eulerian(n: int, k: int) -> float:
-    """Eulerian number ``A(n, k)`` — permutations of ``n`` with ``k`` ascents.
+    """Count the orderings of ``n`` items that go up exactly ``k`` times.
+
+    This is the Eulerian number ``A(n, k)``: the number of permutations of
+    ``1..n`` with exactly ``k`` ascents (positions where the next entry is
+    larger). The package uses them
+    as the coefficients of the polylogarithm of negative integer order, which
+    the ``d``-dimensional densities of several Archimedean families are built
+    from.
+
+    Parameters
+    ----------
+    n : int
+        Permutation length, ``n >= 0``.
+    k : int
+        Number of ascents, ``k >= 0``.
+
+    Returns
+    -------
+    float
+        ``A(n, k)``, computed exactly in integer arithmetic and returned as a
+        float. ``0.0`` when ``k > n``; note that ``A(n, n) = 0`` for ``n >= 1``.
+
+    Raises
+    ------
+    ValueError
+        If ``n`` or ``k`` is negative.
 
     Examples
     --------
@@ -138,5 +248,25 @@ def eulerian(n: int, k: int) -> float:
 
 
 def eulerian_all(n: int) -> NDArray[np.float64]:
-    """All ``A(n, k)`` for ``k = 0..n-1``, as an array."""
+    """Return a whole row of Eulerian numbers at once.
+
+    Equivalent to ``[eulerian(n, k) for k in range(n)]`` (the entries that can
+    be non-zero) but taken from the same cached row in one go.
+
+    Parameters
+    ----------
+    n : int
+        Permutation length, ``n >= 0``.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (max(n, 1),)
+        ``A(n, k)`` for ``k = 0, ..., n - 1``. For ``n = 0`` this is ``[1.0]``.
+
+    Examples
+    --------
+    >>> from rcopula.special.combinatorics import eulerian_all
+    >>> eulerian_all(4).tolist()
+    [1.0, 11.0, 11.0, 1.0]
+    """
     return np.asarray(_eulerian_row(n)[: max(n, 1)], dtype=np.float64)

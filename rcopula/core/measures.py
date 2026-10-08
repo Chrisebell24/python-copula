@@ -78,10 +78,35 @@ def _tensor(level: int) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
 
 
 def rho_by_quadrature(copula: Copula, level: int = _LEVEL) -> float:
-    r"""Spearman's rho as :math:`12\int\int C\,du\,dv - 3`.
+    r"""Compute Spearman's rho of a two-variable copula by numerical integration.
 
-    Needs only the CDF, so it works for every bivariate copula -- including
-    those with no density at all.
+    Spearman's rho is a rank correlation between -1 and 1: 0 means no
+    monotone association, positive values mean the two variables tend to be
+    large together. Use this for copulas that have no closed-form rho, such as
+    rotations, mixtures and Khoudraji constructions.
+
+    Technically, it evaluates :math:`\rho = 12\int\int C\,du\,dv - 3` with a
+    tanh-sinh rule. It needs only the CDF, so it works for every bivariate
+    copula -- including those with no density at all.
+
+    Parameters
+    ----------
+    copula : Copula
+        A fully specified copula with ``dim == 2`` (no NaN parameters).
+    level : int, default 140
+        Half-width of the tanh-sinh node index; larger means more nodes per
+        axis and higher accuracy at more cost. The default gives roughly 150
+        usable nodes per axis and about 1e-9 accuracy.
+
+    Returns
+    -------
+    float
+        Spearman's rho, clipped to ``[-1, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``copula.dim`` is not 2, or the copula has unspecified parameters.
 
     Examples
     --------
@@ -102,11 +127,37 @@ def rho_by_quadrature(copula: Copula, level: int = _LEVEL) -> float:
 
 
 def tau_by_quadrature(copula: Copula, level: int = _LEVEL) -> float:
-    r"""Kendall's tau as :math:`4\int\int C\,dC - 1 = 4\int\int C\,c\,du\,dv - 1`.
+    r"""Compute Kendall's tau of a two-variable copula by numerical integration.
 
-    Needs the density as well as the CDF. Unlike Spearman's rho, tau is **not**
+    Kendall's tau is a rank correlation between -1 and 1 based on how often
+    pairs of observations move in the same direction. Use this for copulas
+    with a density but no closed-form tau. If the copula has a singular part
+    or very strong dependence, prefer :func:`tau_by_partials`.
+
+    Technically, it evaluates
+    :math:`\tau = 4\int\int C\,dC - 1 = 4\int\int C\,c\,du\,dv - 1` with a
+    tanh-sinh rule. It needs the density as well as the CDF. Unlike Spearman's rho, tau is **not**
     linear in the copula -- which is exactly why mixtures and rotations cannot
     simply average their components' values and have to come here instead.
+
+    Parameters
+    ----------
+    copula : Copula
+        A fully specified copula with ``dim == 2`` that has a density
+        (``pdf``).
+    level : int, default 140
+        Half-width of the tanh-sinh node index; larger means more nodes per
+        axis and higher accuracy at more cost.
+
+    Returns
+    -------
+    float
+        Kendall's tau, clipped to ``[-1, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``copula.dim`` is not 2, or the copula has unspecified parameters.
 
     Examples
     --------
@@ -137,8 +188,15 @@ _PARTIAL_STEP = 1e-6
 
 
 def tau_by_partials(copula: Copula, nodes: int = _PARTIAL_NODES) -> float:
-    r"""Kendall's tau as :math:`1 - 4\int\int \partial_1 C\,\partial_2 C\,du\,dv`.
+    r"""Compute Kendall's tau of a two-variable copula using only its CDF.
 
+    Kendall's tau is a rank correlation between -1 and 1. This is the most
+    robust of the quadrature routines: use it when the copula has a singular
+    part (no density everywhere) or very strong dependence.
+
+    Technically, it evaluates
+    :math:`\tau = 1 - 4\int\int \partial_1 C\,\partial_2 C\,du\,dv`, with the
+    partial derivatives taken by central differences and a Gauss-Legendre rule.
     The same quantity as :func:`tau_by_quadrature`, integrated a different way,
     and better in two situations that matter.
 
@@ -155,6 +213,24 @@ def tau_by_partials(copula: Copula, nodes: int = _PARTIAL_NODES) -> float:
 
     The trade is a numerical derivative, so it carries about 4e-8 rather than
     1e-8 -- immaterial next to what it buys.
+
+    Parameters
+    ----------
+    copula : Copula
+        A fully specified copula with ``dim == 2``.
+    nodes : int, default 400
+        Gauss-Legendre nodes per axis. The cost grows with ``nodes**2`` CDF
+        evaluations (times four, for the differences).
+
+    Returns
+    -------
+    float
+        Kendall's tau, clipped to ``[-1, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``copula.dim`` is not 2, or the copula has unspecified parameters.
 
     Examples
     --------

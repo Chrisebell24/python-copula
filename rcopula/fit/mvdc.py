@@ -81,7 +81,38 @@ _LOG_FLOOR = -1e6
 
 @dataclass
 class JointFitResult:
-    """A fitted joint distribution.
+    """The result of fitting both the margins and the copula: a complete, usable distribution.
+
+    Returned by :func:`fit_joint`; you do not normally build one yourself.
+    The fitted :attr:`distribution` can be sampled or evaluated straight
+    away, and :meth:`summary` prints a report.
+
+    Parameters
+    ----------
+    distribution : CopulaDistribution
+        Margins and copula, both fitted.
+    copula : Copula
+        The fitted dependence part alone.
+    margin_params : list of tuple of float, length d
+        Fitted parameters of each margin, in ``scipy`` order.
+    loglik : float
+        Joint log-likelihood, margins included.
+    method : {"ifm", "ml"}
+        Estimation method used.
+    n_obs : int
+        Number of observations (rows) fitted.
+    converged : bool
+        Whether the optimiser reported success (always ``True`` for
+        ``"ifm"``).
+    message : str, default ""
+        Optimiser message (empty for ``"ifm"``).
+    marginal_loglik : float, default 0.0
+        The margins' share of ``loglik``.
+    n_at_boundary : int, default 0
+        Number of observations whose fitted probability integral transform
+        landed on 0 or 1.
+    _x : ndarray of float, shape (n, d)
+        The data that were fitted. Internal; leave at its default.
 
     Attributes
     ----------
@@ -89,19 +120,28 @@ class JointFitResult:
         Margins and copula, both fitted. Ready to ``rvs`` or ``pdf``.
     copula : Copula
         The dependence part alone.
-    margin_params : list of tuple
+    margin_params : list of tuple of float, length d
         The fitted parameters of each margin, in ``scipy`` order (shape
         parameters first, then ``loc`` and ``scale``).
     loglik : float
         Joint log-likelihood, margins included -- so it is **not** comparable
         with a copula-only log-likelihood from :func:`~rcopula.fit`.
     method : str
+        ``"ifm"`` or ``"ml"``.
     n_obs : int
+        Number of observations.
     converged : bool
+        Whether the optimiser reported success.
+    message : str
+        Optimiser message, empty for ``"ifm"``.
+    marginal_loglik : float
+        Sum of the margins' log-densities at the fitted parameters.
     n_at_boundary : int
         Observations whose fitted probability integral transform landed exactly
         on 0 or 1. Almost always the sample extremes, because maximum likelihood
-        puts a margin's support boundary there; see :func:`_joint_loglik`.
+        puts a margin's support boundary there; those values are nudged just
+        inside ``(0, 1)`` before the copula density is evaluated, and this
+        count reports how many were patched.
     """
 
     distribution: CopulaDistribution
@@ -118,30 +158,72 @@ class JointFitResult:
 
     @property
     def n_params(self) -> int:
-        """Every parameter estimated, marginal and dependence."""
+        """How many parameters were estimated in total, margins plus copula.
+
+        Returns
+        -------
+        int
+            Sum of the lengths of ``margin_params`` plus the number of free
+            copula parameters.
+        """
         return sum(len(p) for p in self.margin_params) + int(np.sum(self.copula.free))
 
     @property
     def aic(self) -> float:
-        """Akaike information criterion for the joint model."""
+        """A fit score for the whole model that penalises extra parameters; lower is better (AIC).
+
+        Akaike information criterion, ``2 k - 2 loglik`` with ``k =``
+        :attr:`n_params`.
+
+        Returns
+        -------
+        float
+        """
         return float(2 * self.n_params - 2 * self.loglik)
 
     @property
     def bic(self) -> float:
-        """Bayesian information criterion for the joint model."""
+        """A fit score for the whole model with a stronger penalty than AIC; lower is better (BIC).
+
+        Bayesian information criterion, ``k log n - 2 loglik`` with ``k =``
+        :attr:`n_params`.
+
+        Returns
+        -------
+        float
+        """
         return float(self.n_params * np.log(self.n_obs) - 2 * self.loglik)
 
     @property
     def dependence_loglik(self) -> float:
-        """The copula's contribution: joint log-likelihood minus the margins'.
+        """The part of the log-likelihood due to the copula alone (joint minus margins).
 
+        Use this, not :attr:`loglik`, to compare copula families.
+
+        Returns
+        -------
+        float
+            ``loglik - marginal_loglik``.
+
+        Notes
+        -----
         This *is* comparable across copula families fitted to the same margins,
         which the joint figure is not.
         """
         return float(self.loglik - self.marginal_loglik)
 
     def summary(self) -> str:
-        """A printable report.
+        """A human-readable text report of the fit, ready to print.
+
+        Lists each margin's fitted parameters, the copula, the joint,
+        marginal and dependence log-likelihoods, AIC/BIC, the parameter count
+        and the number of boundary observations, plus a warning if the
+        optimiser did not converge.
+
+        Returns
+        -------
+        str
+            Multi-line text; pass it to ``print``.
 
         Examples
         --------
@@ -249,32 +331,48 @@ def fit_joint(
     margin_kwargs: list[dict[str, Any]] | None = None,
     copula_method: str = "mpl",
 ) -> JointFitResult:
-    """Fit a copula and its margins to data (R's ``fitMvdc``).
+    """Fit a full joint distribution: each variable's own distribution plus the copula linking them.
+
+    Use this when you want a complete model on the original scale -- to
+    simulate realistic data, compute probabilities, or report fitted
+    margins -- rather than the dependence alone. This is R's ``fitMvdc``.
+    If you only care about the dependence, :func:`~rcopula.fit` on ranks is
+    safer, because it makes no assumption about the margins.
 
     Parameters
     ----------
     distribution : CopulaDistribution
         Supplies the *shapes*: which copula family and which marginal families.
-        Its current parameter values are only a starting point.
-    x : array_like, shape (n, d)
-        Data on the original scale, **not** pseudo-observations.
-    method : {"ifm", "ml"}
-        Two-step or joint. See the module docstring.
-    margin_kwargs : list of dict, optional
-        Extra arguments per margin for ``scipy``'s ``fit`` -- most usefully
-        ``{"floc": 0}`` to pin a location that the family requires to be zero.
+        Its current parameter values are only a starting point. Each margin
+        must be a frozen ``scipy.stats`` distribution, so it can be refitted.
+    x : array_like of float, shape (n, d)
+        Data on the original scale, **not** pseudo-observations; ``d`` must
+        equal ``distribution.dim``. A 1-D input is treated as a single row.
+    method : {"ifm", "ml"}, default "ifm"
+        ``"ifm"`` fits each margin first, then the copula (two steps, the
+        standard choice). ``"ml"`` then optimises everything jointly, starting
+        from the IFM answer. See the module docstring.
+    margin_kwargs : list of dict or None, default None
+        One dict per margin (length ``d``) of extra arguments for ``scipy``'s
+        ``fit`` -- most usefully ``{"floc": 0}`` to pin a location that the
+        family requires to be zero. Use ``{}`` for margins that need nothing.
         Getting this wrong is the commonest cause of an implausible fit: a
         Gamma fitted with a free location will happily slide it to just below
         the sample minimum.
-    copula_method : str
+    copula_method : {"mpl", "ml", "itau", "irho", "itau.mpl"}, default "mpl"
         Passed to :func:`~rcopula.fit` for the copula step.
 
     Returns
     -------
     JointFitResult
+        The fitted distribution, the copula, each margin's parameters, the
+        log-likelihoods and AIC/BIC.
 
     Raises
     ------
+    ValueError
+        If ``x`` does not have ``distribution.dim`` columns, ``method`` is not
+        ``"ifm"`` or ``"ml"``, or ``margin_kwargs`` has the wrong length.
     TypeError
         If a margin has no underlying ``scipy`` distribution to refit.
 

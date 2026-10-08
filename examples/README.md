@@ -41,6 +41,7 @@ sit in a comment block beside the Python so the two can be compared directly.
 | [29](29_risk_management_howto.py) | How-to: risk management for a multi-desk book — VaR backtest, Euler allocation, diversification, CoVaR contagion, reverse stress |
 | [30](30_trading_strategies_howto.py) | How-to: copula pairs trading end to end — pick, fit, signal, backtest with costs vs the z-score, a vine basket trade, and a break alarm |
 | [31](31_valuing_odd_assets_howto.py) | How-to: valuing odd assets — worst-of notes, basket puts, first-to-default, cat bonds, private stakes — at the same correlation |
+| [32](32_high_dimensional_basket_howto.py) | How-to: 800 stocks — why naive copulas fail, then a factor copula, a sector-nested copula and a truncated vine, graded against the truth, through 50,000-day VaR and expected shortfall |
 
 ## Beyond finance
 

@@ -42,14 +42,42 @@ from rcopula.core.base import Copula
 
 __all__ = ["STATISTICS", "empirical_copula_at", "gof_statistic"]
 
+#: Names of the goodness-of-fit statistics that :func:`gof_statistic` and
+#: :func:`~rcopula.gof_test` accept, as a ``tuple`` of ``str``:
+#: ``("Sn", "Tn", "AnChisq", "AnGamma")``. ``"Sn"`` is the recommended default.
 STATISTICS = ("Sn", "Tn", "AnChisq", "AnGamma")
 
 
 def empirical_copula_at(u: ArrayLike, at: ArrayLike | None = None) -> NDArray[np.float64]:
-    r"""Empirical copula :math:`C_n` evaluated at each row of ``at``.
+    r"""Compute, for each point, the share of observations that lie below it in every coordinate.
 
+    This is the *empirical copula* :math:`C_n`: the data's own, model-free
+    estimate of the copula. Goodness-of-fit statistics compare it with a fitted
+    parametric copula, and you can use it directly to see what the dependence in
+    a sample looks like without assuming any family.
+
+    Parameters
+    ----------
+    u : array_like of float, shape (n, d)
+        The observations defining the empirical copula, normally
+        pseudo-observations in ``[0, 1]`` (see :func:`~rcopula.pseudo_obs`).
+        A 1-D input is treated as a single row.
+    at : array_like of float, shape (m, d), or None, default None
+        The points at which to evaluate it. ``None`` evaluates at the rows of
+        ``u`` themselves, so ``m = n``. Must have the same number of columns as
+        ``u``.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (m,)
+        For each point, the fraction of rows of ``u`` that are less than or
+        equal to it in every coordinate; values lie in ``[0, 1]``.
+
+    Notes
+    -----
+    Formally :math:`C_n(\mathbf x) = \frac1n \sum_i \mathbf 1\{\mathbf U_i \le \mathbf x\}`.
     Uses the ``1/n`` scaling of Genest-Remillard-Beaudoin, matching R's
-    ``C.n`` with ``offset = 0``.
+    ``C.n`` with ``offset = 0``. Memory and time grow as ``m * n * d``.
 
     Examples
     --------
@@ -82,21 +110,48 @@ def gof_statistic(
     copula: Copula | None = None,
     method: str = "Sn",
 ) -> float:
-    r"""Evaluate a goodness-of-fit statistic (R's ``gofTstat``).
+    r"""Score how far a fitted copula is from the data, where a bigger number means a worse fit.
+
+    This computes one goodness-of-fit statistic (R's ``gofTstat``) and nothing
+    else -- no p-value. Use it to compare candidate families on the same data,
+    or as a building block; for a formal test with a p-value use
+    :func:`~rcopula.gof_test`, which calibrates this number by bootstrap.
 
     Parameters
     ----------
-    u : array_like
-        ``(n, d)`` pseudo-observations. For ``AnChisq``/``AnGamma`` these should
-        already be Rosenblatt-transformed, as in R.
-    copula : Copula, optional
-        The fitted copula, required for ``Sn`` and ``Tn``.
-    method : {"Sn", "Tn", "AnChisq", "AnGamma"}
+    u : array_like of float, shape (n, d)
+        Pseudo-observations, values in ``[0, 1]`` (see :func:`~rcopula.pseudo_obs`).
+        For ``"AnChisq"``/``"AnGamma"`` these should already be
+        Rosenblatt-transformed with the fitted copula, as in R; this function
+        does not do that transform for you.
+    copula : Copula or None, default None
+        The fitted copula to compare against. Required for ``"Sn"`` and
+        ``"Tn"``; ignored by ``"AnChisq"`` and ``"AnGamma"``.
+    method : {"Sn", "Tn", "AnChisq", "AnGamma"}, default "Sn"
+        Which statistic to compute; see the module notes. ``"Sn"`` is the
+        recommended all-round choice.
 
     Returns
     -------
     float
-        The statistic. Larger values indicate worse fit.
+        The statistic, zero or positive. Larger values indicate worse fit.
+        Values are only comparable between fits made with the same ``method``
+        and the same data size.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not one of the four names above, or if ``method`` is
+        ``"Sn"`` or ``"Tn"`` and ``copula`` is ``None``.
+
+    Notes
+    -----
+    ``Sn`` is :math:`\sum_i \{C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)\}^2`.
+    ``Tn`` is computed as :math:`n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|`.
+    ``AnChisq`` and ``AnGamma`` collapse each row to one number (a sum of
+    squared normal quantiles, or a sum of :math:`-\log u`), map it to
+    ``(0, 1)`` with the chi-squared or gamma distribution function, and apply
+    the Anderson-Darling uniformity statistic.
 
     Examples
     --------

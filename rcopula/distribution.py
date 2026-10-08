@@ -41,10 +41,29 @@ __all__ = ["CopulaDistribution", "Margin"]
 
 @runtime_checkable
 class Margin(Protocol):
-    """What a marginal distribution must provide.
+    """The methods a single-variable distribution needs to be used as a margin.
+
+    A margin describes one variable on its own (its scale and shape), for
+    example ``scipy.stats.norm(loc=0, scale=1)``. You never instantiate
+    ``Margin``; it only documents what :class:`CopulaDistribution` expects.
 
     Satisfied by every ``scipy.stats`` frozen distribution, and by anything else
-    exposing the same three methods.
+    exposing the same three methods:
+
+    - ``cdf(x)``: cumulative probability ``P(X <= x)`` for array_like ``x``.
+    - ``pdf(x)``: density at ``x``.
+    - ``ppf(q)``: quantile function, the inverse of ``cdf``, for ``q`` in
+      ``[0, 1]``.
+
+    :class:`CopulaDistribution` also accepts discrete margins that provide
+    ``pmf`` instead of ``pdf`` (such as scipy's frozen discrete distributions).
+
+    Examples
+    --------
+    >>> from scipy import stats
+    >>> from rcopula.distribution import Margin
+    >>> isinstance(stats.norm(), Margin)
+    True
     """
 
     def cdf(self, x: ArrayLike) -> Any: ...
@@ -53,16 +72,50 @@ class Margin(Protocol):
 
 
 class CopulaDistribution:
-    """A joint distribution assembled from a copula and its margins.
+    """A joint distribution made from a copula plus one distribution per variable.
+
+    Use this when you want realistic joint samples or joint probabilities on
+    the original scale of your data: choose each variable's own distribution
+    (the *margins*, e.g. a normal for one, an exponential for another) and a
+    copula for how they move together. The result has those exact margins and
+    that exact dependence (Sklar's theorem).
 
     Parameters
     ----------
     copula : Copula
-        The dependence structure.
-    margins : sequence of frozen distributions
-        One per dimension. A single distribution is broadcast to all dimensions.
-    names : sequence of str, optional
-        Column names, used when input or output is a ``pandas`` frame.
+        The dependence structure, e.g. ``ClaytonCopula(2.0, dim=2)``. Must be
+        fully specified (no ``nan`` parameters) before evaluating or sampling.
+    margins : Margin or list of Margin
+        One distribution per variable, in column order, typically scipy frozen
+        distributions such as ``stats.norm(loc=1, scale=2)``. A list or tuple
+        must have exactly ``copula.dim`` entries; a single distribution is used
+        for every variable. Each margin needs ``cdf``, ``ppf`` and either
+        ``pdf`` (continuous) or ``pmf`` (discrete).
+    names : list of str or None, default None
+        Column names, length ``copula.dim``. When given, :meth:`rvs` returns a
+        ``pandas.DataFrame`` with these columns instead of an array.
+
+    Attributes
+    ----------
+    copula : Copula
+        The copula passed in.
+    margins : list of Margin
+        The margins, one per variable (a single margin is repeated).
+    discrete : numpy.ndarray of bool, shape (d,)
+        ``True`` for variables whose margin is discrete (has ``pmf`` but no
+        ``pdf``).
+    names : list of str or None
+        Column names, or ``None``.
+    dim : int
+        Number of variables.
+
+    Raises
+    ------
+    TypeError
+        If ``copula`` is not a :class:`~rcopula.core.base.Copula`, or a margin
+        lacks the required methods.
+    ValueError
+        If the number of margins or names does not match ``copula.dim``.
 
     Examples
     --------
@@ -140,7 +193,13 @@ class CopulaDistribution:
 
     @property
     def dim(self) -> int:
-        """Dimension of the distribution."""
+        """Number of variables in the distribution (same as the copula's ``dim``).
+
+        Returns
+        -------
+        int
+            The dimension, at least 2.
+        """
         return self.copula.dim
 
     # ------------------------------------------------------------------
@@ -162,12 +221,56 @@ class CopulaDistribution:
     # ------------------------------------------------------------------
 
     def cdf(self, x: ArrayLike) -> NDArray[np.float64]:
-        r"""Joint distribution function :math:`C(F_1(x_1), \dots, F_d(x_d))`."""
+        r"""Probability that every variable is at or below the given values.
+
+        For two variables and a point ``(a, b)`` this is
+        ``P(X_1 <= a and X_2 <= b)``, the joint cumulative distribution
+        function :math:`C(F_1(x_1), \dots, F_d(x_d))`.
+
+        Parameters
+        ----------
+        x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
+            Points on the original scale of the variables, one row per point.
+            A 1-D input is treated as a single point. A DataFrame is used by
+            column position, not by name.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n,)
+            Probabilities in ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` does not have ``d`` columns, or the copula is unfitted.
+        """
         return self.copula.cdf(self._to_uniform(self._validate_x(x)))
 
     def logpdf(self, x: ArrayLike) -> NDArray[np.float64]:
-        r"""Log joint density.
+        r"""Natural logarithm of the joint density at each point.
 
+        Use this rather than ``log(pdf(x))`` for likelihoods: it stays accurate
+        when the density is extremely small.
+
+        Parameters
+        ----------
+        x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
+            Points on the original scale of the variables, one row per point.
+            A 1-D input is treated as a single point.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n,)
+            Log density (or log mass, with discrete margins); ``-inf`` where the
+            density is zero.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` does not have ``d`` columns, or the copula is unfitted.
+
+        Notes
+        -----
         By the chain rule,
         :math:`h(\mathbf{x}) = c(F_1(x_1),\dots)\prod_j f_j(x_j)`, so the log
         density is the copula log density plus the marginal log densities. Doing
@@ -191,7 +294,28 @@ class CopulaDistribution:
         return np.asarray(self.copula.logpdf(u) + marginal)
 
     def pdf(self, x: ArrayLike) -> NDArray[np.float64]:
-        r"""Joint density, or mass, or the mixture of the two.
+        r"""Joint density at each point (or probability mass, if margins are discrete).
+
+        Parameters
+        ----------
+        x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
+            Points on the original scale of the variables, one row per point.
+            A 1-D input is treated as a single point.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n,)
+            Joint density for continuous margins, probability mass for all
+            discrete margins, or the mixed density/mass otherwise.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` does not have ``d`` columns, or the copula is unfitted.
+
+        Notes
+        -----
+        Joint density, or mass, or the mixture of the two.
 
         With continuous margins this is
         :math:`c(F_1(x_1),\dots)\prod_j f_j(x_j)`. With any discrete margin it
@@ -216,8 +340,29 @@ class CopulaDistribution:
         size: int = 1,
         random_state: np.random.Generator | int | None = None,
     ) -> NDArray[np.float64] | pd.DataFrame:
-        """Draw from the joint distribution.
+        """Generate random samples on the original scale of the variables.
 
+        Parameters
+        ----------
+        size : int, default 1
+            Number of observations (rows) to draw. Must be non-negative.
+        random_state : int, numpy.random.Generator or None, default None
+            Seed or generator for reproducible draws; ``None`` gives fresh
+            randomness.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (size, d), or pandas.DataFrame
+            Samples, one row per observation. A ``DataFrame`` with columns
+            :attr:`names` is returned when ``names`` was given.
+
+        Raises
+        ------
+        ValueError
+            If the copula is unfitted or ``size < 0``.
+
+        Notes
+        -----
         Samples the copula, then pushes each coordinate through the
         corresponding marginal quantile function.
         """
@@ -230,11 +375,37 @@ class CopulaDistribution:
     # ------------------------------------------------------------------
 
     def marginal_cdf(self, x: ArrayLike) -> NDArray[np.float64]:
-        """The marginal CDFs applied columnwise -- the copula's own arguments."""
+        """Convert data to the unit scale by applying each margin's CDF to its column.
+
+        The result is what the copula itself sees: column ``j`` becomes
+        ``F_j(x[:, j])``, a value in ``[0, 1]`` -- the copula's own arguments.
+
+        Parameters
+        ----------
+        x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
+            Points on the original scale, one row per point.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n, d)
+            Marginal probabilities in ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If ``x`` does not have ``d`` columns.
+        """
         return self._to_uniform(self._validate_x(x))
 
     def describe(self) -> str:
-        """One-line summary."""
+        """Short human-readable summary of the copula and the margins.
+
+        Returns
+        -------
+        str
+            One line, e.g.
+            ``'Clayton copula, dim 2, theta=2 with margins [norm, expon]'``.
+        """
         # `dist.name` is a scipy detail, not part of the Margin protocol, so
         # fall back to the class name for user-supplied margins.
         names = ", ".join(

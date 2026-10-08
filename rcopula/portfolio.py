@@ -76,11 +76,44 @@ __all__ = [
 
 
 def mispricing_index(copula: Copula, u: ArrayLike) -> tuple[NDArray, NDArray]:
-    r"""Conditional probabilities for both legs of a pair.
+    r"""How cheap or rich each asset of a pair looks, given where its partner is.
 
-    Returns :math:`h_1 = P(U_1 \le u_1 \mid U_2 = u_2)` and
+    For each day, returns two probabilities between 0 and 1. ``h1`` is the
+    chance that asset 1 would be this low *given today's level of asset 2*;
+    ``h2`` is the same for asset 2 given asset 1. A small ``h1`` (say 0.02)
+    means asset 1 is unusually cheap relative to asset 2; a value near 0.5
+    means nothing unusual. These are the inputs to :func:`pairs_signal`.
+
+    Technically these are the copula conditional distribution functions
+    (h-functions) :math:`h_1 = P(U_1 \le u_1 \mid U_2 = u_2)` and
     :math:`h_2 = P(U_2 \le u_2 \mid U_1 = u_1)`.
 
+    Parameters
+    ----------
+    copula : Copula
+        A bivariate copula with its parameters already set, usually fitted to
+        a training window of the pair (see :func:`rcopula.fit`).
+    u : array_like of float, shape (n, 2) or (2,)
+        Pseudo-observations: each asset's return converted to a rank in
+        (0, 1), for example with :func:`rcopula.pseudo_obs`. Column 0 is
+        asset 1, column 1 is asset 2. A single row of length 2 is accepted.
+
+    Returns
+    -------
+    h1 : numpy.ndarray of float, shape (n,)
+        :math:`P(U_1 \le u_1 \mid U_2 = u_2)` for each row: small means asset 1
+        is low relative to asset 2.
+    h2 : numpy.ndarray of float, shape (n,)
+        :math:`P(U_2 \le u_2 \mid U_1 = u_1)` for each row: small means asset 2
+        is low relative to asset 1.
+
+    Raises
+    ------
+    ValueError
+        If ``u`` does not have exactly two columns.
+
+    Notes
+    -----
     Both are uniform under the fitted copula, so a value of 0.02 always means
     "only a 2% chance of being this low" whatever the pair, the margins or the
     dependence shape. That comparability is what a z-scored price spread cannot
@@ -114,24 +147,45 @@ def pairs_signal(
     entry: float = 0.05,
     exit_band: float = 0.5,
 ) -> NDArray[np.int_]:
-    r"""Trading signal from the conditional copula probabilities.
+    r"""Long, short or flat for a pair, based on how mispriced one leg looks.
 
     Returns ``+1`` to go long the spread (long asset 1, short asset 2), ``-1``
-    for the reverse, and ``0`` to stand aside.
+    for the reverse, and ``0`` to stand aside, one value per row of ``u``.
 
     A position opens when **both** legs agree that one asset is mispriced
-    relative to the other -- ``h1`` below ``entry`` *and* ``h2`` above
-    ``1 - entry``. Requiring both is what distinguishes relative mispricing from
-    a common move: if the whole market falls, both conditionals stay near 0.5
-    and no signal fires.
+    relative to the other -- ``h1`` at or below ``entry`` *and* ``h2`` at or
+    above ``1 - entry`` (see :func:`mispricing_index`). Requiring both is what
+    distinguishes relative mispricing from a common move: if the whole market
+    falls, both conditionals stay near 0.5 and no signal fires.
 
     Parameters
     ----------
-    entry : float
-        Threshold for opening. Smaller means rarer, higher-conviction trades.
-    exit_band : float
-        Positions close once the conditional returns within ``exit_band`` of
-        0.5. The default of 0.5 exits only at full reversion.
+    copula : Copula
+        A bivariate copula with its parameters already set (usually fitted to
+        a training window of the pair).
+    u : array_like of float, shape (n, 2) or (2,)
+        Pseudo-observations (ranks in (0, 1)) of the two assets; column 0 is
+        asset 1, column 1 is asset 2.
+    entry : float, default 0.05
+        Probability threshold for opening, strictly between 0 and 0.5.
+        Smaller means rarer, higher-conviction trades.
+    exit_band : float, default 0.5
+        Intended to close positions once the conditional returns within
+        ``exit_band`` of 0.5. **Currently not used**: the signal is computed
+        row by row with no memory of earlier positions, so any row that does
+        not meet the entry rule returns ``0``.
+
+    Returns
+    -------
+    numpy.ndarray of int, shape (n,)
+        ``+1`` (long asset 1 / short asset 2), ``-1`` (short asset 1 / long
+        asset 2) or ``0`` (no position) for each row.
+
+    Raises
+    ------
+    ValueError
+        If ``entry`` is not strictly between 0 and 0.5, or ``u`` does not have
+        two columns.
 
     Examples
     --------
@@ -160,7 +214,32 @@ def pairs_signal(
 
 
 class BacktestResult(NamedTuple):
-    """Outcome of a pairs backtest."""
+    """Headline numbers and daily detail from :func:`backtest_pairs`.
+
+    A named tuple, so fields can be read by name (``result.hit_rate``) or
+    unpacked in order. All figures are frictionless (no costs or slippage).
+
+    Attributes
+    ----------
+    total_return : float
+        Compounded return of the strategy over the whole sample, as a
+        fraction (0.05 means +5%).
+    annualised_sharpe : float
+        Mean over standard deviation of the per-period strategy return,
+        computed over the periods in which a position was held only, scaled
+        by ``sqrt(periods_per_year)``. ``0.0`` if fewer than two such periods.
+    n_trades : int
+        Number of times the position changed from one period to the next.
+        Opening and later closing a position counts as two.
+    hit_rate : float
+        Fraction of in-position periods with a positive strategy return,
+        between 0 and 1. ``0.0`` if no position was ever held.
+    returns : numpy.ndarray of float, shape (n,)
+        Per-period strategy return, ``position * (r1 - r2)``; zero when flat.
+    positions : numpy.ndarray of int, shape (n,)
+        Position held in each period: ``+1``, ``-1`` or ``0``. The first
+        ``train + 1`` entries are always ``0``.
+    """
 
     total_return: float
     annualised_sharpe: float
@@ -185,28 +264,48 @@ def backtest_pairs(
     periods_per_year: int = 252,
     refit_every: int = 0,
 ) -> BacktestResult:
-    r"""Walk-forward backtest of the copula pairs strategy.
+    r"""Replay the copula pairs strategy through history, without look-ahead.
 
-    Fits the copula on a trailing window, forms a signal from the *next*
-    observation only, and holds the resulting position for one period. The
-    signal at time ``t`` never sees data from time ``t``, which is the part
-    most easily got wrong.
+    Use it to see how often :func:`pairs_signal` would have fired on a real
+    pair and whether the trades made money before costs.
+
+    At each period ``t`` the copula is fitted on the trailing ``train``
+    returns, today's return is ranked within that window, and the resulting
+    signal is held for the *next* period only (``t + 1``). The position earned
+    in period ``t + 1`` therefore never depends on the return of period
+    ``t + 1``, which is the part most easily got wrong.
 
     Parameters
     ----------
-    returns : array_like
-        ``(n, 2)`` period returns for the two assets.
+    returns : array_like or pandas.DataFrame of float, shape (n, 2)
+        Period (e.g. daily) simple returns of the two assets, as fractions
+        (0.01 = 1%). Column 0 is asset 1, column 1 is asset 2.
     copula : Copula
-        Family to fit. Parameters are estimated from each training window.
-    train : int
-        Length of the trailing window.
-    refit_every : int
-        Refit cadence. ``0`` refits every period; larger values are faster and
-        make the position depend on a slightly staler model.
+        Copula family to use, e.g. ``ClaytonCopula()``. Its starting parameter
+        is ignored; parameters are re-estimated from each training window.
+    train : int, default 250
+        Length of the trailing fitting window, in periods (250 is roughly one
+        trading year of daily data).
+    entry : float, default 0.05
+        Entry threshold passed to :func:`pairs_signal`; must lie in (0, 0.5).
+    periods_per_year : int, default 252
+        Used only to annualise the Sharpe ratio (252 for daily, 52 weekly,
+        12 monthly).
+    refit_every : int, default 0
+        Refit cadence in periods. ``0`` refits every period; larger values are
+        faster and make the position depend on a slightly staler model.
 
     Returns
     -------
     BacktestResult
+        Named tuple with ``total_return``, ``annualised_sharpe``,
+        ``n_trades``, ``hit_rate``, ``returns`` (shape (n,)) and
+        ``positions`` (shape (n,)); see :class:`BacktestResult`.
+
+    Raises
+    ------
+    ValueError
+        If ``returns`` is not two-column, or has ``train + 1`` rows or fewer.
 
     Notes
     -----
@@ -284,7 +383,31 @@ def simulate_returns(
     n: int = 20_000,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    """Scenario returns from a copula model, for the optimisers below.
+    """Simulate many joint return scenarios from a copula plus per-asset margins.
+
+    The copula sets how the assets move together (including in the tails);
+    the margins set each asset's own return distribution. The output is a
+    table of scenarios to feed :func:`mean_cvar_weights` or
+    :func:`efficient_frontier`.
+
+    Parameters
+    ----------
+    copula : Copula
+        A copula of dimension ``d`` with its parameters set.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Return distribution of each asset, e.g. ``stats.norm(0.0005, 0.012)``
+        for a daily mean of 0.05% and volatility of 1.2%. A single
+        distribution is used for every asset.
+    n : int, default 20000
+        Number of scenarios (rows) to draw.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducible draws.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n, d)
+        Simulated returns, one scenario per row and one asset per column, in
+        the units of the margins.
 
     Examples
     --------
@@ -308,8 +431,42 @@ def mean_cvar_weights(
     target_return: float | None = None,
     bounds: tuple[float, float] = (0.0, 1.0),
 ) -> NDArray[np.float64]:
-    r"""Weights minimising conditional value at risk, by linear programming.
+    r"""Portfolio weights that minimise the average loss on the worst days.
 
+    Finds fully invested weights that minimise conditional value at risk
+    (CVaR, also called expected shortfall): the average loss in the worst
+    ``1 - alpha`` share of scenarios. Unlike minimum variance, it looks only at
+    the downside and sees tail dependence. Optionally require a minimum mean
+    return to trace out a risk/return trade-off.
+
+    Parameters
+    ----------
+    scenarios : array_like of float, shape (n, d)
+        Scenario **returns** (not losses), one scenario per row and one asset
+        per column, e.g. from :func:`simulate_returns` or historical data.
+    alpha : float, default 0.95
+        CVaR confidence level in (0, 1). 0.95 averages the worst 5% of
+        scenarios.
+    target_return : float, optional
+        Minimum required mean portfolio return per scenario, in the same units
+        as ``scenarios``. Omit (``None``) for the global CVaR minimum.
+    bounds : tuple of (float, float), default (0.0, 1.0)
+        ``(lower, upper)`` bound applied to every weight. The default forbids
+        shorting; e.g. ``(-1.0, 1.0)`` allows it.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (d,)
+        Weights, summing to one.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is not in (0, 1), or the problem is infeasible (most often
+        a ``target_return`` above what any allowed portfolio can earn).
+
+    Notes
+    -----
     Rockafellar & Uryasev (2000) showed that minimising
 
     .. math::
@@ -320,21 +477,9 @@ def mean_cvar_weights(
     scenarios. That makes it exact and fast -- no gradient descent, no local
     optima -- and it is why scenario-based CVaR optimisation is practical at all.
 
-    Parameters
-    ----------
-    scenarios : array_like
-        ``(n, d)`` scenario **returns** (not losses).
-    alpha : float
-        CVaR confidence level.
-    target_return : float, optional
-        Minimum required mean return. Omit for the global CVaR minimum.
-    bounds : tuple
-        ``(lower, upper)`` bound on each weight. The default forbids shorting.
-
-    Returns
-    -------
-    ndarray
-        Weights summing to one.
+    The program has one auxiliary variable per scenario, and its constraint
+    matrix is built densely, so memory grows with the square of ``n``. A few
+    thousand scenarios is comfortable; tens of thousands may not be.
 
     Examples
     --------
@@ -393,11 +538,31 @@ def mean_cvar_weights(
 def min_variance_weights(
     scenarios: ArrayLike, bounds: tuple[float, float] = (0.0, 1.0)
 ) -> NDArray[np.float64]:
-    """Minimum-variance weights, as a Markowitz benchmark.
+    """Portfolio weights with the lowest volatility, as a Markowitz benchmark.
 
-    Provided for comparison: mean-variance treats gains and losses
-    symmetrically and sees only the covariance matrix, so it cannot distinguish
-    two portfolios with the same covariance but different tail dependence.
+    Provided for comparison with :func:`mean_cvar_weights`: mean-variance
+    treats gains and losses symmetrically and sees only the covariance matrix,
+    so it cannot distinguish two portfolios with the same covariance but
+    different tail dependence.
+
+    Parameters
+    ----------
+    scenarios : array_like of float, shape (n, d)
+        Scenario or historical returns, one row per scenario, one column per
+        asset. Only their sample covariance is used.
+    bounds : tuple of (float, float), default (0.0, 1.0)
+        ``(lower, upper)`` bound applied to every weight. The default forbids
+        shorting.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (d,)
+        Weights, summing to one, that minimise portfolio variance.
+
+    Raises
+    ------
+    ValueError
+        If the optimiser (SLSQP) fails to converge.
 
     Examples
     --------
@@ -440,13 +605,44 @@ def efficient_frontier(
     n_points: int = 20,
     bounds: tuple[float, float] = (0.0, 1.0),
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
-    """Mean-CVaR efficient frontier.
+    """The best tail risk achievable at each level of expected return.
+
+    Solves :func:`mean_cvar_weights` for a ladder of target returns, from the
+    minimum-CVaR portfolio's mean up to the highest single-asset mean, and
+    reports the return, CVaR and weights at each point -- the mean-CVaR
+    efficient frontier. Plot ``cvars`` against ``returns`` to see how much
+    extra tail loss each step of extra return costs.
+
+    Parameters
+    ----------
+    scenarios : array_like of float, shape (n, d)
+        Scenario **returns** (not losses), one row per scenario, one column
+        per asset.
+    alpha : float, default 0.95
+        CVaR confidence level in (0, 1).
+    n_points : int, default 20
+        Number of target returns to try along the frontier.
+    bounds : tuple of (float, float), default (0.0, 1.0)
+        ``(lower, upper)`` bound applied to every weight. The default forbids
+        shorting.
 
     Returns
     -------
-    returns, cvars, weights : ndarray
-        Target return, achieved CVaR, and the weights at each frontier point.
-        Infeasible targets are dropped rather than raising.
+    returns : numpy.ndarray of float, shape (m,)
+        Mean portfolio return achieved at each frontier point (at least the
+        target), in the units of ``scenarios``.
+    cvars : numpy.ndarray of float, shape (m,)
+        CVaR (expected shortfall of the portfolio loss) at each point, as a
+        positive loss.
+    weights : numpy.ndarray of float, shape (m, d)
+        Portfolio weights at each point; each row sums to one.
+
+    ``m <= n_points``: infeasible targets are dropped rather than raising.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is not in (0, 1).
 
     Examples
     --------

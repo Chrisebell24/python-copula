@@ -83,20 +83,52 @@ _TAIL_RADIUS = 1e-6
 
 
 class OuterPowerCopula(Copula):
-    r"""An Archimedean copula with its generator raised to an outer power.
+    r"""Give an Archimedean copula a second parameter that adds dependence and an upper tail.
+
+    One-parameter Archimedean families have one fixed shape (Clayton: strong
+    lower tail, no upper tail). The outer power transformation replaces the
+    generator :math:`\psi(t)` by :math:`\psi(t^{1/\alpha})` with
+    :math:`\alpha \ge 1`. Raising ``alpha`` moves Kendall's tau towards 1 by
+    the closed form :math:`\tau_\alpha = 1 - (1 - \tau_\psi)/\alpha` and
+    creates upper tail dependence, so you get a two-parameter family to fit.
+    :func:`opower` is a shorter way to build one.
 
     Parameters
     ----------
     base : ArchimedeanCopula
-        Supplies :math:`\psi`. Its parameter is the first parameter here.
-    alpha : float
+        Supplies :math:`\psi`, e.g. ``ClaytonCopula(2.0)``. Its parameter
+        becomes the first parameter here, and its dimension is used.
+    alpha : float, default nan
         The outer power, :math:`\alpha \ge 1`. At :math:`\alpha = 1` the
         transformation is the identity and this *is* the base copula.
-    free : array_like of bool, optional
+        ``nan`` means "to be estimated by fitting".
+    free : array_like of bool, shape (2,), or None, default None
+        Keyword-only. Which of ``(theta, alpha)`` are estimated when fitting;
+        ``None`` means both.
+
+    Attributes
+    ----------
+    base : ArchimedeanCopula
+        The copula whose generator is transformed.
+    alpha : float
+        The outer power (see :attr:`alpha`).
+    params : numpy.ndarray of float64, shape (2,)
+        ``(theta, alpha)``.
+    param_names : tuple of str
+        The base generator's parameter name, then ``"alpha"``.
+
+    Raises
+    ------
+    TypeError
+        If ``base`` is not an Archimedean copula.
+    ValueError
+        If ``alpha < 1`` or ``theta`` lies outside the base family's range.
 
     Notes
     -----
     Parameters are ordered ``(theta, alpha)``, so ``fit`` estimates both.
+    The density and sampler are available for ``d = 2`` only; the CDF,
+    Kendall's tau and tail dependence work in any dimension.
 
     Examples
     --------
@@ -134,6 +166,13 @@ class OuterPowerCopula(Copula):
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Allowed range of ``(theta, alpha)``: the base family's range, then ``[1, inf)``.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            Two ``(lower, upper)`` pairs.
+        """
         return [self.generator.bounds(self._dim), (1.0, np.inf)]
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> OuterPowerCopula:
@@ -146,7 +185,13 @@ class OuterPowerCopula(Copula):
 
     @property
     def alpha(self) -> float:
-        """The outer power."""
+        """The outer power :math:`\alpha` (1 means no transformation).
+
+        Returns
+        -------
+        float
+            The current value; ``nan`` if not yet specified.
+        """
         return float(self._params[1])
 
     # -- the transformed generator ----------------------------------------
@@ -199,7 +244,20 @@ class OuterPowerCopula(Copula):
     # -- measures ----------------------------------------------------------
 
     def tau(self) -> float:
-        r"""Kendall's tau, :math:`1 - (1 - \tau_\psi)/\alpha`.
+        r"""Return Kendall's tau, a rank correlation, from its closed form.
+
+        :math:`\tau = 1 - (1 - \tau_\psi)/\alpha`, where :math:`\tau_\psi`
+        is the base copula's tau.
+
+        Returns
+        -------
+        float
+            Kendall's tau.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` or ``alpha`` is unspecified (``nan``).
 
         Examples
         --------
@@ -212,19 +270,45 @@ class OuterPowerCopula(Copula):
         return float(1.0 - (1.0 - self.base.with_params([self.params[0]]).tau()) / self.alpha)
 
     def rho(self) -> float:
-        """Spearman's rho, by quadrature on the CDF."""
+        """Return Spearman's rho, a rank correlation, computed numerically from the CDF.
+
+        Returns
+        -------
+        float
+            Spearman's rho, by quadrature.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` or ``alpha`` is unspecified (``nan``).
+        """
         from rcopula.core.measures import rho_by_quadrature
 
         self._require_specified()
         return float(rho_by_quadrature(self))
 
     def lambda_(self) -> TailDependence:
-        r"""Tail dependence, from the diagonal limits.
+        r"""Return the chance of joint extremes in each tail, estimated close to the corners.
+
+        The coefficients are the diagonal limits
+        :math:`\lambda_L = \lim C(u, u)/u` and
+        :math:`\lambda_U = \lim (1 - 2u + C(u, u))/(1 - u)`, evaluated at
+        ``u = 1e-6`` and ``u = 1 - 1e-6``.
 
         Evaluated numerically rather than from a closed form: the transformation
         changes the regular variation of :math:`\psi'` at each end differently
         for each base family, and a formula asserted for all of them would be
         wrong for some.
+
+        Returns
+        -------
+        TailDependence
+            Named tuple ``(lower, upper)`` of floats clipped to ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` or ``alpha`` is unspecified (``nan``).
 
         Examples
         --------
@@ -261,7 +345,14 @@ class OuterPowerCopula(Copula):
         return np.asarray(inverse_rosenblatt(self, rng.uniform(size=(int(size), 2))), dtype=float)
 
     def describe(self) -> str:
-        """One-line summary."""
+        """Return a one-line, human-readable summary with the family and both parameters.
+
+        Returns
+        -------
+        str
+            For example ``"Outer-power Clayton copula, dim 2, theta=2,
+            alpha=1.5"``.
+        """
         theta, alpha = (float(p) for p in self._params)
         return (
             f"Outer-power {self.generator.name} copula, dim {self._dim}, "
@@ -270,17 +361,32 @@ class OuterPowerCopula(Copula):
 
 
 def opower(base: ArchimedeanCopula, alpha: float, **kwargs: Any) -> OuterPowerCopula:
-    r"""Raise an Archimedean generator to an outer power (R's ``opower``).
+    r"""Add a second "dial" to an Archimedean copula via the outer power transformation.
+
+    Shorthand for ``OuterPowerCopula(base, alpha, **kwargs)`` (R's
+    ``opower``). The result has parameters ``(theta, alpha)``: larger
+    ``alpha`` means stronger dependence and more upper-tail dependence.
 
     Parameters
     ----------
     base : ArchimedeanCopula
+        The copula whose generator is transformed, e.g. ``ClaytonCopula(2.0)``.
     alpha : float
-        The power, at least 1.
+        The power, at least 1 (``nan`` to leave it for fitting).
+    **kwargs
+        Passed to :class:`OuterPowerCopula`; currently only ``free``.
 
     Returns
     -------
     OuterPowerCopula
+        The transformed copula, of the same dimension as ``base``.
+
+    Raises
+    ------
+    TypeError
+        If ``base`` is not an Archimedean copula.
+    ValueError
+        If ``alpha < 1``.
 
     Examples
     --------

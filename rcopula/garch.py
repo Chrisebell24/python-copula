@@ -139,26 +139,65 @@ def _neg_loglik(
 
 @dataclass(frozen=True)
 class GarchResult:
-    """A fitted GARCH(1,1) margin.
+    r"""One asset's fitted volatility model: parameters, daily volatility, forecasts.
+
+    This is what :func:`fit_garch` returns. It tells you how volatile the
+    asset is today, how volatile it is on average, how quickly a volatility
+    spike fades, and it holds the "de-volatilised" returns (the standardised
+    residuals) that the copula step is fitted to. You normally get one from
+    :func:`fit_garch` rather than building it yourself.
+
+    The model is a constant-mean GARCH(1,1):
+    :math:`r_t = \mu + \sigma_t z_t`, with
+    :math:`\sigma_t^2 = \omega + \alpha\varepsilon_{t-1}^2 + \beta\sigma_{t-1}^2`
+    and :math:`\varepsilon_t = r_t - \mu`.
+
+    Parameters
+    ----------
+    mu : float
+        Constant mean return per period, in the units of the input returns.
+    omega : float
+        Variance intercept :math:`\omega`, in squared return units.
+    alpha : float
+        Reaction to yesterday's shock (ARCH coefficient), between 0 and 1.
+    beta : float
+        Weight on yesterday's variance (GARCH coefficient), between 0 and 1.
+    df : float or None
+        Student-t degrees of freedom of the innovations; ``None`` for normal
+        innovations.
+    sigma : numpy.ndarray of float, shape (n,)
+        Fitted conditional standard deviation for each observation.
+    resid : numpy.ndarray of float, shape (n,)
+        Standardised residuals, unitless.
+    loglik : float
+        Maximised log-likelihood on the original data scale.
+    dist : str
+        ``"normal"`` or ``"t"``.
+    name : str, default ""
+        Series label.
 
     Attributes
     ----------
     mu, omega, alpha, beta : float
         Constant mean and variance-equation parameters, on the **original**
-        scale of the data.
+        scale of the data (``mu`` in return units, ``omega`` in squared return
+        units; ``alpha`` and ``beta`` are unitless).
     df : float or None
         Innovation degrees of freedom; ``None`` for normal innovations.
-    sigma : ndarray
-        Fitted conditional standard deviations, one per observation.
-    resid : ndarray
-        Standardised residuals :math:`z_t = (r_t - \\mu)/\\sigma_t`. These are
-        the input to the copula step.
+    sigma : numpy.ndarray of float, shape (n,)
+        Fitted conditional standard deviations, one per observation, in the
+        units of the input returns (e.g. daily volatility for daily returns).
+    resid : numpy.ndarray of float, shape (n,)
+        Standardised residuals :math:`z_t = (r_t - \mu)/\sigma_t`: each day's
+        return divided by that day's volatility. These are the input to the
+        copula step.
     loglik : float
         Maximised log-likelihood.
     dist : str
         ``"normal"`` or ``"t"``.
     name : str
-        Series label, carried through from a ``pandas`` column name.
+        Series label, carried through from a ``pandas`` column name; ``""``
+        if none was given.
     """
 
     mu: float
@@ -174,42 +213,128 @@ class GarchResult:
 
     @property
     def persistence(self) -> float:
-        """:math:`\\alpha + \\beta`. Near 1 means shocks decay slowly."""
+        r"""How long volatility shocks linger: :math:`\alpha + \beta`.
+
+        Values near 1 (typical for daily equity returns: 0.97-0.99) mean a
+        volatility spike fades slowly; values well below 1 mean it dies out
+        within days.
+
+        Returns
+        -------
+        float
+            :math:`\alpha + \beta`, between 0 and 1 (capped at 0.9999 by the fit).
+        """
         return self.alpha + self.beta
 
     @property
     def unconditional_vol(self) -> float:
-        """Long-run standard deviation, :math:`\\sqrt{\\omega/(1-\\alpha-\\beta)}`."""
+        r"""The long-run average volatility the model reverts to.
+
+        Technically the unconditional standard deviation,
+        :math:`\sqrt{\omega/(1-\alpha-\beta)}`. Forecasts drift towards it as
+        the horizon grows.
+
+        Returns
+        -------
+        float
+            Per-period standard deviation, in the units of the input returns
+            (e.g. daily volatility for daily returns; multiply by
+            :math:`\sqrt{252}` for an annualised figure).
+        """
         return float(np.sqrt(self.omega / (1.0 - self.persistence)))
 
     @property
     def half_life(self) -> float:
-        """Days for a variance shock to decay by half, ``log(0.5)/log(persistence)``."""
+        """Number of periods for a volatility shock to fade by half.
+
+        Computed as ``log(0.5) / log(persistence)``.
+
+        Returns
+        -------
+        float
+            Half-life in periods of the input data (days for daily returns).
+        """
         return float(np.log(0.5) / np.log(self.persistence))
 
     @property
     def n_params(self) -> int:
+        """Number of estimated parameters: 4 for normal innovations, 5 for Student-t.
+
+        Returns
+        -------
+        int
+            ``4`` (mu, omega, alpha, beta) or ``5`` (plus df).
+        """
         return 4 if self.df is None else 5
 
     @property
     def aic(self) -> float:
+        """Akaike information criterion; lower is better when comparing fits.
+
+        Use it to compare, say, a normal and a Student-t fit of the same
+        series. Computed as ``2 * n_params - 2 * loglik``.
+
+        Returns
+        -------
+        float
+            The AIC.
+        """
         return 2.0 * self.n_params - 2.0 * self.loglik
 
     @property
     def bic(self) -> float:
+        """Bayesian information criterion; lower is better, and stricter than AIC.
+
+        Computed as ``n_params * log(n) - 2 * loglik``, with ``n`` the number of
+        observations.
+
+        Returns
+        -------
+        float
+            The BIC.
+        """
         return self.n_params * float(np.log(self.sigma.size)) - 2.0 * self.loglik
 
     def innovation(self) -> Any:
-        """The fitted innovation law, standardised to unit variance.
+        """The distribution of each period's volatility-adjusted "surprise" (variance 1).
 
-        A frozen ``scipy.stats`` distribution, so it plugs straight into
+        Standard normal for ``dist="normal"``; a Student-t rescaled to unit
+        variance for ``dist="t"``. It is a frozen ``scipy.stats``
+        distribution, so it plugs straight into
         :class:`~rcopula.distribution.CopulaDistribution`.
+
+        Returns
+        -------
+        scipy.stats frozen distribution
+            Mean 0, variance 1, with ``.ppf``, ``.cdf``, ``.rvs`` and so on.
         """
         return stats.norm() if self.df is None else _standardised_t(self.df)
 
     def forecast_variance(self, horizon: int = 1) -> NDArray[np.float64]:
-        r"""Conditional variance forecasts for the next ``horizon`` steps.
+        r"""Forecast the variance (volatility squared) for each of the next periods.
 
+        Use it to see how today's elevated (or depressed) volatility is
+        expected to drift back to its long-run level over the coming days.
+
+        Parameters
+        ----------
+        horizon : int, default 1
+            Number of periods ahead to forecast; must be at least 1.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (horizon,)
+            Element ``h - 1`` is the expected variance ``h`` periods after the
+            last observation, in squared return units. These are per-period
+            variances, not cumulative ones.
+
+        Raises
+        ------
+        ValueError
+            If ``horizon < 1``.
+
+        Notes
+        -----
         One step ahead is exact; beyond that the forecast decays geometrically
         towards the unconditional variance,
 
@@ -237,7 +362,34 @@ class GarchResult:
         return long_run + decay * (first - long_run)
 
     def forecast_vol(self, horizon: int = 1) -> NDArray[np.float64]:
-        """Conditional standard deviation forecasts; see :meth:`forecast_variance`."""
+        """Forecast the volatility (standard deviation) for each of the next periods.
+
+        The square root of :meth:`forecast_variance`.
+
+        Parameters
+        ----------
+        horizon : int, default 1
+            Number of periods ahead to forecast; must be at least 1.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (horizon,)
+            Per-period volatility forecasts, in the units of the input returns.
+
+        Raises
+        ------
+        ValueError
+            If ``horizon < 1``.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from rcopula.garch import fit_garch
+        >>> rng = np.random.default_rng(0)
+        >>> res = fit_garch(rng.standard_normal(1000) * 0.01)
+        >>> res.forecast_vol(5).shape
+        (5,)
+        """
         return np.sqrt(self.forecast_variance(horizon))
 
     def __repr__(self) -> str:
@@ -282,22 +434,43 @@ def fit_garch(
     dist: Literal["normal", "t"] = "normal",
     name: str = "",
 ) -> GarchResult:
-    r"""Fit a GARCH(1,1) with constant mean by (quasi-)maximum likelihood.
+    r"""Estimate one asset's time-varying volatility from its return history.
+
+    Fits a GARCH(1,1) model with constant mean by (quasi-)maximum likelihood.
+    Use it to measure how volatile a series is today versus on average, to
+    forecast volatility, or -- the main use in this package -- to strip
+    volatility clustering out of returns before fitting a copula (see
+    :class:`CopulaGarch`).
 
     Parameters
     ----------
-    x : array_like
-        A single return series.
-    dist : {"normal", "t"}
+    x : array_like of float, shape (n,)
+        A single return series (e.g. daily log-returns), oldest first, with at
+        least 50 finite observations. Any units work (0.01 or 1.0 for 1%); the
+        fitted ``mu``, ``omega`` and ``sigma`` come back in the same units.
+        Multi-dimensional input is flattened.
+    dist : {"normal", "t"}, default "normal"
         Innovation distribution. ``"normal"`` is quasi-MLE -- consistent for the
         variance parameters even when returns are fat-tailed (Bollerslev &
         Wooldridge 1992), which is why it remains the default. ``"t"`` estimates
         the degrees of freedom as well and gives a better fit when you intend to
         *simulate* from the margin rather than only filter with it.
+    name : str, default ""
+        Label stored on the result (used as a row name by
+        :meth:`CopulaGarch.summary`).
 
     Returns
     -------
     GarchResult
+        Fitted parameters, the conditional volatility path ``sigma`` (shape
+        ``(n,)``), the standardised residuals ``resid`` (shape ``(n,)``) and
+        forecasting methods.
+
+    Raises
+    ------
+    ValueError
+        If ``x`` has fewer than 50 observations, contains NaN or infinite
+        values, is constant, or if ``dist`` is not ``"normal"`` or ``"t"``.
 
     Notes
     -----
@@ -413,21 +586,47 @@ def fit_garch(
 
 
 class CopulaGarch:
-    """Joint model: GARCH margins coupled by a copula.
+    """Multi-asset returns: each asset's own volatility, plus a copula linking the shocks.
+
+    Each asset gets a GARCH(1,1) model so that its volatility can rise and
+    fall over time; the copula then describes how the assets' de-volatilised
+    shocks move together, including in the tails. Use it to simulate future
+    joint returns and to produce forward-looking portfolio VaR and expected
+    shortfall that reflect both today's volatility and crash co-movement.
+
+    Most users build one with :meth:`fit` from a returns table. The
+    constructor is for assembling a model from margins and a copula you have
+    already fitted (or chosen) yourself.
 
     Parameters
     ----------
-    margins : sequence of GarchResult
-        One fitted GARCH per series.
+    margins : list of GarchResult, length d
+        One fitted GARCH per series, e.g. from :func:`fit_garch`.
     copula : Copula
-        Fitted copula for the standardised innovations.
-    innovations : {"empirical", "parametric"}
+        Copula for the standardised innovations, with ``copula.dim == d``.
+        It is used as given (not refitted).
+    innovations : {"empirical", "parametric"}, default "empirical"
         How to invert the copula's uniforms when simulating. ``"empirical"``
         draws from the *observed* standardised residuals (filtered historical
         simulation) and so inherits their skew and kurtosis without assuming a
         shape; ``"parametric"`` uses the fitted normal or Student-t. Empirical
         cannot produce an innovation larger than the largest one seen, so use
         parametric for long-horizon or deep-tail work.
+
+    Attributes
+    ----------
+    margins : list of GarchResult, length d
+        The per-asset volatility models.
+    copula : Copula
+        The copula coupling the standardised innovations.
+    innovations : str
+        ``"empirical"`` or ``"parametric"``.
+
+    Raises
+    ------
+    ValueError
+        If ``len(margins) != copula.dim``, or ``innovations`` is not one of
+        the two allowed strings.
 
     Examples
     --------
@@ -452,10 +651,24 @@ class CopulaGarch:
 
     @property
     def dim(self) -> int:
+        """Number of assets in the model.
+
+        Returns
+        -------
+        int
+            ``d``, the number of margins.
+        """
         return len(self.margins)
 
     @property
     def names(self) -> list[str]:
+        """Asset labels, falling back to ``"x0"``, ``"x1"``, ... for unnamed margins.
+
+        Returns
+        -------
+        list of str, length d
+            One label per asset, in column order.
+        """
         return [m.name or f"x{j}" for j, m in enumerate(self.margins)]
 
     @classmethod
@@ -467,24 +680,43 @@ class CopulaGarch:
         innovations: Literal["empirical", "parametric"] = "empirical",
         method: str = "mpl",
     ) -> CopulaGarch:
-        r"""Two-step estimation: GARCH per column, then a copula on the residuals.
+        r"""Fit the whole model to a table of asset returns.
+
+        Two-step estimation (Patton 2006): first a GARCH(1,1) is fitted to each
+        column to remove volatility clustering, then the copula is fitted to
+        the resulting standardised residuals. This is the usual entry point.
 
         Parameters
         ----------
-        returns : array_like or DataFrame
-            ``(n, d)`` returns. Column names are kept if a frame is passed.
+        returns : array_like of float or pandas.DataFrame, shape (n, d)
+            Returns, one row per period (oldest first) and one column per
+            asset, with at least 50 rows. Column names are kept if a frame is
+            passed.
         copula : Copula
             Family to fit, with ``dim`` matching the number of columns. Any
             starting parameters are ignored -- it is refitted.
-        dist : {"normal", "t"}
-            Innovation distribution for the marginal GARCH models.
-        innovations : {"empirical", "parametric"}
+        dist : {"normal", "t"}, default "normal"
+            Innovation distribution for the marginal GARCH models; see
+            :func:`fit_garch`.
+        innovations : {"empirical", "parametric"}, default "empirical"
             Simulation margin; see the class docstring.
-        method : str
+        method : str, default "mpl"
             Copula estimation method, passed to :func:`~rcopula.fit.fit`.
             The default ``"mpl"`` is the standard choice here, since the
             residuals' distribution is not being claimed to be exactly the
             fitted one.
+
+        Returns
+        -------
+        CopulaGarch
+            The fitted joint model.
+
+        Raises
+        ------
+        ValueError
+            If ``returns`` is not 2-d, its column count differs from
+            ``copula.dim``, or any column fails :func:`fit_garch` (too short,
+            non-finite or constant).
 
         Examples
         --------
@@ -547,18 +779,37 @@ class CopulaGarch:
         n: int = 10_000,
         random_state: np.random.Generator | int | None = None,
     ) -> NDArray[np.float64]:
-        r"""Simulate ``n`` joint return paths of length ``horizon``.
+        r"""Generate ``n`` possible future return paths for all assets, starting from today.
+
+        Use it for scenario analysis or any risk measure the built-in
+        :meth:`forecast_risk` does not cover (e.g. a path-dependent payoff).
 
         Each step draws an innovation vector from the copula -- so the
         cross-sectional dependence is the fitted one -- and pushes it through
         each margin's own GARCH recursion, so volatility keeps clustering along
         the path. Both effects are present simultaneously, which is the reason
-        to build the model at all.
+        to build the model at all. Paths start from the last observed
+        volatility and shock.
+
+        Parameters
+        ----------
+        horizon : int, default 1
+            Number of future periods per path; must be at least 1.
+        n : int, default 10_000
+            Number of simulated paths.
+        random_state : int, numpy.random.Generator or None, default None
+            Seed or generator, for reproducible draws.
 
         Returns
         -------
-        ndarray
-            Shape ``(n, horizon, d)``.
+        numpy.ndarray of float, shape (n, horizon, d)
+            ``out[i, t, j]`` is the return of asset ``j`` in period ``t + 1``
+            of path ``i``, in the units of the input returns.
+
+        Raises
+        ------
+        ValueError
+            If ``horizon < 1``.
 
         Examples
         --------
@@ -610,10 +861,42 @@ class CopulaGarch:
         n: int = 10_000,
         random_state: np.random.Generator | int | None = None,
     ) -> NDArray[np.float64]:
-        """Cumulative return over ``horizon``, shape ``(n, d)``.
+        """Simulate each asset's total return over the next ``horizon`` periods.
 
+        Runs :meth:`simulate` and adds up each path's per-period returns.
         Sums the simulated log-returns, which is the usual convention. For
-        simple returns compound them instead.
+        simple returns compound them instead (simulate and use
+        ``np.prod(1 + paths, axis=1) - 1``).
+
+        Parameters
+        ----------
+        horizon : int, default 1
+            Number of future periods to accumulate over; must be at least 1.
+        n : int, default 10_000
+            Number of simulated scenarios.
+        random_state : int, numpy.random.Generator or None, default None
+            Seed or generator, for reproducible draws.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n, d)
+            Cumulative return of each asset in each scenario.
+
+        Raises
+        ------
+        ValueError
+            If ``horizon < 1``.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> import rcopula as rc
+        >>> from rcopula.garch import CopulaGarch
+        >>> rng = np.random.default_rng(0)
+        >>> r = rng.standard_normal((1000, 2)) * 0.01
+        >>> model = CopulaGarch.fit(r, rc.GaussianCopula(0.0, dim=2))
+        >>> model.forecast(horizon=5, n=100, random_state=0).shape
+        (100, 2)
         """
         return np.asarray(self.simulate(horizon, n, random_state).sum(axis=1))
 
@@ -625,27 +908,45 @@ class CopulaGarch:
         n: int = 50_000,
         random_state: np.random.Generator | int | None = None,
     ) -> dict[str, float]:
-        r"""Portfolio VaR and expected shortfall from the predictive distribution.
+        r"""Forecast a portfolio's Value-at-Risk and expected shortfall over the horizon.
 
         This is the payoff of the whole construction: a forward-looking risk
         number that respects both current volatility -- which a static copula
         ignores -- and tail dependence, which a GARCH-only model ignores.
+        Estimated by Monte Carlo from :meth:`forecast`.
 
         Parameters
         ----------
-        weights : array_like, optional
-            Portfolio weights; equal-weighted if omitted.
-        alpha : float
-            Confidence level.
-        horizon : int
-            Forecast horizon in periods.
+        weights : array_like of float, shape (d,), optional
+            Portfolio weights, one per asset in column order (e.g. ``[0.6,
+            0.4]``); not rescaled. Equal-weighted if omitted.
+        alpha : float, default 0.99
+            Confidence level, e.g. 0.99 for a 99% VaR.
+        horizon : int, default 1
+            Forecast horizon in periods; must be at least 1.
+        n : int, default 50_000
+            Number of simulated scenarios. More scenarios give a less noisy
+            estimate, especially at high ``alpha``.
+        random_state : int, numpy.random.Generator or None, default None
+            Seed or generator, for reproducible results.
 
         Returns
         -------
-        dict
-            ``var``, ``expected_shortfall``, ``mean`` and ``volatility`` of the
-            horizon return, all as **losses** for the two risk measures and as
-            returns for the two moments.
+        dict of str to float
+            Statistics of the portfolio return over the horizon, in the units of
+            the input returns:
+
+            - ``"var"`` -- Value-at-Risk, as a **loss** (positive means losing
+              money): exceeded with probability ``1 - alpha``.
+            - ``"expected_shortfall"`` -- average loss given the VaR is
+              exceeded, as a **loss**.
+            - ``"mean"`` -- mean portfolio return (a return, not a loss).
+            - ``"volatility"`` -- standard deviation of the portfolio return.
+
+        Raises
+        ------
+        ValueError
+            If ``weights`` does not have length ``d`` or ``horizon < 1``.
 
         Examples
         --------
@@ -683,7 +984,14 @@ class CopulaGarch:
         }
 
     def summary(self) -> pd.DataFrame:
-        """Per-margin parameters and diagnostics as a frame.
+        """A table of each asset's fitted volatility parameters, one row per asset.
+
+        Returns
+        -------
+        pandas.DataFrame, shape (d, 8)
+            Indexed by :attr:`names`, with float columns ``mu``, ``omega``,
+            ``alpha``, ``beta``, ``df`` (NaN for normal innovations),
+            ``persistence``, ``half_life`` (periods) and ``loglik``.
 
         Examples
         --------

@@ -111,20 +111,34 @@ def _debye_exp(x: NDArray[np.float64], n: int) -> NDArray[np.float64]:
 
 
 def debye_n(x: ArrayLike, n: int) -> NDArray[np.float64]:
-    r"""Evaluate the Debye function :math:`D_n(x)` of order ``n``.
+    r"""Evaluate the Debye function of order ``n``, a smooth integral the Frank copula needs.
+
+    The Debye function :math:`D_n(x)` is a normalised integral (defined in the
+    module docstring) that starts at 1 when ``x = 0`` and decays towards 0 as
+    ``x`` grows. The package needs it because the Frank copula's Kendall's tau
+    and Spearman's rho are written in terms of :math:`D_1` and :math:`D_2`, and
+    ``scipy`` does not provide it. Use :func:`debye1` or :func:`debye2` for the
+    two orders the copulas actually use.
 
     Parameters
     ----------
-    x : array_like
-        Real arguments. ``x = 0`` returns ``1`` (the limiting value); negative
-        arguments are handled exactly by reflection.
+    x : array_like of float, any shape
+        Real arguments; a Python ``float`` works too. ``x = 0`` returns ``1``
+        (the limiting value); negative arguments are handled exactly by
+        reflection; ``nan`` gives ``nan``.
     n : int
         Order, ``n >= 1``.
 
     Returns
     -------
-    ndarray
-        :math:`D_n(x)`, elementwise.
+    numpy.ndarray of float64, same shape as ``x``
+        :math:`D_n(x)`, elementwise. A scalar input gives a 0-d result
+        (a ``numpy.float64``).
+
+    Raises
+    ------
+    ValueError
+        If ``n < 1``.
 
     Notes
     -----
@@ -174,10 +188,21 @@ def debye_n(x: ArrayLike, n: int) -> NDArray[np.float64]:
 
 
 def debye1(x: ArrayLike) -> NDArray[np.float64]:
-    r"""First-order Debye function :math:`D_1(x)`.
+    r"""Evaluate the first-order Debye function :math:`D_1(x)`, used for Frank's Kendall tau.
 
-    Appears in the Frank copula's Kendall tau,
-    :math:`\tau(\theta) = 1 - 4\bigl(1 - D_1(\theta)\bigr)/\theta`.
+    Shorthand for ``debye_n(x, 1)``. It appears in the Frank copula's Kendall
+    tau, :math:`\tau(\theta) = 1 - 4\bigl(1 - D_1(\theta)\bigr)/\theta`,
+    which is how the package converts between Frank's ``theta`` and tau.
+
+    Parameters
+    ----------
+    x : array_like of float, any shape
+        Real arguments. ``x = 0`` returns ``1``.
+
+    Returns
+    -------
+    numpy.ndarray of float64, same shape as ``x``
+        :math:`D_1(x)`, elementwise (0-d for a scalar input).
 
     Examples
     --------
@@ -194,10 +219,20 @@ def debye1(x: ArrayLike) -> NDArray[np.float64]:
 
 
 def debye2(x: ArrayLike) -> NDArray[np.float64]:
-    r"""Second-order Debye function :math:`D_2(x)`.
+    r"""Evaluate the second-order Debye function :math:`D_2(x)`, used for Frank's Spearman rho.
 
-    Appears in the Frank copula's Spearman rho,
-    :math:`\rho(\theta) = 1 - 12\bigl(D_1(\theta) - D_2(\theta)\bigr)/\theta`.
+    Shorthand for ``debye_n(x, 2)``. It appears in the Frank copula's Spearman
+    rho, :math:`\rho(\theta) = 1 - 12\bigl(D_1(\theta) - D_2(\theta)\bigr)/\theta`.
+
+    Parameters
+    ----------
+    x : array_like of float, any shape
+        Real arguments. ``x = 0`` returns ``1``.
+
+    Returns
+    -------
+    numpy.ndarray of float64, same shape as ``x``
+        :math:`D_2(x)`, elementwise (0-d for a scalar input).
 
     Examples
     --------

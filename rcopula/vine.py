@@ -92,19 +92,68 @@ def _h_inverse(copula: Copula, target: NDArray, given: NDArray, side: int) -> ND
 
 
 class VineCopula(Copula):
-    """A pair-copula construction.
+    """A many-variable copula built by chaining together two-variable copulas.
+
+    Technically a *pair-copula construction* (vine copula). Each pair of
+    variables -- and, in later "trees", each pair conditional on the variables
+    between them -- gets its own bivariate copula, which may be a different
+    family with a different parameter. Use it when one family cannot describe
+    every pair: for example, crash-together (Clayton) dependence between two
+    assets but symmetric (Frank) dependence elsewhere. To estimate one from
+    data, use :func:`fit_vine` rather than building it by hand.
 
     Parameters
     ----------
     pair_copulas : sequence of sequence of Copula
-        ``pair_copulas[k]`` holds tree ``k``'s copulas, so it has ``d - 1 - k``
-        entries. Every entry must be bivariate.
-    structure : {"C", "D"}
-        Canonical (star trees) or drawable (path trees).
-    order : sequence of int, optional
-        Which variable takes which position in the structure. For a C-vine the
-        first entry is the root of tree 1; for a D-vine the sequence is the path.
-        Defaults to ``0, 1, ..., d-1``.
+        The bivariate copulas, grouped by tree. ``pair_copulas[k]`` holds tree
+        ``k``'s copulas, so for ``d`` variables there are ``d - 1`` trees and
+        tree ``k`` has ``d - 1 - k`` entries (``d(d-1)/2`` copulas in all).
+        Every entry must have ``dim == 2``. The dimension ``d`` is inferred as
+        ``len(pair_copulas) + 1``.
+    structure : {"C", "D"}, default "D"
+        ``"C"`` (canonical): each tree is a star around one central variable,
+        which suits one market factor plus its satellites. ``"D"`` (drawable):
+        each tree is a path, which suits naturally ordered variables such as
+        maturities.
+    order : sequence of int or None, default None
+        A permutation of ``0, 1, ..., d-1`` saying which data column takes
+        which position in the structure. For a C-vine the first entry is the
+        root of tree 1; for a D-vine the sequence is the path. ``None`` means
+        ``0, 1, ..., d-1``.
+    free : array_like of bool or None, default None, keyword-only
+        Free/fixed mask passed to :class:`~rcopula.core.base.Copula`. A vine
+        has no top-level parameters of its own (its parameters live in the
+        pair-copulas), so this is accepted for interface compatibility and
+        normally left as ``None``.
+
+    Attributes
+    ----------
+    pair_copulas : list of list of Copula
+        The bivariate copulas by tree, as given.
+    structure : str
+        ``"C"`` or ``"D"``.
+    order : tuple of int
+        The variable ordering, length ``d``.
+    dim : int
+        Number of variables ``d``.
+    n_pairs : int
+        Number of bivariate copulas, ``d(d-1)/2``.
+    is_gaussian : bool
+        Whether every pair-copula is Gaussian.
+
+    Raises
+    ------
+    ValueError
+        If ``structure`` is not ``"C"`` or ``"D"``, if a tree has the wrong
+        number of copulas for the dimension, if any pair-copula is not
+        bivariate, or if ``order`` is not a permutation of ``0..d-1``.
+
+    Notes
+    -----
+    The density, the sampler (:meth:`rvs`) and the Rosenblatt transform are
+    exact. There is no closed-form distribution function, so :meth:`cdf`
+    raises :class:`NotImplementedError`; neither are there single-number
+    ``tau``/``rho``/``lambda_`` summaries, since every pair has its own.
 
     Examples
     --------
@@ -180,11 +229,27 @@ class VineCopula(Copula):
 
     @property
     def n_pairs(self) -> int:
-        """How many bivariate copulas the construction uses."""
+        """How many bivariate copulas the vine contains.
+
+        Returns
+        -------
+        int
+            ``d(d-1)/2`` for a ``d``-dimensional vine.
+        """
         return self.dim * (self.dim - 1) // 2
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Bounds on the vine's own top-level parameters: always empty.
+
+        A vine's parameters belong to its pair-copulas, so there is nothing at
+        this level to bound.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            Always ``[]``.
+        """
         return []
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> VineCopula:
@@ -247,7 +312,24 @@ class VineCopula(Copula):
         )
 
     def loglik(self, data: ArrayLike) -> float:
-        """Total log-likelihood, on pseudo-observations if the data are raw."""
+        """Sum the log-density over all rows: how well the vine explains the data.
+
+        Higher is better. Useful for comparing fitted vines on the same data,
+        or for building an AIC/BIC by hand.
+
+        Parameters
+        ----------
+        data : array_like of float, shape (n, d)
+            Observations. If every value already lies strictly inside
+            ``(0, 1)`` they are used as-is (treated as copula-scale data);
+            otherwise they are converted to pseudo-observations (ranks scaled
+            into ``(0, 1)``) first.
+
+        Returns
+        -------
+        float
+            The total log-likelihood, ``sum(log c(u_i))``.
+        """
         u = np.atleast_2d(np.asarray(data, dtype=np.float64))
         if not np.all((u > 0.0) & (u < 1.0)):
             u = pseudo_obs(u)
@@ -320,12 +402,57 @@ class VineCopula(Copula):
         return x
 
     def rosenblatt(self, u: ArrayLike) -> NDArray[np.float64]:
-        r"""Map the sample to independent uniforms.
+        r"""Turn dependent copula data into independent uniform columns.
 
+        This is the Rosenblatt transform: each column is replaced by its
+        conditional probability given the columns before it in the D-vine
+        path. If the vine is the right model for the data, the output columns
+        are independent and uniform on ``(0, 1)``, so it is the standard way to
+        check a fitted vine (test the output for independence) and the inverse
+        of how :meth:`rvs` samples.
+
+        Parameters
+        ----------
+        u : array_like of float, shape (n, d)
+            Copula-scale data (values in ``(0, 1)``), with columns in the
+            original variable order; the vine's ``order`` is applied
+            internally.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n, d)
+            The transformed values, in the *structure* order (position ``i``
+            is the ``i``-th variable along the D-vine path, i.e. column
+            ``order[i]`` of the input).
+
+        Raises
+        ------
+        ValueError
+            If ``u`` does not have ``d`` columns.
+        NotImplementedError
+            If the vine is a C-vine; only D-vines are supported here.
+
+        Notes
+        -----
         The forward direction of the sampler, and the sharpest available check
         on both: under the true vine the output is independent
         :math:`\mathrm{Unif}(0,1)`, so any error in either recursion shows up as
         dependence that should not be there.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> import rcopula as rc
+        >>> from rcopula.vine import VineCopula
+        >>> vine = VineCopula(
+        ...     [[rc.ClaytonCopula(2.0), rc.FrankCopula(4.0)], [rc.GumbelCopula(1.5)]],
+        ...     structure="D",
+        ... )
+        >>> w = vine.rosenblatt(vine.rvs(4000, random_state=1))
+        >>> w.shape
+        (4000, 3)
+        >>> bool(np.all(np.abs(np.corrcoef(w, rowvar=False) - np.eye(3)) < 0.06))
+        True
         """
         arranged = self._reorder(np.atleast_2d(np.asarray(u, dtype=np.float64)))
         if arranged.shape[1] != self.dim:
@@ -365,12 +492,38 @@ class VineCopula(Copula):
 
     @property
     def is_gaussian(self) -> bool:
-        """Whether every pair-copula is Gaussian, making the vine one too."""
+        """Whether every pair-copula is Gaussian, which makes the whole vine Gaussian.
+
+        When ``True``, :meth:`to_gaussian` can return the equivalent
+        :class:`~rcopula.core.elliptical.GaussianCopula`.
+
+        Returns
+        -------
+        bool
+        """
         return all(isinstance(cop, GaussianCopula) for level in self.pair_copulas for cop in level)
 
     def to_gaussian(self) -> GaussianCopula:
-        r"""The equivalent Gaussian copula, when every pair-copula is Gaussian.
+        r"""Convert an all-Gaussian vine into the single Gaussian copula it equals.
 
+        Only works when every pair-copula is Gaussian (see :attr:`is_gaussian`).
+        Useful for reading off the implied full correlation matrix, or as an
+        exact correctness check on a vine.
+
+        Returns
+        -------
+        GaussianCopula
+            A ``d``-dimensional Gaussian copula with an unstructured
+            (``dispstr="un"``) correlation matrix, indexed by the original
+            variable order.
+
+        Raises
+        ------
+        ValueError
+            If any pair-copula is not Gaussian.
+
+        Notes
+        -----
         A vine's tree-:math:`k` parameters are **partial correlations** given the
         conditioning set, and the partial-correlation recursion
 
@@ -442,6 +595,14 @@ class VineCopula(Copula):
     # -- dependence ----------------------------------------------------
 
     def tau(self) -> float:
+        """Not available for a vine: every pair has its own Kendall's tau.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Estimate pairwise taus from :meth:`rvs` output, or read
+            them from tree 1's pair-copulas.
+        """
         raise NotImplementedError(
             "a vine has a different Kendall's tau for every pair -- that is what "
             "it is for. Estimate it pairwise from rvs(), or read tree 1's "
@@ -449,9 +610,23 @@ class VineCopula(Copula):
         )
 
     def rho(self) -> float:
+        """Not available for a vine: every pair has its own Spearman's rho.
+
+        Raises
+        ------
+        NotImplementedError
+            Always.
+        """
         raise NotImplementedError("a vine has a different Spearman's rho for every pair")
 
     def lambda_(self) -> TailDependence:
+        """Not available for a vine: tail dependence differs by pair.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Tree 1's pair-copulas give it for the pairs they join.
+        """
         raise NotImplementedError(
             "tail dependence differs by pair in a vine; tree 1's pair-copulas "
             "give it for the pairs they join"
@@ -459,6 +634,22 @@ class VineCopula(Copula):
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> Copula:
+        """Not available for a vine: one tau cannot pin down ``d(d-1)/2`` parameters.
+
+        Parameters
+        ----------
+        tau : float
+            Ignored.
+        dim : int, default 2
+            Ignored.
+        **kwargs : Any
+            Ignored.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Use :func:`fit_vine` to estimate a vine from data.
+        """
         raise NotImplementedError(
             "a vine has d(d-1)/2 parameters; a single tau cannot identify them. Use fit_vine."
         )
@@ -466,6 +657,30 @@ class VineCopula(Copula):
     # -- presentation --------------------------------------------------
 
     def describe(self) -> str:
+        """Return a readable, multi-line summary of the vine, one line per pair-copula.
+
+        The first line gives the structure, dimension and order. Each further
+        line names the tree, the edge as ``a,b|conditioning`` in original
+        variable indices, and that pair-copula's own one-line description.
+
+        Returns
+        -------
+        str
+            ``1 + d(d-1)/2`` lines joined by newlines.
+
+        Examples
+        --------
+        >>> import rcopula as rc
+        >>> from rcopula.vine import VineCopula
+        >>> vine = VineCopula(
+        ...     [[rc.ClaytonCopula(2.0), rc.GumbelCopula(2.5)], [rc.FrankCopula(3.0)]],
+        ...     structure="D",
+        ... )
+        >>> print(vine.describe().splitlines()[0])
+        D-vine copula, dim 3, order [0, 1, 2]
+        >>> len(vine.describe().splitlines())
+        4
+        """
         rows = [f"{self.structure}-vine copula, dim {self.dim}, order {list(self.order)}"]
         for k, level in enumerate(self.pair_copulas):
             for i, cop in enumerate(level):
@@ -514,32 +729,63 @@ def fit_vine(
     criterion: str = "aic",
     truncate: int | None = None,
 ) -> VineCopula:
-    """Estimate a vine sequentially, choosing each pair-copula's family.
+    """Fit a vine copula to data, picking the best family for each pair automatically.
 
+    Give it a table of observations (one column per variable) and it returns a
+    :class:`VineCopula` whose every pair-copula family and parameter has been
+    chosen from the data. Use it when you want flexible, pair-by-pair
+    dependence across three or more variables without choosing families by
+    hand.
+
+    Parameters
+    ----------
+    data : array_like or pandas.DataFrame of float, shape (n, d)
+        Observations, one row per observation and one column per variable,
+        with ``d >= 2``. Raw data are fine: they are converted to
+        pseudo-observations (ranks scaled into ``(0, 1)``) internally.
+    structure : {"C", "D"}, default "D"
+        ``"C"`` builds star-shaped trees around a central variable; ``"D"``
+        builds path-shaped trees. See :class:`VineCopula`.
+    families : sequence of str, default DEFAULT_FAMILIES
+        Candidate families tried on every edge; names as in
+        :data:`~rcopula.select.FAMILIES`. The default is ``("independence",
+        "gaussian", "student", "clayton", "gumbel", "frank")``, which spans
+        no tail dependence, lower-only, upper-only and both.
+    order : sequence of int or None, default None
+        A permutation of ``0..d-1`` giving the variable ordering. ``None``
+        orders variables by total absolute Kendall's tau with the others,
+        strongest first. For a C-vine that puts the most connected variable at
+        the root -- which is what makes a C-vine worth choosing; for a D-vine
+        the same rule is used for reproducibility.
+    criterion : {"aic", "bic", "loglik", "xv"}, default "aic"
+        How each edge's winning family is chosen, passed to
+        :func:`~rcopula.select.select_copula`: lowest AIC or BIC, highest
+        log-likelihood, or cross-validated likelihood.
+    truncate : int or None, default None
+        Fit only the first ``truncate`` trees and set every pair-copula in the
+        higher trees to independence. ``None`` fits all ``d - 1`` trees.
+        Higher trees usually carry little, and truncating is the standard way
+        to stop a vine from spending parameters on noise.
+
+    Returns
+    -------
+    VineCopula
+        The fitted vine. Read ``fitted.order`` for the ordering actually used
+        and ``fitted.describe()`` for the chosen families.
+
+    Raises
+    ------
+    ValueError
+        If ``data`` has fewer than two columns or ``structure`` is not ``"C"``
+        or ``"D"``.
+
+    Notes
+    -----
     Tree by tree, each edge's family is selected by
     :func:`~rcopula.select.select_copula` on the h-transformed data that edge
     actually sees, and the h-functions for the next tree are built from the
     winner. That is Dissmann et al.'s sequential procedure, and it is what makes
     a :math:`d(d-1)/2`-parameter model estimable at all.
-
-    Parameters
-    ----------
-    data : array_like
-        ``(n, d)`` observations, rank-transformed internally.
-    structure : {"C", "D"}
-    families : sequence of str
-        Candidates for every edge; see
-        :data:`~rcopula.select.FAMILIES`.
-    order : sequence of int, optional
-        Variable ordering. For a C-vine, defaults to putting the variable with
-        the strongest total rank dependence at the root -- which is what makes a
-        C-vine worth choosing.
-    criterion : str
-        Passed to :func:`~rcopula.select.select_copula`.
-    truncate : int, optional
-        Fit only the first ``truncate`` trees and set the rest to independence.
-        Higher trees usually carry little, and truncating is the standard way to
-        stop a vine from spending parameters on noise.
 
     Examples
     --------

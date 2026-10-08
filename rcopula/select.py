@@ -97,7 +97,24 @@ CRITERIA = ("aic", "bic", "loglik", "xv")
 
 @dataclass(frozen=True)
 class FamilySpec:
-    """One candidate family, with the dimensions it is valid in.
+    """A registry entry describing one candidate copula family for :func:`select_copula`.
+
+    Each entry knows how to build an unfitted copula of a given dimension,
+    the largest dimension the family supports, and which groups (such as
+    ``"archimedean"``) it belongs to. The built-in entries live in
+    :data:`FAMILIES`; you rarely need to create one yourself.
+
+    Parameters
+    ----------
+    name : str
+        Key in :data:`FAMILIES`, e.g. ``"clayton"``.
+    factory : callable
+        Function ``factory(dim: int) -> Copula`` returning an unfitted
+        instance of the family in dimension ``dim``.
+    max_dim : int or None
+        Largest supported dimension; ``None`` means any dimension.
+    groups : frozenset of str
+        Group labels accepted by ``select_copula(families=...)``.
 
     Attributes
     ----------
@@ -109,6 +126,13 @@ class FamilySpec:
         Largest supported dimension; ``None`` means any.
     groups : frozenset of str
         Group labels accepted by ``select_copula(families=...)``.
+
+    Examples
+    --------
+    >>> from rcopula.select import FAMILIES
+    >>> spec = FAMILIES["tawn"]
+    >>> spec.max_dim, spec.admissible(2), spec.admissible(3)
+    (2, True, False)
     """
 
     name: str
@@ -117,6 +141,18 @@ class FamilySpec:
     groups: frozenset[str]
 
     def admissible(self, dim: int) -> bool:
+        """Check whether this family can be used for data with ``dim`` columns.
+
+        Parameters
+        ----------
+        dim : int
+            Number of variables (columns) in the data, at least 2.
+
+        Returns
+        -------
+        bool
+            ``True`` if ``max_dim`` is ``None`` or ``dim <= max_dim``.
+        """
         return self.max_dim is None or dim <= self.max_dim
 
 
@@ -212,8 +248,46 @@ def cross_validate(
     random_state: np.random.Generator | int | None = None,
     ties_method: str = "average",
 ) -> float:
-    r"""k-fold cross-validated log-likelihood (R's ``xvCopula``).
+    r"""Score a copula family by how well it predicts data it was not fitted on (higher is better).
 
+    Splits the data into ``k`` parts, fits on all but one part and scores
+    the left-out part, rotating through every part. Use it to compare
+    families more honestly than with AIC, at the cost of ``k`` fits per
+    family. This is R's ``xvCopula``.
+
+    Parameters
+    ----------
+    copula : Copula
+        Family to score; its parameter values are only a starting point.
+    data : array_like of float or pandas.DataFrame, shape (n, d)
+        Observations, one row per observation; ``d`` must equal
+        ``copula.dim``. Rank-transformed internally, so raw data is fine.
+    k : int, default 10
+        Number of folds, between 2 and ``n``.
+    method : {"mpl", "ml", "itau", "irho", "itau.mpl"}, default "mpl"
+        Estimation method for each training fit; see :func:`~rcopula.fit`.
+    random_state : int, numpy.random.Generator or None, default None
+        Controls the random fold assignment. Pass an int for reproducible
+        results.
+    ties_method : {"average", "min", "max", "dense", "ordinal", "random"}, default "average"
+        How tied values are ranked when ``data`` is turned into
+        pseudo-observations.
+
+    Returns
+    -------
+    float
+        Cross-validated log-likelihood, rescaled to a full-sample scale;
+        higher is better.
+
+    Raises
+    ------
+    ValueError
+        If ``k`` is not between 2 and the number of observations, or if a
+        training fit fails (for example, the data have the wrong number of
+        columns).
+
+    Notes
+    -----
     Fits on ``k-1`` folds and scores the held-out one, summed over folds and
     **multiplied by** :math:`n/(n - n/k)` so the result is on the scale of a
     full-sample log-likelihood and comparable across families -- the same
@@ -224,24 +298,6 @@ def cross_validate(
     data and the usual "one penalty unit per parameter" accounting no longer
     holds (Gronneberg & Hjort 2014). Cross-validation sidesteps the bias by
     scoring on data the fit never saw. It costs ``k`` fits per family.
-
-    Parameters
-    ----------
-    copula : Copula
-        Family to score.
-    data : array_like
-        ``(n, d)`` observations; rank-transformed internally.
-    k : int
-        Number of folds.
-    method : str
-        Estimation method for each training fit.
-    random_state : Generator, int or None
-        Controls the fold assignment.
-
-    Returns
-    -------
-    float
-        Cross-validated log-likelihood; higher is better.
 
     Examples
     --------
@@ -282,18 +338,31 @@ def cross_validate(
 
 @dataclass(frozen=True)
 class SelectionResult:
-    """Outcome of :func:`select_copula`.
+    """The ranking from :func:`select_copula`: a comparison table plus the winning fitted copula.
+
+    Print it to see the table; use :attr:`best` to get the winning copula,
+    already fitted, and :attr:`results` for every candidate's full fit.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        Ranked comparison table (see Attributes).
+    results : dict of str to CopulaFitResult
+        Fit result per family name.
+    criterion : {"aic", "bic", "loglik", "xv"}
+        Column that decided the ranking.
 
     Attributes
     ----------
-    table : DataFrame
-        One row per candidate, sorted best-first. Columns: ``n_params``,
-        ``loglik``, ``aic``, ``bic``, ``tau``, ``lambda_lower``,
-        ``lambda_upper``, ``converged``, ``message``, plus ``xv`` and the
-        goodness-of-fit columns when those were requested.
-    results : dict
+    table : pandas.DataFrame
+        One row per candidate, indexed by family name and sorted best-first.
+        Columns: ``n_params``, ``loglik``, ``aic``, ``bic``, ``tau``,
+        ``lambda_lower``, ``lambda_upper``, ``converged``, ``n_obs``,
+        ``message``, plus ``xv`` and the goodness-of-fit columns
+        (``gof_statistic``, ``gof_pvalue``) when those were requested.
+    results : dict of str to CopulaFitResult
         Family name to :class:`~rcopula.fit.results.CopulaFitResult`, including
-        the ones that failed (absent if the fit raised).
+        the ones that did not converge (absent if the fit raised).
     criterion : str
         Which column decided the ranking.
     """
@@ -304,23 +373,61 @@ class SelectionResult:
 
     @property
     def best_name(self) -> str:
-        """Name of the winning family."""
+        """The name of the family that ranked first, e.g. ``"clayton"``.
+
+        Returns
+        -------
+        str
+
+        Raises
+        ------
+        ValueError
+            If the table is empty.
+        """
         if self.table.empty:
             raise ValueError("no family could be fitted")
         return str(self.table.index[0])
 
     @property
     def best_result(self) -> CopulaFitResult:
-        """The winning :class:`~rcopula.fit.results.CopulaFitResult`."""
+        """The full fit result (estimates, log-likelihood, ...) of the winning family.
+
+        Returns
+        -------
+        CopulaFitResult
+
+        Raises
+        ------
+        ValueError
+            If the table is empty.
+        KeyError
+            If the top-ranked family has no fit result because its fit
+            raised (possible only when every candidate failed).
+        """
         return self.results[self.best_name]
 
     @property
     def best(self) -> Copula:
-        """The winning copula, fitted and ready to use."""
+        """The winning copula, with its fitted parameters, ready to sample from or evaluate.
+
+        Returns
+        -------
+        Copula
+        """
         return self.best_result.copula
 
     def summary(self) -> str:
-        """A printable ranking table."""
+        """The ranking as a human-readable text table, ready to print.
+
+        Includes a header with the sample size and criterion; the ``n_obs``
+        and ``message`` columns are left out for width. ``repr`` of the
+        result shows the same text.
+
+        Returns
+        -------
+        str
+            Multi-line text; pass it to ``print``.
+        """
         head = (
             f"Copula family selection  (n = {int(self.table['n_obs'].iloc[0])}, "
             f"criterion = {self.criterion})"
@@ -343,42 +450,71 @@ def select_copula(
     random_state: np.random.Generator | int | None = None,
     ties_method: str = "average",
 ) -> SelectionResult:
-    r"""Fit every admissible family and rank them.
+    r"""Try many copula families on your data and rank them from best to worst fit.
+
+    Fits every candidate family that supports your data's dimension, scores
+    each one (by AIC unless you choose otherwise), and returns a sorted
+    table along with the winning copula, already fitted. Use it when you do
+    not know which family to pick.
 
     Parameters
     ----------
-    data : array_like or DataFrame
-        ``(n, d)`` observations. Rank-transformed internally, so raw data is
-        fine.
-    families : str or sequence
-        A group name (``"all"``, ``"elliptical"``, ``"archimedean"``,
-        ``"extreme"``, ``"other"``, ``"baseline"``), a list of family names from
-        :data:`FAMILIES`, or a list of unfitted :class:`~rcopula.core.base.Copula`
-        instances when you want full control (a fixed ``df``, a particular
-        ``dispstr``, a rotated family, ...).
-    criterion : {"aic", "bic", "loglik", "xv"}
-        Ranking column. ``"xv"`` triggers a k-fold cross-validation per family
-        and is ``k`` times slower.
-    method : str
+    data : array_like of float or pandas.DataFrame, shape (n, d)
+        Observations, one row per observation and one column per variable.
+        Rank-transformed internally, so raw data is fine.
+    families : str, sequence of str or sequence of Copula, default "all"
+        Which candidates to try: a group name (``"all"``, ``"elliptical"``,
+        ``"archimedean"``, ``"extreme"``, ``"other"``, ``"baseline"``), a list
+        of family names from :data:`FAMILIES`, or a list of unfitted
+        :class:`~rcopula.core.base.Copula` instances when you want full control
+        (a fixed ``df``, a particular ``dispstr``, a rotated family, ...).
+        Families limited to two dimensions are skipped automatically for a
+        group name.
+    criterion : {"aic", "bic", "loglik", "xv"}, default "aic"
+        Ranking column. ``"aic"`` and ``"bic"`` rank lowest first; ``"loglik"``
+        and ``"xv"`` rank highest first. ``"xv"`` triggers a k-fold
+        cross-validation per family and is ``k`` times slower.
+    method : {"mpl", "ml", "itau", "irho", "itau.mpl"}, default "mpl"
         Estimation method passed to :func:`~rcopula.fit.fit`.
-    gof : bool or str
+    gof : bool or {"pb", "mult"}, default False
         ``True`` or ``"pb"`` runs the parametric-bootstrap goodness-of-fit test
         on each family; ``"mult"`` uses the multiplier bootstrap, which is much
         faster. Adds ``gof_statistic`` and ``gof_pvalue`` columns.
-    k : int
-        Folds, when ``criterion="xv"``.
-    n_rep : int
-        Bootstrap replicates, when ``gof`` is requested.
+    k : int, default 10
+        Number of folds (2 to ``n``), used only when ``criterion="xv"``.
+    n_rep : int, default 200
+        Bootstrap replicates (positive), used only when ``gof`` is requested.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed for the cross-validation folds and the goodness-of-fit bootstrap.
+        Pass an int for reproducible results.
+    ties_method : {"average", "min", "max", "dense", "ordinal", "random"}, default "average"
+        How tied values are ranked when ``data`` is turned into
+        pseudo-observations.
 
     Returns
     -------
     SelectionResult
+        The ranked table (``.table``), the winner (``.best``,
+        ``.best_name``) and every fit (``.results``).
+
+    Raises
+    ------
+    ValueError
+        If ``criterion`` or ``gof`` is not one of the listed values, a family
+        name or group is unknown, a named family does not support the data's
+        dimension, ``families`` is empty, or a supplied copula's ``dim`` does
+        not match the data.
+    TypeError
+        If ``families`` mixes names and copula objects, or contains something
+        that is neither.
 
     Notes
     -----
-    A family that fails to converge is **reported, not raised**: its row carries
-    the error message and ``converged=False``, and it is ranked last. Silently
-    dropping it would misrepresent the comparison.
+    A family whose fit **raises** is reported, not raised: its row carries
+    the error message, ``NaN`` scores and ``converged=False``, and it is
+    ranked last. A fit that runs but whose optimiser reports non-convergence
+    keeps its score and is ranked by it, with ``converged=False`` in its
+    row. Silently dropping either would misrepresent the comparison.
 
     Examples
     --------

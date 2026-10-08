@@ -51,21 +51,50 @@ SMOOTHINGS = ("none", "beta", "checkerboard")
 
 
 class EmpiricalCopula(Copula):
-    r"""Nonparametric copula estimated from data.
+    r"""A copula read directly off your data, with no assumed family.
+
+    It describes the dependence in a sample using only the ranks of the
+    observations. Use it as a model-free reference: to compare a fitted
+    parametric copula against, to compute sample dependence measures, or to
+    resample the dependence structure of the data.
 
     Parameters
     ----------
-    data : array_like
-        ``(n, d)`` observations. Converted to pseudo-observations internally, so
-        raw data on any scale is fine.
-    smoothing : {"none", "beta", "checkerboard"}
+    data : array_like of float, shape (n, d)
+        The observations, one row per observation and one column per variable
+        (``n >= 2``, ``d >= 2``). They are converted to ranks internally
+        (pseudo-observations), so raw data on any scale is fine.
+    smoothing : {"none", "beta", "checkerboard"}, default "none"
         ``"none"`` is the classical step-function estimator. ``"beta"`` and
         ``"checkerboard"`` are smoothed and are genuine copulas; only ``"beta"``
-        admits a density.
+        admits a density (so :meth:`pdf` works only with ``"beta"``).
+    offset : float, default 0.0
+        Keyword-only. Added to the denominator ``n`` of the unsmoothed
+        estimator, as in R's ``empCopula``. Rarely needed.
+    ties_method : str, default "average"
+        Keyword-only. How tied values are ranked; passed to
+        :func:`~rcopula.dependence.pseudo_obs`.
+    **kwargs
+        Accepted and ignored.
+
+    Attributes
+    ----------
+    smoothing : str
+        The smoothing in use.
     offset : float
-        Added to the denominator, as in R's ``empCopula``. Rarely needed.
+        The denominator offset.
     ties_method : str
-        Passed to :func:`~rcopula.dependence.pseudo_obs`.
+        The tie-breaking rule used for the ranks.
+    n_obs : int
+        Number of observations.
+    pseudo_observations : numpy.ndarray of float, shape (n, d)
+        The rank-transformed data.
+
+    Raises
+    ------
+    ValueError
+        If ``smoothing`` is not one of the three options, there are fewer than
+        two observations, or the data has fewer than two columns.
 
     Examples
     --------
@@ -129,16 +158,36 @@ class EmpiricalCopula(Copula):
 
     @property
     def n_obs(self) -> int:
-        """Number of observations the estimator was built from."""
+        """Number of observations (rows of ``data``) the estimator was built from.
+
+        Returns
+        -------
+        int
+        """
         return self._n
 
     @property
     def pseudo_observations(self) -> NDArray[np.float64]:
-        """The rank-transformed data underlying the estimator."""
+        """The data converted to ranks scaled into ``(0, 1)``.
+
+        These pseudo-observations are what the estimator is actually built
+        from; each column is roughly uniform.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n, d)
+        """
         return self._u
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Parameter bounds; always empty, since the estimator has no parameters.
+
+        Returns
+        -------
+        list
+            ``[]``.
+        """
         return []
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> EmpiricalCopula:
@@ -200,8 +249,34 @@ class EmpiricalCopula(Copula):
     # -- estimators R exposes as free functions -------------------------
 
     def dCdu(self, u: ArrayLike, bandwidth: float | None = None) -> NDArray[np.float64]:
-        r"""Partial derivatives :math:`\partial C_n/\partial u_j` (R's ``dCn``).
+        r"""Estimate how fast the empirical copula changes in each coordinate.
 
+        Returns approximate partial derivatives
+        :math:`\partial C_n/\partial u_j` at the given points, by finite
+        differences (R's ``dCn``). Mostly needed by goodness-of-fit tests (the
+        multiplier bootstrap), since a step function has no true derivatives.
+
+        Parameters
+        ----------
+        u : array_like of float, shape (m, d) or (d,)
+            Points in the unit cube at which to evaluate.
+        bandwidth : float or None, default None
+            Half-width ``b`` of the difference step, in ``(0, 1)``. ``None`` (or
+            0) uses :math:`n^{-1/2}`.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (m, d)
+            Column ``j`` holds the estimated derivative with respect to
+            ``u_j``.
+
+        Raises
+        ------
+        ValueError
+            If ``u`` has the wrong number of columns.
+
+        Notes
+        -----
         Uses the Remillard-Scaillet (2009) central difference
 
         .. math::
@@ -234,25 +309,65 @@ class EmpiricalCopula(Copula):
     # -- dependence measures, taken from the sample ---------------------
 
     def tau(self) -> float:
-        """Sample Kendall's tau (averaged over pairs when ``dim > 2``)."""
+        """Kendall's tau of the data: a rank correlation between -1 and 1.
+
+        It is the probability that two observations are ordered the same way
+        in both variables minus the probability they are ordered oppositely.
+
+        Returns
+        -------
+        float
+            The sample value; for ``dim > 2``, the average over all pairs.
+        """
         m = cor_kendall(self._u)
         return float(m[np.triu_indices(self._dim, 1)].mean())
 
     def rho(self) -> float:
-        """Sample Spearman's rho (averaged over pairs when ``dim > 2``)."""
+        """Spearman's rho of the data: the correlation of the ranks, between -1 and 1.
+
+        Returns
+        -------
+        float
+            The sample value; for ``dim > 2``, the average over all pairs.
+        """
         m = cor_spearman(self._u)
         return float(m[np.triu_indices(self._dim, 1)].mean())
 
     def beta(self) -> float:
-        """Sample Blomqvist's beta."""
+        """Blomqvist's beta of the data: dependence measured at the medians.
+
+        It compares how often all variables fall on the same side of their
+        medians with what independence would give; between -1 and 1.
+
+        Returns
+        -------
+        float
+            The sample value from :func:`~rcopula.dependence.beta_n`.
+        """
         return beta_n(self._u)
 
     def lambda_(self) -> TailDependence:
-        r"""Nonparametric tail-dependence estimates.
+        r"""Estimate from the data how likely the two variables are to be extreme together.
 
+        Tail dependence is the chance that one variable is extreme given that
+        the other is equally extreme, in the limit; this gives rough estimates
+        for the lower and upper tails. Two-dimensional data only.
+
+        Returns
+        -------
+        TailDependence
+            ``lower`` and ``upper`` estimates, nominally in ``[0, 1]``.
+
+        Raises
+        ------
+        NotImplementedError
+            If ``dim != 2``.
+
+        Notes
+        -----
         Uses the standard threshold estimators at :math:`p = n^{-1/2}`:
         :math:`\hat\lambda_L = C_n(p,p)/p` and
-        :math:`\hat\lambda_U = (1 - 2p + C_n(1-p, 1-p))/p`.
+        :math:`\hat\lambda_U = (1 - 2(1-p) + C_n(1-p, 1-p))/p`.
 
         These converge slowly -- tail dependence is estimated from the handful
         of points in the corner, so treat them as indicative rather than
@@ -266,4 +381,11 @@ class EmpiricalCopula(Copula):
         return TailDependence(lower=lower, upper=upper)
 
     def describe(self) -> str:
+        """Return a one-line summary: dimension, sample size and smoothing.
+
+        Returns
+        -------
+        str
+            E.g. ``"Empirical copula, dim 2, n=500, smoothing='none'"``.
+        """
         return f"Empirical copula, dim {self._dim}, n={self._n}, smoothing={self.smoothing!r}"

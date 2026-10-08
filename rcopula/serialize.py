@@ -170,7 +170,41 @@ def _encode(copula: Copula) -> dict[str, Any]:
 
 
 def to_dict(copula: Copula) -> dict[str, Any]:
-    """A copula as a plain dictionary, ready for JSON, YAML or a database.
+    """Convert a copula into a plain Python dictionary you can store or send anywhere.
+
+    The dictionary holds only strings, numbers, booleans, lists and nested
+    dictionaries, so it can go into JSON, YAML or a database as-is. Use
+    :func:`to_json` if you just want a JSON string, and :func:`from_dict` to
+    turn the dictionary back into a copula.
+
+    Parameters
+    ----------
+    copula : Copula
+        The copula to save: any parametric family, or a structural
+        construction (rotated, outer power, Khoudraji, mixture, nested
+        Archimedean, vine) built from them. Not an
+        :class:`~rcopula.core.empirical.EmpiricalCopula`.
+
+    Returns
+    -------
+    dict of str to Any
+        ``"rcopula"`` : str
+            Version of rcopula that wrote the document.
+        ``"schema"`` : int
+            Layout version of the document (currently 2).
+        ``"copula"`` : dict
+            The copula itself. Every node has a ``"kind"`` (the class name).
+            A plain family also has ``"dim"`` (int), ``"params"`` (list of
+            float) and ``"free"`` (list of bool), plus ``"dispstr"`` for the
+            elliptical families and ``"df_fixed"`` for the Student t. A
+            structural copula instead holds its components as nested nodes.
+
+    Raises
+    ------
+    TypeError
+        If the copula is (or contains) an
+        :class:`~rcopula.core.empirical.EmpiricalCopula`, which is
+        deliberately not serialisable.
 
     Examples
     --------
@@ -192,13 +226,29 @@ def to_dict(copula: Copula) -> dict[str, Any]:
 
 
 def to_json(copula: Copula, *, indent: int | None = 2) -> str:
-    """A copula as a JSON string.
+    """Save a copula as a JSON text string, so it can be written to a file and reloaded exactly.
+
+    The string is the JSON form of :func:`to_dict`'s output. Read it back
+    with :func:`from_json`; the reloaded copula is bit-identical.
 
     Parameters
     ----------
     copula : Copula
-    indent : int or None
-        Passed to :func:`json.dumps`. ``None`` gives the compact form.
+        The copula to save; see :func:`to_dict` for what is accepted.
+    indent : int or None, default 2
+        Spaces of indentation, passed to :func:`json.dumps`. ``None`` gives
+        the compact single-line form.
+
+    Returns
+    -------
+    str
+        The JSON document.
+
+    Raises
+    ------
+    TypeError
+        If the copula is (or contains) an
+        :class:`~rcopula.core.empirical.EmpiricalCopula`.
 
     Examples
     --------
@@ -341,14 +391,30 @@ def _decode(node: dict[str, Any]) -> Copula:
 
 
 def from_dict(document: dict[str, Any]) -> Copula:
-    """Rebuild a copula from :func:`to_dict`'s output.
+    """Turn a dictionary made by :func:`to_dict` back into a working copula.
+
+    Documents written by older versions of rcopula (schema 1) are upgraded
+    automatically on the way in.
+
+    Parameters
+    ----------
+    document : dict of str to Any
+        A dictionary as returned by :func:`to_dict`, with at least the keys
+        ``"schema"`` and ``"copula"``.
+
+    Returns
+    -------
+    Copula
+        The rebuilt copula, of the same class and with the same parameters
+        (and fixed/free flags) as the one that was saved.
 
     Raises
     ------
     ValueError
-        If the document was written by a newer schema, or names a copula this
-        version does not know. Refusing is deliberate: silently mis-reading a
-        model is worse than not reading it.
+        If the dictionary has no ``"schema"`` or ``"copula"`` field, was
+        written by a newer schema, or names a copula this version does not
+        know. Refusing is deliberate: silently mis-reading a model is worse
+        than not reading it.
 
     Examples
     --------
@@ -377,7 +443,25 @@ def from_dict(document: dict[str, Any]) -> Copula:
 
 
 def from_json(text: str) -> Copula:
-    """Rebuild a copula from :func:`to_json`'s output.
+    """Load a copula back from a JSON string made by :func:`to_json`.
+
+    Parameters
+    ----------
+    text : str
+        The JSON document, for example the contents of a file written from
+        :func:`to_json`.
+
+    Returns
+    -------
+    Copula
+        The rebuilt copula.
+
+    Raises
+    ------
+    json.JSONDecodeError
+        If ``text`` is not valid JSON.
+    ValueError
+        For the same reasons as :func:`from_dict`.
 
     Examples
     --------

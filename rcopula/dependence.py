@@ -47,29 +47,46 @@ def pseudo_obs(
     lower_tail: bool = True,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64] | pd.DataFrame:
-    r"""Rank-transform data onto the unit cube (R's ``pobs``).
+    r"""Turn each column of data into ranks scaled to lie between 0 and 1.
+
+    These are the "pseudo-observations" (R's ``pobs``). Copula methods work on
+    values between 0 and 1, but data does not arrive that way; replacing each
+    value by its rank within its column puts it there while keeping only the
+    information about *how the columns move together*. Call this first on raw
+    data before fitting a copula.
 
     Each column is replaced by :math:`r_{ij} / (n+1)`, where :math:`r_{ij}` is
     the rank of observation :math:`i` within column :math:`j`.
 
     Parameters
     ----------
-    x : array_like or DataFrame
-        ``(n, d)`` observations. A ``pandas`` frame is returned as a frame with
-        its columns and index preserved.
-    ties_method : str
-        How to rank tied values: one of ``average``, ``min``, ``max``,
-        ``dense``, ``ordinal``, ``random``. ``average`` is the default, as in R.
-    lower_tail : bool
+    x : array_like or pandas.DataFrame of float, shape (n, d) or (n,)
+        Observations, one row per observation and one column per variable. A
+        1-D input is treated as a single column, shape ``(n, 1)``. A
+        ``pandas`` frame is returned as a frame with its columns and index
+        preserved. Must have at least one row.
+    ties_method : str, default "average"
+        How to rank tied values: one of ``"average"``, ``"min"``, ``"max"``,
+        ``"dense"``, ``"ordinal"``, ``"random"``. ``"average"`` gives tied
+        values the mean of the ranks they span, as in R. ``"random"`` breaks ties at random.
+    lower_tail : bool, default True
         If ``False``, return ``1 - pseudo_obs(x)``, which is the transform of
-        the survival copula.
-    random_state : Generator, int or None
-        Only used when ``ties_method="random"``, which breaks ties at random.
+        the survival copula (the copula of the data flipped upside down).
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for breaking ties. Only used when
+        ``ties_method="random"``.
 
     Returns
     -------
-    ndarray or DataFrame
-        Values strictly inside ``(0, 1)``.
+    numpy.ndarray of float, shape (n, d), or pandas.DataFrame
+        Values strictly inside ``(0, 1)``. A DataFrame (same index and
+        columns) when ``x`` was a DataFrame, otherwise an ndarray.
+
+    Raises
+    ------
+    ValueError
+        If ``ties_method`` is not one of the listed names, or ``x`` has no
+        rows.
 
     Notes
     -----
@@ -134,7 +151,26 @@ def pseudo_obs(
 
 
 def cor_kendall(x: ArrayLike) -> NDArray[np.float64]:
-    """Pairwise Kendall's tau matrix (R's ``corKendall``).
+    """Measure how strongly each pair of columns rises and falls together, by rank.
+
+    Returns the matrix of pairwise Kendall's tau (R's ``corKendall``). Kendall's
+    tau is the probability that two observations are ordered the same way in
+    both columns minus the probability they are ordered oppositely: 1 means
+    the columns always move together, -1 always opposite, 0 no tendency. It
+    depends only on ranks, so it is unaffected by the marginal distributions,
+    and many copula families have a closed-form link between tau and their
+    parameter (see ``from_tau`` on the copula classes).
+
+    Parameters
+    ----------
+    x : array_like of float, shape (n, d)
+        Data or pseudo-observations, one column per variable. Must be 2-D.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (d, d)
+        Symmetric matrix with ones on the diagonal; entry ``[i, j]`` is
+        Kendall's tau between columns ``i`` and ``j``, in ``[-1, 1]``.
 
     Examples
     --------
@@ -159,7 +195,22 @@ def cor_kendall(x: ArrayLike) -> NDArray[np.float64]:
 
 
 def cor_spearman(x: ArrayLike) -> NDArray[np.float64]:
-    """Pairwise Spearman's rho matrix.
+    """Measure how strongly each pair of columns is correlated, after ranking them.
+
+    Returns the matrix of pairwise Spearman's rho: the ordinary (Pearson)
+    correlation of the ranks. Like Kendall's tau it ranges from -1 to 1 and is
+    unaffected by the marginal distributions.
+
+    Parameters
+    ----------
+    x : array_like of float, shape (n, d)
+        Data or pseudo-observations, one column per variable. Must be 2-D.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (d, d)
+        Symmetric matrix with ones on the diagonal; entry ``[i, j]`` is
+        Spearman's rho between columns ``i`` and ``j``, in ``[-1, 1]``.
 
     Examples
     --------
@@ -181,11 +232,32 @@ def cor_spearman(x: ArrayLike) -> NDArray[np.float64]:
 
 
 def beta_n(u: ArrayLike) -> float:
-    r"""Sample Blomqvist's beta (R's ``betan``).
+    r"""Measure dependence by how often all columns are on the same side of their medians.
 
+    This is the sample Blomqvist's beta (R's ``betan``).
     :math:`\beta` measures dependence at the centre only: the proportion of
     observations in the two concordant quadrants around the median, rescaled to
     :math:`[-1, 1]`. Cheap to compute and robust, but blind to the tails.
+
+    Parameters
+    ----------
+    u : array_like of float, shape (n, d)
+        Data or pseudo-observations, ``d >= 2`` columns. Only the position of
+        each value relative to its column median matters, so raw data works
+        as well as ranks.
+
+    Returns
+    -------
+    float
+        The estimate, in ``[-1, 1]`` for ``d = 2``: 1 when every observation is
+        in the all-below or all-above corner, about 0 under independence.
+
+    Notes
+    -----
+    For ``d`` columns the statistic is
+    :math:`(2^{d-1}(p_{\le} + p_{>}) - 1) / (2^{d-1} - 1)`, where
+    :math:`p_{\le}` and :math:`p_{>}` are the fractions of rows with every
+    coordinate at or below, or every coordinate above, its column median.
 
     Examples
     --------
@@ -230,21 +302,30 @@ def beta_n(u: ArrayLike) -> float:
 
 @dataclass(frozen=True)
 class TailEstimate:
-    """A nonparametric tail dependence estimate.
+    """How likely two variables are to be extreme together, estimated from data alone.
+
+    Returned by :func:`fit_lambda`. ``lower`` estimates the chance that one
+    variable is in its extreme low tail given that the other is (joint
+    crashes); ``upper`` the same for the high tail. Both are between 0 (no
+    tendency to be extreme together) and 1.
 
     Attributes
     ----------
     lower, upper : float
-        The estimates at the chosen threshold.
+        The lower- and upper-tail dependence estimates at the chosen
+        threshold, each in ``[0, 1]``.
     lower_se, upper_se : float
         Asymptotic standard errors. The counts behind them are binomial, so
         these are only meaningful when ``k`` is not tiny -- below about 20
         exceedances, use a bootstrap instead.
     k : int
-        Number of order statistics used.
+        Number of order statistics used (how many of the most extreme
+        observations define "the tail").
     n : int
+        Sample size.
     method : str
-    path : ndarray, shape (m, 3)
+        The estimator used: ``"schmidt-stadtmuller"`` or ``"log"``.
+    path : numpy.ndarray of float, shape (m, 3)
         ``(k, lower, upper)`` over a range of thresholds. **Look at this**: a
         threshold-dependent estimator is only believable where the path is flat,
         and the plateau is the estimate. See :func:`~rcopula.plots.tail_plot`.
@@ -260,7 +341,17 @@ class TailEstimate:
     path: NDArray[np.float64]
 
     def summary(self) -> str:
-        """A printable report, with the interval each estimate implies."""
+        """Return a printable text report, with the 95% interval each estimate implies.
+
+        The intervals are estimate +/- 1.96 standard errors, clipped to
+        ``[0, 1]``.
+
+        Returns
+        -------
+        str
+            A multi-line table of estimate, standard error and interval for
+            each tail.
+        """
         return "\n".join(
             [
                 f"Tail dependence ({self.method}), n = {self.n}, k = {self.k}",
@@ -295,7 +386,10 @@ def fit_lambda(
     method: str = "schmidt-stadtmuller",
     ties_method: str = "average",
 ) -> TailEstimate:
-    r"""Estimate tail dependence without assuming a family.
+    r"""Estimate how likely two variables are to be extreme together, assuming no family.
+
+    Use this to decide *which* family to fit: whether the data shows joint
+    crashes (lower tail), joint booms (upper tail), both, or neither.
 
     Every parametric estimate of :math:`\lambda` is really an estimate of the
     *family*: fit a Gaussian copula and you will get zero whatever the data
@@ -316,18 +410,30 @@ def fit_lambda(
 
     Parameters
     ----------
-    x : array_like, shape (n, 2)
-        Data or pseudo-observations; ranks are taken either way.
-    k : int, optional
-        Order statistics to use. Defaults to :math:`\lfloor \sqrt n \rfloor`,
-        which is a convention rather than a result -- **look at the path**.
-    method : {"schmidt-stadtmuller", "log"}
-    ties_method : str
-        Passed to :func:`pseudo_obs`.
+    x : array_like of float, shape (n, 2)
+        Data or pseudo-observations for exactly two variables; ranks are taken
+        either way.
+    k : int or None, default None
+        Number of most-extreme observations to use, with ``1 <= k < n``.
+        ``None`` means :math:`\lfloor \sqrt n \rfloor`, which is a
+        convention rather than a result -- **look at the path**.
+    method : {"schmidt-stadtmuller", "log"}, default "schmidt-stadtmuller"
+        Which estimator to use; see above.
+    ties_method : str, default "average"
+        How to rank tied values; one of the names accepted by
+        :func:`pseudo_obs`, which it is passed to.
 
     Returns
     -------
     TailEstimate
+        Lower and upper estimates with standard errors, ``k``, ``n``,
+        ``method`` and the threshold ``path``.
+
+    Raises
+    ------
+    ValueError
+        If ``x`` does not have exactly two columns, ``method`` is unknown, or
+        ``k`` is outside ``1 <= k < n``.
 
     Notes
     -----
@@ -422,7 +528,10 @@ def fit_lambda(
 
 
 def to_emp_margins(u: ArrayLike, data: ArrayLike) -> NDArray[np.float64]:
-    r"""Map uniforms onto the empirical margins of a reference sample.
+    r"""Turn values between 0 and 1 back into values that look like a reference dataset.
+
+    Each column of ``u`` is mapped onto the observed values of the matching
+    column of ``data`` (the empirical margins).
 
     The inverse direction of :func:`pseudo_obs`, and the last step of a
     simulation that wants to keep the data's own marginal shapes rather than
@@ -436,15 +545,24 @@ def to_emp_margins(u: ArrayLike, data: ArrayLike) -> NDArray[np.float64]:
 
     Parameters
     ----------
-    u : array_like, shape (n, d)
-        Values in :math:`(0, 1)`, typically from ``copula.rvs``.
-    data : array_like, shape (m, d)
+    u : array_like of float, shape (n, d)
+        Values in :math:`[0, 1]`, typically from ``copula.rvs``. A 1-D input
+        is treated as a single row.
+    data : array_like of float, shape (m, d)
         The reference sample. Needs the same number of columns, not the same
         number of rows.
 
     Returns
     -------
-    ndarray, shape (n, d)
+    numpy.ndarray of float, shape (n, d)
+        Column ``j`` holds empirical quantiles of ``data[:, j]`` at levels
+        ``u[:, j]``; every value is one that occurs in ``data``.
+
+    Raises
+    ------
+    ValueError
+        If ``u`` and ``data`` have different numbers of columns, or ``u`` has
+        values outside ``[0, 1]``.
 
     Notes
     -----

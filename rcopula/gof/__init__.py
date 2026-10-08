@@ -1,4 +1,9 @@
-"""Goodness-of-fit testing for copulas."""
+"""Goodness-of-fit testing for copulas: does a fitted copula family match the data?
+
+:func:`gof_test` tests one family against one sample, :func:`gof_two_sample`
+compares the copulas of two samples, and :func:`gof_statistic` computes the
+underlying distance without a p-value.
+"""
 
 from __future__ import annotations
 

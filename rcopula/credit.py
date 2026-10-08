@@ -84,17 +84,45 @@ def default_indicators(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.bool_]:
-    r"""Simulate which names default before the horizon.
+    r"""Simulate which borrowers ("names") default before the horizon.
 
+    Each simulated scenario is one possible future: a row of ``True``/``False``
+    flags saying which names in the portfolio defaulted. Each name defaults
+    with the probability you give it; the copula decides how often names
+    default *together*. Use it as the raw building block for loss
+    distributions, basket default swaps or your own payoff logic.
+
+    Parameters
+    ----------
+    copula : Copula
+        Any ``rcopula`` copula whose dimension ``d`` equals the number of names.
+        It controls the dependence between defaults only, not their marginal
+        probabilities.
+    default_prob : float or array_like of float, shape (d,)
+        Probability that each name defaults by the horizon, each in ``[0, 1]``
+        (e.g. ``0.02`` for 2%). A single number applies to every name.
+    n : int, default 100_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducible draws.
+
+    Returns
+    -------
+    numpy.ndarray of bool, shape (n, d)
+        ``True`` where the name defaulted in that scenario.
+
+    Raises
+    ------
+    ValueError
+        If any default probability lies outside ``[0, 1]``, or
+        ``default_prob`` has a length other than 1 or ``d``.
+
+    Notes
+    -----
     A name defaults when its copula coordinate falls below its default
     probability: :math:`U_i \le p_i`. That is exactly the one-factor threshold
     model when ``copula`` is Gaussian with exchangeable correlation, but works
     for any family.
-
-    Returns
-    -------
-    ndarray of bool
-        ``(n, d)``, ``True`` where the name defaulted.
 
     Examples
     --------
@@ -128,8 +156,41 @@ def default_times(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Copula-linked default times under constant hazard rates (Li 2000).
+    r"""Simulate *when* each name defaults, in years, with defaults linked by a copula.
 
+    This is the Li (2000) default-time model behind classic CDO pricing. Each
+    name keeps its own credit curve (a constant hazard rate, i.e. a constant
+    annual default intensity); the copula decides whether early defaults tend
+    to cluster. Use it when timing matters, e.g. first-to-default within five
+    years: ``(times <= 5.0)``.
+
+    Parameters
+    ----------
+    copula : Copula
+        Any ``rcopula`` copula whose dimension ``d`` equals the number of names.
+    hazard_rate : float or array_like of float, shape (d,)
+        Constant annual hazard rate of each name, strictly positive (``0.02``
+        means roughly a 2% chance of default per year; a common rule of thumb
+        is ``spread / (1 - recovery)``). A single number applies to every name.
+    n : int, default 100_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducible draws.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n, d)
+        Default time of each name in each scenario, in years (the same time
+        unit as ``1 / hazard_rate``). Values are positive and unbounded.
+
+    Raises
+    ------
+    ValueError
+        If any hazard rate is zero or negative, or ``hazard_rate`` has a
+        length other than 1 or ``d``.
+
+    Notes
+    -----
     With a flat hazard :math:`\lambda_i`, the survival function is
     :math:`e^{-\lambda_i t}`, so :math:`\tau_i = -\log(1 - U_i)/\lambda_i`
     turns a copula draw into a default time while preserving each name's own
@@ -162,17 +223,42 @@ def portfolio_loss(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Simulate the fractional loss on a credit portfolio.
+    r"""Simulate the credit portfolio's loss, as a fraction of total exposure.
+
+    Each scenario's loss is the sum, over the names that defaulted, of
+    exposure times loss-given-default, divided by total exposure. A result of
+    ``0.04`` means the portfolio lost 4% of its notional. Feed the output to
+    :func:`tranche_loss`, :func:`tranche_spread` or a VaR/ES function.
 
     Parameters
     ----------
-    default_prob : array_like
-        Per-name default probability to the horizon.
-    lgd : array_like
-        Loss given default, as a fraction of exposure.
-    exposure : array_like, optional
-        Per-name exposure. Defaults to equal. Losses are returned as a fraction
-        of total exposure, so the result always lies in ``[0, 1]``.
+    copula : Copula
+        Any ``rcopula`` copula whose dimension ``d`` equals the number of names.
+    default_prob : float or array_like of float, shape (d,)
+        Per-name default probability to the horizon, each in ``[0, 1]``. A
+        single number applies to every name.
+    lgd : float or array_like of float, shape (d,), default 0.6
+        Loss given default, as a fraction of exposure (``0.6`` means 40%
+        recovery). A single number applies to every name.
+    exposure : float or array_like of float, shape (d,), optional
+        Per-name exposure (notional), in any currency unit. Defaults to equal.
+        Only relative sizes matter: losses are returned as a fraction of total
+        exposure, so the result always lies in ``[0, 1]`` when ``lgd`` does.
+    n : int, default 100_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducible draws.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n,)
+        Fractional portfolio loss in each scenario.
+
+    Raises
+    ------
+    ValueError
+        If any default probability lies outside ``[0, 1]``, or a per-name
+        input has a length other than 1 or ``d``.
 
     Examples
     --------
@@ -202,8 +288,37 @@ def portfolio_loss(
 
 
 def tranche_loss(loss: ArrayLike, attachment: float, detachment: float) -> NDArray[np.float64]:
-    r"""Loss allocated to a tranche, as a fraction of tranche notional.
+    r"""Share of a tranche's notional wiped out by each portfolio loss.
 
+    A tranche is a slice of the portfolio's losses between an attachment and a
+    detachment point. For a 3-7% tranche, a 2% portfolio loss leaves it
+    untouched, a 5% loss wipes out half of it, and anything above 7% wipes it
+    out completely.
+
+    Parameters
+    ----------
+    loss : float or array_like of float, shape (n,)
+        Portfolio loss(es) as a fraction of total notional, typically the
+        output of :func:`portfolio_loss`.
+    attachment : float
+        Lower edge of the tranche, as a fraction of portfolio notional (e.g.
+        ``0.03`` for 3%).
+    detachment : float
+        Upper edge of the tranche, as a fraction of portfolio notional. Must
+        satisfy ``0 <= attachment < detachment <= 1``.
+
+    Returns
+    -------
+    numpy.ndarray of float, same shape as ``loss``
+        Tranche loss as a fraction of tranche notional, each in ``[0, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``0 <= attachment < detachment <= 1`` does not hold.
+
+    Notes
+    -----
     A tranche spanning :math:`[a, d]` absorbs
     :math:`\min(\max(L - a, 0),\, d - a)`, rescaled by its width. Equity
     tranches take the first losses; senior tranches are untouched until the
@@ -228,7 +343,32 @@ def tranche_loss(loss: ArrayLike, attachment: float, detachment: float) -> NDArr
 
 
 def tranche_expected_loss(loss: ArrayLike, attachment: float, detachment: float) -> float:
-    """Expected tranche loss, as a fraction of tranche notional.
+    """Average share of a tranche's notional lost, across simulated scenarios.
+
+    This is the number that drives a tranche's price: the mean of
+    :func:`tranche_loss` over all scenarios. ``0.25`` means the tranche
+    expects to lose a quarter of its notional by the horizon.
+
+    Parameters
+    ----------
+    loss : array_like of float, shape (n,)
+        Simulated portfolio losses as fractions of total notional, typically
+        the output of :func:`portfolio_loss`.
+    attachment : float
+        Lower edge of the tranche, as a fraction of portfolio notional.
+    detachment : float
+        Upper edge of the tranche, as a fraction of portfolio notional. Must
+        satisfy ``0 <= attachment < detachment <= 1``.
+
+    Returns
+    -------
+    float
+        Expected tranche loss as a fraction of tranche notional, in ``[0, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``0 <= attachment < detachment <= 1`` does not hold.
 
     Examples
     --------
@@ -251,8 +391,43 @@ def tranche_spread(
     maturity: float = 5.0,
     discount_rate: float = 0.0,
 ) -> float:
-    r"""Approximate fair running spread on a tranche, in basis points.
+    r"""Rough fair running spread on a tranche, in basis points per year.
 
+    Turns a tranche's expected loss into the annual premium a protection
+    buyer would pay. Use it to compare how much different copulas reprice
+    the same tranche, not to quote a trade.
+
+    Parameters
+    ----------
+    loss : array_like of float, shape (n,)
+        Simulated portfolio losses as fractions of total notional, typically
+        the output of :func:`portfolio_loss`. They should be losses to
+        ``maturity``.
+    attachment : float
+        Lower edge of the tranche, as a fraction of portfolio notional.
+    detachment : float
+        Upper edge of the tranche, as a fraction of portfolio notional. Must
+        satisfy ``0 <= attachment < detachment <= 1``.
+    maturity : float, default 5.0
+        Tranche maturity in years. Must be positive.
+    discount_rate : float, default 0.0
+        Continuously compounded annual rate (``0.03`` for 3%). Zero means no
+        discounting.
+
+    Returns
+    -------
+    float
+        Approximate fair spread in basis points per year (``250.0`` means
+        2.5% of tranche notional per year).
+
+    Raises
+    ------
+    ValueError
+        If ``maturity`` is not positive, or the attachment/detachment points
+        are invalid.
+
+    Notes
+    -----
     Equates the protection leg to the premium leg under a **single-period,
     flat-curve** approximation:
 
@@ -289,8 +464,40 @@ def nth_to_default_probability(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> float:
-    r"""Probability that at least ``n_th`` names default -- a basket default swap.
+    r"""Probability that at least ``n_th`` names in a basket default by the horizon.
 
+    This is the trigger probability of an ``n_th``-to-default basket swap:
+    protection pays out once the ``n_th`` default occurs. ``n_th=1`` is
+    first-to-default.
+
+    Parameters
+    ----------
+    copula : Copula
+        Any ``rcopula`` copula whose dimension ``d`` equals the basket size.
+    default_prob : float or array_like of float, shape (d,)
+        Per-name default probability to the horizon, each in ``[0, 1]``. A
+        single number applies to every name.
+    n_th : int, default 1
+        How many defaults trigger the payout, between 1 and ``d``.
+    n : int, default 100_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducible draws.
+
+    Returns
+    -------
+    float
+        Simulated probability, in ``[0, 1]``, that ``n_th`` or more names
+        default.
+
+    Raises
+    ------
+    ValueError
+        If ``n_th`` is outside ``1..d``, or any default probability lies
+        outside ``[0, 1]``.
+
+    Notes
+    -----
     First-to-default is worth most when defaults are *independent* (many chances
     for a first one); ``n``-th-to-default is worth most when they are
     *dependent* (defaults arrive together). That inversion is the whole
@@ -319,8 +526,39 @@ def nth_to_default_probability(
 
 
 def vasicek_loss_cdf(x: ArrayLike, default_prob: float, correlation: float) -> NDArray[np.float64]:
-    r"""Vasicek large-homogeneous-pool loss distribution.
+    r"""Probability that a very large, uniform loan pool loses at most ``x`` (Vasicek).
 
+    A closed-form answer, with no simulation, to "how likely is my portfolio
+    loss to stay below ``x``?" for a pool of many small, identical loans
+    whose defaults are linked by a one-factor Gaussian copula. It is the
+    formula behind Basel IRB capital, and a check on simulated results.
+
+    Parameters
+    ----------
+    x : float or array_like of float
+        Loss level(s) as a fraction of the pool (losses here assume 100% loss
+        given default; to apply an LGD, evaluate at ``x / lgd``).
+    default_prob : float
+        Default probability of each loan to the horizon, strictly in
+        ``(0, 1)``.
+    correlation : float
+        Asset correlation of the one-factor Gaussian model, strictly in
+        ``(0, 1)`` (Basel uses roughly ``0.12`` to ``0.24`` for corporates).
+
+    Returns
+    -------
+    numpy.ndarray of float, same shape as ``x``
+        :math:`P(L \le x)`, each in ``[0, 1]``. A scalar ``x`` gives a 0-d
+        array; wrap it in ``float()`` if needed.
+
+    Raises
+    ------
+    ValueError
+        If ``default_prob`` or ``correlation`` is not strictly inside
+        ``(0, 1)``.
+
+    Notes
+    -----
     .. math::
 
         P(L \le x) = \Phi\!\left(
@@ -366,18 +604,58 @@ def implied_correlation(
     n: int = 40_000,
     random_state: np.random.Generator | int | None = None,
 ) -> float:
-    r"""Gaussian-copula correlation reproducing a given tranche expected loss.
+    r"""Find the Gaussian-copula correlation that reproduces a tranche's expected loss.
 
-    The market's "implied correlation": invert the one-factor Gaussian model
-    until it reproduces an observed tranche price. Doing this tranche by tranche
-    on the same pool produces the **correlation skew** -- different tranches
-    implying different correlations, which is a contradiction if the model were
-    right, and is the standard evidence that it is not.
+    The credit market's "implied correlation", analogous to implied
+    volatility: the single correlation number that makes the Gaussian copula
+    model match an observed tranche price, here expressed as an expected
+    loss.
+
+    Parameters
+    ----------
+    target_expected_loss : float
+        Expected tranche loss to match, as a fraction of tranche notional (as
+        returned by :func:`tranche_expected_loss`), in ``[0, 1]``.
+    default_prob : float
+        Default probability of every name to the horizon, in ``[0, 1]``.
+    attachment : float
+        Lower edge of the tranche, as a fraction of portfolio notional.
+    detachment : float
+        Upper edge of the tranche, as a fraction of portfolio notional. Must
+        satisfy ``0 <= attachment < detachment <= 1``.
+    lgd : float, default 1.0
+        Loss given default, as a fraction of exposure, for every name.
+    n_names : int, default 200
+        Number of equally weighted names in the simulated pool.
+    n : int, default 40_000
+        Number of simulated scenarios per trial correlation.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator. Pass an ``int`` so every trial correlation reuses
+        the same random numbers; with ``None`` or a ``Generator`` each trial
+        sees fresh noise and the root search can be erratic.
+
+    Returns
+    -------
+    float
+        Implied correlation, found to within about ``1e-4``.
 
     Raises
     ------
     ValueError
-        If the target is unattainable over ``correlation`` in ``(0, 1)``.
+        If the target is unattainable over ``correlation`` in ``(0, 1)``
+        (in practice, the search range ``[1e-4, 0.95]``), or the tranche
+        bounds are invalid.
+
+    Notes
+    -----
+    The correlation is found by root search on a Monte Carlo estimate, so it
+    carries simulation error, and each call runs dozens of full simulations.
+
+    Inverting the one-factor Gaussian model until it reproduces an observed
+    tranche price, tranche by tranche on the same pool, produces the
+    **correlation skew** -- different tranches implying different
+    correlations, which is a contradiction if the model were right, and is
+    the standard evidence that it is not.
 
     Examples
     --------

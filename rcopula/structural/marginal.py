@@ -52,27 +52,49 @@ __all__ = ["marginal_copula"]
 
 
 def marginal_copula(copula: Copula, indices: Sequence[int]) -> Copula:
-    r"""The copula of a subset of the coordinates.
+    r"""Extract the dependence between just some of the variables from a larger copula.
+
+    Given a ``d``-dimensional copula, return the copula of a chosen subset of
+    its coordinates (R's ``margCopula``). Use it to ask what a five-asset model
+    says about two of the assets, or to run a bivariate-only diagnostic (a
+    Pickands plot, a K-plot, a tail-concentration plot) on a pair taken from a
+    larger fitted model. Nothing is re-estimated: the result is read off the
+    existing parameters.
+
+    Supported inputs: Archimedean families (same parameter, fewer
+    dimensions), Gaussian and Student-t copulas (the sub-matrix of the
+    correlation), independence and comonotonicity, and the structural
+    wrappers -- :class:`~rcopula.structural.RotatedCopula`,
+    :class:`~rcopula.structural.MixtureCopula`, and for pairs
+    only :class:`~rcopula.structural.NestedArchimedean` and
+    :class:`~rcopula.structural.KhoudrajiCopula`.
 
     Parameters
     ----------
     copula : Copula
+        The ``d``-dimensional copula to take the margin of.
     indices : sequence of int
-        Which coordinates to keep, in the order they should appear. At least
-        two, all distinct, all within range. The order matters for an
+        Zero-based coordinates to keep, in the order they should appear. At
+        least two, all distinct, all in ``[0, d)``. The order matters for an
         asymmetric copula: ``[1, 0]`` is not ``[0, 1]`` unless the copula is
-        exchangeable.
+        exchangeable. Passing every coordinate in increasing order returns
+        ``copula`` itself.
 
     Returns
     -------
     Copula
-        Of dimension ``len(indices)``.
+        A copula of dimension ``len(indices)``, usually of the same family.
+        Elliptical margins always come back with ``dispstr="un"``.
 
     Raises
     ------
+    ValueError
+        If fewer than two indices are given, if they repeat, or if any is out
+        of range.
     NotImplementedError
         For families whose margins are not of the same family -- the empirical
-        copula, and extreme-value families defined only in two dimensions.
+        copula, and extreme-value families defined only in two dimensions --
+        and for nested or Khoudraji margins of more than two coordinates.
 
     Notes
     -----

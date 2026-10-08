@@ -1,6 +1,6 @@
 # Finance tutorials
 
-Four plain-language walk-throughs, each a sequence of short steps from data to an
+Five plain-language walk-throughs, each a sequence of short steps from data to an
 answer a desk would act on. Every one has a runnable script in
 [`examples/`](https://github.com/Chrisebell24/python-copula/tree/main/examples)
 that simulates its own market, so it works offline and **asserts every number
@@ -12,8 +12,9 @@ quoted here**. To use real data, swap step 1 for your own returns.
 | [Risk management](#risk-management-for-a-trading-book) | Backtest VaR, allocate risk to desks, measure diversification and contagion, reverse stress test |
 | [Trading strategies](#trading-strategies-with-copulas) | Pick pairs, turn a copula into a signal, backtest with costs, trade a basket with a vine, spot a broken pair |
 | [Valuing odd assets](#valuing-odd-assets) | Price worst-of notes, basket puts, first-to-default, cat bonds and private stakes under different tails |
+| [Scaling to 800 stocks](#scaling-to-800-stocks) | Beat the curse of dimensionality with factor, sector-nested and truncated-vine copulas, then simulate 50,000 days for VaR and ES |
 
-The thread through all four: a correlation matrix is a **Gaussian copula**, and a
+The thread through all five: a correlation matrix is a **Gaussian copula**, and a
 Gaussian copula says extreme days happen independently. Each tutorial measures
 what that assumption costs.
 
@@ -516,3 +517,128 @@ r = private.ppf(rc.inverse_rosenblatt(rc.ClaytonCopula.from_tau(0.5), z)[:, 1])
 Under Clayton the stake falls further and more predictably. Gaussian says it may
 well have escaped. A lender against the stake has collateral that falls hardest
 when everything falls.
+
+## Scaling to 800 stocks
+
+Copulas that work beautifully for five assets break at 800. One Clayton or Gumbel
+copula forces all 319,600 pairs to share a single tail number; an unstructured
+800-stock Gaussian or Student-t copula needs 319,600 correlations, far more than
+a few years of data can pin down. The fix is structure: assume a few factors, or
+sectors, drive the co-movement. Four steps, from 800 return series to a VaR you
+can trust. The runnable version simulates a market whose true dependence is
+known, so every model can be graded against it:
+[`examples/32_high_dimensional_basket_howto.py`](https://github.com/Chrisebell24/python-copula/blob/main/examples/32_high_dimensional_basket_howto.py).
+
+**0. See why the obvious copulas fail.** A single Archimedean copula can't tell a
+same-sector pair from a cross-sector one. A full correlation matrix estimated
+from four years of data is nearly singular: it "finds" portfolios that look
+almost riskless.
+
+```python
+import numpy as np
+
+sample_corr = np.corrcoef(z_train, rowvar=False)  # z_train: 1,000 days x 800 stocks
+np.linalg.eigvalsh(sample_corr)[0]
+# smallest eigenvalue: true matrix 0.342, estimated 0.004
+# Kendall's tau: same sector 0.31, different sectors 0.19; one Clayton forces 0.21 on all
+```
+
+**1. Filter each stock with GARCH.** Strip out each stock's own volatility
+clustering, then turn its residuals into uniforms with `pseudo_obs`. 800 fits take
+about 7 seconds. rcopula fits GARCH(1,1); it has no asymmetric (GJR) variant.
+
+```python
+import pandas as pd
+import rcopula as rc
+from rcopula.garch import fit_garch
+
+margins = [fit_garch(returns[c], dist="t", name=c) for c in returns.columns]
+u = rc.pseudo_obs(np.column_stack([m.resid for m in margins]))
+```
+
+**2. Fit a structured copula.** Three architectures, each fitted on four years and
+graded on two more:
+
+- **Factor copula.** Each stock is a market loading times a market factor, plus a
+  sector loading times its sector factor, plus noise of its own; given the
+  factors, stocks are independent. 800 + 800 loadings + 1 tail number = **1,601
+  parameters** instead of 319,600. The example fits the loadings by matching
+  sample correlations (rcopula has no factor-copula class) and profiles the
+  Student-t degrees of freedom.
+
+  ```
+  held-out log-likelihood per day
+  full 319,600-entry matrix   -1,763
+  factor, Gaussian               233
+  factor, Student-t              325     df = 4, as in the truth
+  ```
+
+- **Nested copula by sector.** A Clayton copula inside each sector, a weaker one
+  linking the ten sectors: 11 parameters.
+
+  ```python
+  from rcopula.structural import NestedArchimedean
+
+  sectors = [NestedArchimedean(rc.ClaytonCopula(theta[s]), members[s]) for s in range(10)]
+  nested = NestedArchimedean(rc.ClaytonCopula(theta_root), children=sectors)
+  # root theta 0.48, sectors 0.88 on average
+  ```
+
+- **Truncated vine.** An equal-weight index at the root of a C-vine, cut after the
+  first tree: every stock links to the index with its own family, and the stocks
+  are independent given the index. 800 pair-copulas, fitted in about 2 minutes.
+
+  ```python
+  vine = rc.fit_vine(
+      np.column_stack([index_u, u]),
+      structure="C",
+      order=list(range(801)),
+      families=("gaussian", "student"),
+      truncate=1,
+  )
+  # all 800 links choose the Student-t
+  ```
+
+Grade them on days when 80 or more of the 800 stocks have their own worst-1% day
+(a mass crash), or best-1% day (a mass rally):
+
+```
+                   mass crash   mass rally
+truth                 2.97%        2.81%
+factor, Student-t     2.64%        2.78%    <- closest overall
+factor, Gaussian      1.24%        1.36%
+nested Clayton        2.84%        0.00%    <- right on crashes, blind to rallies
+vine (index root)     1.83%        1.96%    <- cannot see sectors after one tree
+```
+
+The factor copula's loadings can also move over time: `rcopula.dynamic.fit_dynamic`
+with `driver="gas"` lets one stock's link to the market drift day by day. Read its
+gain with care. On this market, whose loadings are constant, it found gains from
+0.5 to 20 log-likelihood units depending on the simulated history, because a
+Gaussian recursion mistakes fat-tailed panic days for moving correlation.
+
+**3. Simulate 50,000 days for all 800 stocks.** Draw uniforms from the factor
+copula, turn each into a return through its stock's residual distribution and
+tomorrow's GARCH volatility, and sum the P&L. 50,000 × 800 is 320 MB, so simulate
+in chunks of 10,000 and keep only the P&L.
+
+```python
+for _ in range(5):
+    v = simulate_factor_t(10_000, market_loadings, sector_loadings, df=4.0)
+    pnl.append(to_returns(v) @ positions)  # $125,000 in each of 800 stocks
+```
+
+**4. Read off VaR and expected shortfall.**
+
+```
+                     VaR 99%   ES 99%   diversification
+truth                $2.51m    $3.33m       42.9%
+factor, Student-t    $2.44m    $3.19m       42.5%
+factor, Gaussian     $2.23m    $2.62m       52.2%   <- 21% too little ES
+```
+
+Diversification is how far the book's ES sits below the sum of 800 standalone
+ESs. On the book's worst 1% of days, 487 of the 800 stocks are having their own
+worst-5% day; independent failures would give 40. The Student-t factor copula
+says 487, the Gaussian 339. That gap is the diversification a correlation matrix
+promises and a panic takes away.

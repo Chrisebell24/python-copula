@@ -55,8 +55,32 @@ METHODS = ("mpl", "ml", "itau", "irho", "itau.mpl")
 def nearest_correlation(
     matrix: ArrayLike, tol: float = 1e-10, max_iter: int = 200
 ) -> NDArray[np.float64]:
-    """Nearest positive-definite correlation matrix, by alternating projections.
+    """Repair a "correlation matrix" that is not a valid one, changing it as little as possible.
 
+    Returns the nearest positive-definite matrix with ones on the diagonal,
+    found by alternating projections (Higham, 2002). Use it when a matrix
+    assembled entry by entry -- for example from pairwise Kendall's tau --
+    cannot be used as a correlation matrix because it has a negative
+    eigenvalue.
+
+    Parameters
+    ----------
+    matrix : array_like of float, shape (d, d)
+        Square matrix to repair. It is symmetrised first, as
+        ``(matrix + matrix.T) / 2``.
+    tol : float, default 1e-10
+        Small positive number: the smallest eigenvalue allowed in the result,
+        and the convergence tolerance.
+    max_iter : int, default 200
+        Maximum number of projection rounds (a positive integer).
+
+    Returns
+    -------
+    ndarray of float, shape (d, d)
+        Symmetric, positive-definite matrix with unit diagonal.
+
+    Notes
+    -----
     Inverting pairwise dependence measures gives a symmetric matrix with unit
     diagonal, but nothing guarantees it is positive definite -- each entry is
     estimated separately. R applies the same repair (``Matrix::nearPD``) after
@@ -118,18 +142,39 @@ def _as_pseudo_obs(data: ArrayLike, ties_method: str) -> NDArray[np.float64]:
 
 
 def loglik_copula(params: ArrayLike, u: ArrayLike, copula: Copula, error: str = "-inf") -> float:
-    """Log-likelihood of a copula at given parameters (R's ``loglikCopula``).
+    """Score how well a copula with the given parameters explains the data (higher is better).
+
+    Returns the copula log-likelihood: the sum of the log-density over all
+    rows of ``u``. This is R's ``loglikCopula``. Use it to compare parameter
+    values by hand or to build your own optimiser; :func:`fit` uses it
+    internally.
 
     Parameters
     ----------
-    params : array_like
-        Parameter vector to evaluate at.
-    u : array_like
-        ``(n, d)`` observations in the unit cube.
+    params : array_like of float, shape (p,)
+        Full parameter vector to evaluate at, in the order of
+        ``copula.param_names``.
+    u : array_like of float, shape (n, d)
+        Observations strictly inside the unit cube (pseudo-observations or
+        copula samples). A 1-D input is treated as a single row.
     copula : Copula
         Supplies the family; its own parameter values are ignored.
-    error : {"-inf", "raise"}
-        What to do when the parameters are inadmissible.
+    error : {"-inf", "raise"}, default "-inf"
+        What to do when the parameters are inadmissible (outside the family's
+        range, or giving a non-finite density): ``"-inf"`` returns
+        ``-inf``; ``"raise"`` re-raises the underlying error.
+
+    Returns
+    -------
+    float
+        The log-likelihood, or ``-inf`` for inadmissible parameters when
+        ``error="-inf"``.
+
+    Raises
+    ------
+    ValueError, numpy.linalg.LinAlgError or NotImplementedError
+        Only with ``error="raise"``, when the parameters are inadmissible or
+        the family has no density.
 
     Examples
     --------
@@ -396,32 +441,80 @@ def fit(
     estimate_variance: bool = True,
     ties_method: str = "average",
 ) -> CopulaFitResult:
-    """Fit a copula to data.
+    """Estimate a copula's parameters from data.
+
+    Give it a copula family (for example ``ClaytonCopula()``) and a table of
+    observations; it returns the best-fitting parameters together with
+    standard errors, a log-likelihood and AIC/BIC. Your data can be raw
+    values or already-uniform pseudo-observations -- raw values are turned
+    into ranks first, so the margins do not matter.
 
     Parameters
     ----------
     copula : Copula
         Family to fit. Its parameter values are used only as a starting point;
-        pass e.g. ``ClaytonCopula()`` with unspecified parameters.
-    data : array_like
-        ``(n, d)`` observations. Values already in ``(0, 1)`` are taken to be
-        pseudo-observations; anything else is rank-transformed first.
-    method : {"mpl", "ml", "itau", "irho", "itau.mpl"}
-        Estimation method. See the module docstring.
-    start : array_like, optional
-        Starting parameters for the likelihood methods. Defaults to the
-        inversion-of-tau estimate, as in R.
-    optim_method : str, optional
-        A ``scipy.optimize.minimize`` method name. Defaults to ``L-BFGS-B`` for
-        multi-parameter problems and ``Nelder-Mead`` for one.
-    estimate_variance : bool
-        Whether to compute the asymptotic covariance matrix.
-    ties_method : str
-        Passed to :func:`~rcopula.dependence.pseudo_obs` when transforming.
+        pass e.g. ``ClaytonCopula()`` with unspecified parameters. Parameters
+        pinned with ``fix_params`` are held fixed.
+    data : array_like of float or pandas.DataFrame, shape (n, d)
+        Observations, one row per observation and one column per variable;
+        ``d`` must equal ``copula.dim``. If every value is strictly inside
+        ``(0, 1)`` the data are taken to be pseudo-observations as they are;
+        otherwise each column is rank-transformed first. A 1-D input is
+        treated as a single column.
+    method : {"mpl", "ml", "itau", "irho", "itau.mpl"}, default "mpl"
+        Estimation method:
+
+        * ``"mpl"`` -- maximum pseudo-likelihood; the usual choice.
+        * ``"ml"`` -- same estimate, standard errors that assume the margins
+          are known.
+        * ``"itau"`` / ``"irho"`` -- invert Kendall's tau / Spearman's rho;
+          fast, no optimiser.
+        * ``"itau.mpl"`` -- Student-t copula only: correlations from tau,
+          degrees of freedom by pseudo-likelihood.
+
+        See the module docstring for details.
+    start : array_like of float, shape (p,), or None, default None
+        Starting parameters for ``"mpl"`` and ``"ml"`` (full vector, in the
+        order of ``copula.param_names``). ``None`` uses the inversion-of-tau
+        estimate, as in R. Ignored by the other methods.
+    optim_method : str or None, default None
+        A ``scipy.optimize.minimize`` method name, e.g. ``"BFGS"``. ``None``
+        uses ``L-BFGS-B`` for multi-parameter problems and ``Nelder-Mead``
+        for one. Used by ``"mpl"`` and ``"ml"`` only.
+    estimate_variance : bool, default True
+        Whether to compute the asymptotic covariance matrix (and therefore
+        standard errors). Set to ``False`` to save time.
+    ties_method : {"average", "min", "max", "dense", "ordinal", "random"}, default "average"
+        How tied values are ranked; passed to
+        :func:`~rcopula.dependence.pseudo_obs` when transforming raw data.
 
     Returns
     -------
     CopulaFitResult
+        Fitted copula, estimates of the free parameters, standard errors
+        (``bse``), log-likelihood, AIC/BIC and a printable ``summary()``.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not one of the five listed; if the number of data
+        columns differs from ``copula.dim``; if ``"itau"``/``"irho"`` cannot
+        invert the sample measure for this family (e.g. negative tau for a
+        Gumbel copula); or if ``"itau.mpl"`` is used with anything other than
+        a Student-t copula with ``dispstr="un"``.
+
+    See Also
+    --------
+    rcopula.fit_joint : Fit the margins and the copula together.
+    rcopula.select_copula : Fit several families and rank them.
+
+    Notes
+    -----
+    ``"mpl"`` and ``"ml"`` produce the same point estimate and differ only
+    in the variance. ``"itau.mpl"`` does not compute a covariance matrix,
+    whatever ``estimate_variance`` says. A copula with no free parameters is
+    not optimised; its log-likelihood is still reported so it can take part
+    in AIC/BIC comparisons.
 
     Examples
     --------

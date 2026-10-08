@@ -236,7 +236,7 @@ theory, and `rc.statarb.select_partners` picks which assets to group together.
 
 ### More finance tutorials
 
-Three more in the same step-by-step style, each with a runnable script that checks
+Four more in the same step-by-step style, each with a runnable script that checks
 its own numbers, are on the [finance tutorials](https://chrisebell24.github.io/python-copula/finance-tutorials/) page:
 
 | | |
@@ -244,6 +244,7 @@ its own numbers, are on the [finance tutorials](https://chrisebell24.github.io/p
 | [Risk management](https://chrisebell24.github.io/python-copula/finance-tutorials/#risk-management-for-a-trading-book) | VaR and expected shortfall in dollars, a VaR backtest, which desk the risk comes from, how much diversification really buys, contagion between desks, reverse stress testing — [`examples/29`](https://github.com/Chrisebell24/python-copula/blob/main/examples/29_risk_management_howto.py) |
 | [Trading strategies](https://chrisebell24.github.io/python-copula/finance-tutorials/#trading-strategies-with-copulas) | Picking pairs, a copula mispricing signal, an out-of-sample backtest with costs against the z-score trade, a vine basket trade, and an alarm for when a pair breaks — [`examples/30`](https://github.com/Chrisebell24/python-copula/blob/main/examples/30_trading_strategies_howto.py) |
 | [Valuing odd assets](https://chrisebell24.github.io/python-copula/finance-tutorials/#valuing-odd-assets) | Worst-of notes, basket puts, first-to-default baskets, catastrophe bonds and private stakes, priced at the same correlation under different tails — [`examples/31`](https://github.com/Chrisebell24/python-copula/blob/main/examples/31_valuing_odd_assets_howto.py) |
+| [Scaling to 800 stocks](https://chrisebell24.github.io/python-copula/finance-tutorials/#scaling-to-800-stocks) | Why one Clayton or a 319,600-entry correlation matrix fails at 800 stocks; a factor copula, a sector-nested copula and a truncated vine graded against the truth; 50,000-day VaR and expected shortfall — [`examples/32`](https://github.com/Chrisebell24/python-copula/blob/main/examples/32_high_dimensional_basket_howto.py) |
 
 ## Datasets
 
@@ -265,7 +266,7 @@ data file is ever committed.
 
 ## Examples
 
-Thirty-one scripts in [`examples/`](https://github.com/Chrisebell24/python-copula/tree/main/examples/), each of which **runs and asserts
+Thirty-two scripts in [`examples/`](https://github.com/Chrisebell24/python-copula/tree/main/examples/), each of which **runs and asserts
 its own claims** — so they cannot drift out of date without failing:
 
 ```bash
