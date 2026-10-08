@@ -29,18 +29,26 @@ _LOG2 = float(np.log(2.0))
 
 
 def log1mexp(a: ArrayLike) -> NDArray[np.float64]:
-    """Compute ``log(1 - exp(-a))`` accurately for ``a > 0``.
+    """Compute ``log(1 - exp(-a))`` without the rounding errors of the naive formula.
+
+    Typing ``np.log(1 - np.exp(-a))`` loses every digit when ``a`` is tiny
+    (``1 - exp(-a)`` rounds to 0) and is inaccurate in other ranges too. Copula
+    log-densities and log-CDFs are full of this expression, so the package
+    routes it through here. Use it whenever you need the log of a probability
+    written as ``1 - exp(-a)``.
 
     Parameters
     ----------
-    a : array_like
-        Non-negative values. ``a = 0`` yields ``-inf`` (since ``log 0 = -inf``);
-        negative values yield ``nan``, because ``1 - exp(-a) < 0`` there.
+    a : array_like of float, any shape
+        Non-negative values; a Python ``float`` works too. ``a = 0`` yields
+        ``-inf`` (since ``log 0 = -inf``); negative values yield ``nan``,
+        because ``1 - exp(-a) < 0`` there. No error is raised for either.
 
     Returns
     -------
-    ndarray
-        ``log(1 - exp(-a))``, elementwise.
+    numpy.ndarray of float64, same shape as ``a``
+        ``log(1 - exp(-a))``, elementwise. A scalar input gives a
+        ``numpy.float64``.
 
     Notes
     -----
@@ -72,17 +80,23 @@ def log1mexp(a: ArrayLike) -> NDArray[np.float64]:
 
 
 def log1pexp(x: ArrayLike) -> NDArray[np.float64]:
-    """Compute ``log(1 + exp(x))`` accurately for all real ``x``.
+    """Compute ``log(1 + exp(x))`` (the softplus function) without overflow or rounding loss.
+
+    The naive formula overflows for large ``x`` (``exp(1000)`` is ``inf``) and
+    loses accuracy for very negative ``x``. This version is accurate for every
+    real input, which matters inside log-likelihoods that are evaluated far
+    into the tails.
 
     Parameters
     ----------
-    x : array_like
-        Any real values.
+    x : array_like of float, any shape
+        Any real values; a Python ``float`` works too. ``nan`` gives ``nan``.
 
     Returns
     -------
-    ndarray
-        ``log(1 + exp(x))``, elementwise. This is the softplus function.
+    numpy.ndarray of float64, same shape as ``x``
+        ``log(1 + exp(x))``, elementwise. A scalar input gives a
+        ``numpy.float64``.
 
     Notes
     -----
@@ -130,9 +144,13 @@ def signed_logsumexp(
     signs: ArrayLike,
     axis: int | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Sum signed terms given in log-absolute form, without leaving log space.
+    """Add up positive and negative numbers that are stored as logarithms, without overflow.
 
     Computes ``log|S|`` and ``sign(S)`` where ``S = sum(signs * exp(log_abs))``.
+    It is ``scipy.special.logsumexp`` extended to terms that may be negative,
+    and it is what you need when the individual terms are far too large or too
+    small to hold as ordinary floats but their (possibly cancelling) sum is
+    wanted.
 
     This is the workhorse for ``d``-dimensional Archimedean densities, whose
     generator derivatives are alternating sums with terms spanning hundreds of
@@ -141,19 +159,22 @@ def signed_logsumexp(
 
     Parameters
     ----------
-    log_abs : array_like
-        Logarithms of the absolute values of the terms.
-    signs : array_like
-        Signs (``+1`` or ``-1``) of the terms; broadcast against ``log_abs``.
-    axis : int, optional
+    log_abs : array_like of float, any shape
+        Logarithms of the absolute values of the terms. ``-inf`` stands for a
+        zero term.
+    signs : array_like of float, broadcastable to ``log_abs.shape``
+        Signs (``+1`` or ``-1``, or ``0`` to ignore a term) of the terms.
+    axis : int or None, default None
         Axis to sum over. ``None`` sums the flattened input.
 
     Returns
     -------
-    log_abs_sum : ndarray
-        ``log|S|``. Equals ``-inf`` where the terms cancel exactly.
-    sign_sum : ndarray
-        ``sign(S)``, one of ``-1.0``, ``0.0``, ``1.0``.
+    log_abs_sum : numpy.ndarray of float64
+        ``log|S|``, with ``axis`` removed from the shape (a ``numpy.float64``
+        when ``axis=None``). Equals ``-inf`` where the terms cancel exactly.
+    sign_sum : numpy.ndarray of float64
+        ``sign(S)``, one of ``-1.0``, ``0.0``, ``1.0``; same shape as
+        ``log_abs_sum``.
 
     Examples
     --------

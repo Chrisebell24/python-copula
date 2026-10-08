@@ -400,17 +400,36 @@ _FAST_LOGPDF: dict[str, tuple[Any, Any]] = {
 
 @dataclass(frozen=True)
 class DynamicPath:
-    """The filtered output of a :class:`DynamicCopula`.
+    """The copula parameter at every time step, as worked out by a dynamic copula.
+
+    This is what :meth:`DynamicCopula.filter` returns: one parameter value per
+    observation, plus how well each observation fits the copula in force at
+    that moment. You do not normally build one yourself.
+
+    Parameters
+    ----------
+    path : numpy.ndarray of float, shape (n,)
+        See ``Attributes``.
+    linked : numpy.ndarray of float, shape (n,)
+        See ``Attributes``.
+    loglik_contributions : numpy.ndarray of float, shape (n,)
+        See ``Attributes``.
 
     Attributes
     ----------
-    path : ndarray, shape (n,)
-        The copula parameter at each observation, on its natural scale.
-    linked : ndarray, shape (n,)
-        The same path before the link -- the scale the recursion runs on.
-    loglik_contributions : ndarray, shape (n,)
+    path : numpy.ndarray of float, shape (n,)
+        The copula parameter at each observation, on its natural scale (for a
+        Gaussian copula, the correlation at each time step).
+    linked : numpy.ndarray of float, shape (n,)
+        The same path before the link -- the unconstrained scale the recursion
+        runs on.
+    loglik_contributions : numpy.ndarray of float, shape (n,)
         ``log c(u_t; theta_t)`` term by term. Summing gives the log-likelihood;
         the series itself shows which observations the model finds surprising.
+        A non-finite term is replaced by ``-1e10``.
+    loglik : float
+        Total log-likelihood, the sum of ``loglik_contributions`` (a read-only
+        property).
     """
 
     path: NDArray[np.float64]
@@ -419,35 +438,83 @@ class DynamicPath:
 
     @property
     def loglik(self) -> float:
-        """Total log-likelihood."""
+        """Total log-likelihood: how well the whole path fits the data (higher is better).
+
+        Returns
+        -------
+        float
+            The sum of ``loglik_contributions``.
+        """
         return float(np.sum(self.loglik_contributions))
 
 
 class DynamicCopula:
-    r"""A bivariate copula whose parameter follows an observation-driven recursion.
+    r"""A two-variable copula whose strength of dependence changes over time.
+
+    An ordinary copula has one fixed parameter for the whole sample. Here the
+    parameter is updated after every observation by a simple rule (an
+    observation-driven recursion), so it can rise in turbulent periods and fall
+    in calm ones. Use it to evaluate, simulate or forecast a model whose
+    coefficients you already know; to *estimate* the coefficients from data,
+    use :func:`fit_dynamic`.
 
     Parameters
     ----------
     family : Copula
-        A bivariate copula. Its parameter values set the starting point of the
-        recursion and, for a multi-parameter family such as
-        :class:`~rcopula.StudentCopula`, fix everything that does not vary.
-    coefficients : sequence of 3 floats
-        ``(omega, alpha, beta)``.
-    driver : {"patton", "gas"}
+        A bivariate copula (``family.dim == 2``), for example
+        ``rcopula.GaussianCopula(0.3)``. Its current parameter values set the
+        starting point of the recursion and, for a multi-parameter family such
+        as :class:`~rcopula.StudentCopula`, fix everything that does not vary
+        (the degrees of freedom stay constant).
+    coefficients : array_like of float, shape (3,)
+        ``(omega, alpha, beta)``, required and keyword-only. ``omega`` is the
+        intercept, ``alpha`` how strongly the parameter reacts to new data, and
+        ``beta`` how persistent it is (values near 1 change slowly). They act
+        on the linked (unconstrained) scale, so any real numbers are valid.
+    driver : {"patton", "gas"}, default "patton"
         Which recursion. ``"patton"`` uses a moving average of a forcing term;
         ``"gas"`` uses the likelihood score. See the module docstring.
-    forcing : {"auto", "normal-product", "abs-difference"}
+    forcing : {"auto", "normal-product", "abs-difference"}, default "auto"
         Patton's forcing term. ``"auto"`` picks the normal product for
         elliptical families and the absolute difference otherwise, which is what
         Patton did. Ignored by the GAS driver, which needs no such choice.
+    lags : int, default 10
+        Length of the moving-average window, in observations; must be at least
+        1. Patton used 10. Only used by the ``"patton"`` driver.
+    index : int, default 0
+        Which entry of ``family.params`` varies, when the family has more than
+        one. The default is the first, which is the correlation for a t copula.
+    bounds : tuple of (float, float) or None, default None
+        ``(lower, upper)`` working range for the varying parameter, with
+        ``lower < upper``. ``None`` uses the family's own domain, with an
+        infinite side replaced by a finite span (25 for a one-sided parameter
+        such as Clayton's, ``(-40, 40)`` for Frank's).
+
+    Attributes
+    ----------
+    family : Copula
+        The copula passed in.
+    coefficients : numpy.ndarray of float, shape (3,)
+        ``(omega, alpha, beta)``.
+    driver : str
+        ``"patton"`` or ``"gas"``.
+    forcing : str
+        The resolved forcing term, ``"normal-product"`` or
+        ``"abs-difference"`` (never ``"auto"``).
     lags : int
-        Length of the moving-average window. Patton used 10.
+        Moving-average window length.
     index : int
-        Which parameter varies, when the family has more than one. Defaults to
-        the first, which is the correlation for a t copula.
-    bounds : (float, float), optional
-        Override the working range of the varying parameter.
+        Position of the varying parameter in ``family.params``.
+    link : object
+        The map from the unconstrained scale onto ``(lower, upper)``; its
+        ``lower`` and ``upper`` attributes give the working range.
+
+    Raises
+    ------
+    ValueError
+        If ``family`` is not bivariate, ``coefficients`` does not have exactly
+        three entries, ``driver`` is not ``"patton"`` or ``"gas"``, or
+        ``bounds`` is not increasing.
 
     Notes
     -----
@@ -574,16 +641,30 @@ class DynamicCopula:
     # -- public ------------------------------------------------------------
 
     def filter(self, u: ArrayLike) -> DynamicPath:
-        """Run the recursion over ``u`` and return the parameter path.
+        """Work out the copula parameter at every time step of ``u``.
+
+        Runs the recursion forwards through the data with the model's fixed
+        coefficients, and reports the parameter path and how well each
+        observation fits.
 
         Parameters
         ----------
-        u : array_like, shape (n, 2)
-            Pseudo-observations in :math:`(0,1)^2`.
+        u : array_like of float, shape (n, 2)
+            Pseudo-observations, each value strictly between 0 and 1, in time
+            order (oldest first). Unlike :func:`fit_dynamic`, raw data are not
+            converted here.
 
         Returns
         -------
         DynamicPath
+            ``path`` (parameter per observation, shape ``(n,)``), ``linked``
+            (the same on the unconstrained scale) and ``loglik_contributions``
+            (per-observation log-density); ``.loglik`` gives the total.
+
+        Raises
+        ------
+        ValueError
+            If ``u`` is not two-dimensional with exactly two columns.
 
         Examples
         --------
@@ -633,11 +714,57 @@ class DynamicCopula:
         return DynamicPath(path=theta, linked=linked, loglik_contributions=contributions)
 
     def loglik(self, u: ArrayLike) -> float:
-        """Log-likelihood of ``u`` under the recursion."""
+        """Score how well the model fits ``u``: the log-likelihood (higher is better).
+
+        Shorthand for ``self.filter(u).loglik``.
+
+        Parameters
+        ----------
+        u : array_like of float, shape (n, 2)
+            Pseudo-observations strictly between 0 and 1, in time order.
+
+        Returns
+        -------
+        float
+            Sum over observations of ``log c(u_t; theta_t)``.
+
+        Raises
+        ------
+        ValueError
+            If ``u`` does not have shape ``(n, 2)``.
+        """
         return self.filter(u).loglik
 
     def with_coefficients(self, coefficients: ArrayLike) -> DynamicCopula:
-        """A copy with different ``(omega, alpha, beta)``."""
+        """Make a copy of this model with different ``(omega, alpha, beta)``.
+
+        Everything else -- family, driver, forcing, lags, varying parameter and
+        working range -- is carried over unchanged. The original is not
+        modified.
+
+        Parameters
+        ----------
+        coefficients : array_like of float, shape (3,)
+            The new ``(omega, alpha, beta)``.
+
+        Returns
+        -------
+        DynamicCopula
+            A new model.
+
+        Raises
+        ------
+        ValueError
+            If ``coefficients`` does not have exactly three entries.
+
+        Examples
+        --------
+        >>> import rcopula as rc
+        >>> from rcopula.dynamic import DynamicCopula
+        >>> model = DynamicCopula(rc.GaussianCopula(0.0), coefficients=(0.0, 0.1, 0.9))
+        >>> model.with_coefficients((0.0, 0.2, 0.5)).coefficients.tolist()
+        [0.0, 0.2, 0.5]
+        """
         return DynamicCopula(
             self.family,
             coefficients=coefficients,
@@ -651,19 +778,28 @@ class DynamicCopula:
     def simulate(
         self, size: int, *, random_state: Any = None, burn_in: int = 200
     ) -> NDArray[np.float64]:
-        """Draw a path from the model.
+        """Generate a random time series of pseudo-observations from the model.
 
-        The recursion feeds on its own output, so this is genuinely sequential:
-        each observation is drawn from the copula the previous ones implied.
+        Useful for checking a fit (simulate from known coefficients, refit,
+        compare) or for scenario analysis. The recursion feeds on its own
+        output, so this is genuinely sequential: each observation is drawn from
+        the copula the previous ones implied.
 
         Parameters
         ----------
         size : int
-            Number of observations to return.
-        random_state : None, int or Generator
-        burn_in : int
-            Draws discarded first, so the returned path does not depend on where
-            ``family.params`` happened to start.
+            Number of observations to return; a non-negative whole number.
+        random_state : int, numpy.random.Generator or None, default None
+            Seed or generator for reproducible draws. ``None`` uses fresh
+            randomness.
+        burn_in : int, default 200
+            Draws generated and thrown away first, so the returned path does not
+            depend on where ``family.params`` happened to start. Non-negative.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (size, 2)
+            Pseudo-observations in time order, each value between 0 and 1.
 
         Examples
         --------
@@ -718,17 +854,43 @@ class DynamicCopula:
         draws: int = 2000,
         random_state: Any = None,
     ) -> dict[str, NDArray[np.float64]]:
-        """Simulate the parameter forward from the end of ``u``.
+        """Predict where the copula parameter is heading over the next few steps.
 
-        The recursion is driven by future observations, so beyond one step ahead
-        the parameter is a random variable rather than a number. This returns
-        its distribution.
+        The model is first run over ``u``, then many possible futures are
+        simulated from its last state. The recursion is driven by future
+        observations, so beyond one step ahead the parameter is a random
+        variable rather than a number; this returns a summary of its
+        distribution at each step.
+
+        Parameters
+        ----------
+        u : array_like of float, shape (n, 2)
+            Pseudo-observations strictly between 0 and 1, in time order; the
+            forecast starts after the last row.
+        horizon : int
+            Number of steps ahead to forecast; at least 1.
+        draws : int, default 2000
+            Number of simulated futures. More gives smoother percentiles at
+            proportionally higher cost.
+        random_state : int, numpy.random.Generator or None, default None
+            Seed or generator for reproducible simulation.
 
         Returns
         -------
-        dict
-            ``"mean"``, ``"median"``, ``"lower"`` and ``"upper"`` (5th and 95th
-            percentiles), each of length ``horizon``.
+        dict of str to numpy.ndarray of float
+            Four arrays, each of shape ``(horizon,)``, with entry ``h`` for the
+            step ``h + 1`` ahead:
+
+            - ``"mean"``: average simulated parameter.
+            - ``"median"``: median simulated parameter.
+            - ``"lower"``: 5th percentile.
+            - ``"upper"``: 95th percentile.
+
+        Raises
+        ------
+        ValueError
+            If ``horizon`` is less than 1, or ``u`` does not have shape
+            ``(n, 2)``.
 
         Examples
         --------
@@ -797,22 +959,40 @@ class DynamicCopula:
 
 @dataclass
 class DynamicFitResult:
-    """A fitted time-varying copula.
+    """The result of fitting a time-varying copula with :func:`fit_dynamic`.
+
+    Holds the estimated coefficients, the fitted parameter path, and the fit of
+    an ordinary constant-parameter copula for comparison, so you can judge
+    whether letting dependence move was worth it. You do not normally build one
+    yourself.
+
+    Every constructor argument is the field of the same name listed under
+    ``Attributes``; ``message`` defaults to ``""``.
 
     Attributes
     ----------
     model : DynamicCopula
-        The model at the estimated coefficients.
-    coefficients : ndarray
-        ``(omega, alpha, beta)``.
+        The model at the estimated coefficients; use it to filter new data,
+        simulate or forecast.
+    coefficients : numpy.ndarray of float, shape (3,)
+        Estimated ``(omega, alpha, beta)``.
     loglik : float
-    path : ndarray
-        The filtered parameter path.
+        Maximised log-likelihood of the time-varying model.
+    path : numpy.ndarray of float, shape (n_obs,)
+        The filtered parameter path: the copula parameter at each observation.
     constant_loglik : float
         Log-likelihood of the same family with a constant parameter, fitted by
         maximum likelihood. The comparison is the point of the exercise.
+    constant_param : float
+        The fitted constant value of the varying parameter.
     n_obs : int
+        Number of observations used.
     converged : bool
+        Whether the optimiser reported success.
+    message : str
+        The optimiser's status message.
+    n_params, aic, bic, persistence
+        Read-only properties; see each one below.
     """
 
     model: DynamicCopula
@@ -828,34 +1008,66 @@ class DynamicFitResult:
 
     @property
     def n_params(self) -> int:
-        """Three, always: omega, alpha and beta."""
+        """Number of estimated coefficients: three, always (omega, alpha and beta).
+
+        Returns
+        -------
+        int
+            ``3``.
+        """
         return 3
 
     @property
     def aic(self) -> float:
-        """Akaike information criterion."""
+        """Akaike information criterion: fit penalised for complexity (lower is better).
+
+        Returns
+        -------
+        float
+            ``2 * n_params - 2 * loglik``.
+        """
         return float(2 * self.n_params - 2 * self.loglik)
 
     @property
     def bic(self) -> float:
-        """Bayesian information criterion."""
+        """Bayesian information criterion: like AIC with a stiffer penalty (lower is better).
+
+        Returns
+        -------
+        float
+            ``n_params * log(n_obs) - 2 * loglik``.
+        """
         return float(self.n_params * np.log(self.n_obs) - 2 * self.loglik)
 
     @property
     def persistence(self) -> float:
-        """The autoregressive coefficient beta.
+        """How slowly the dependence changes: the autoregressive coefficient beta.
 
         Near 1 the parameter drifts slowly and the recursion is close to a unit
         root; near 0 it is essentially the constant model with noise.
+
+        Returns
+        -------
+        float
+            ``coefficients[2]``.
         """
         return float(self.coefficients[2])
 
     def constancy_test(self) -> tuple[float, float]:
-        """Likelihood ratio against a constant copula.
+        """Check whether a time-varying copula fits clearly better than a constant one.
+
+        Computes the likelihood-ratio statistic comparing this fit with the
+        constant-parameter fit of the same family. A large statistic (small
+        p-value) suggests the dependence really does move -- but read the
+        caveat in the Notes before relying on the p-value.
 
         Returns
         -------
-        statistic, pvalue
+        statistic : float
+            ``2 * (loglik - constant_loglik)``, floored at 0.
+        pvalue : float
+            Nominal p-value from a chi-squared distribution with 2 degrees of
+            freedom. Approximate only; see Notes.
 
         Notes
         -----
@@ -883,7 +1095,16 @@ class DynamicFitResult:
         return statistic, float(stats.chi2(2).sf(statistic))
 
     def summary(self) -> str:
-        """A printable report.
+        """Produce a plain-text report of the fit, ready to print.
+
+        Lists the coefficients, log-likelihood, AIC/BIC, the constant-copula
+        comparison and the range of the fitted parameter path, plus a warning
+        line if the optimiser did not converge.
+
+        Returns
+        -------
+        str
+            A multi-line report.
 
         Examples
         --------
@@ -933,27 +1154,63 @@ def fit_dynamic(
     bounds: tuple[float, float] | None = None,
     start: ArrayLike | None = None,
 ) -> DynamicFitResult:
-    """Fit a time-varying copula by maximum likelihood.
+    """Estimate, from data, a two-variable copula whose dependence changes over time.
+
+    Finds the ``(omega, alpha, beta)`` coefficients of a :class:`DynamicCopula`
+    that make the observed series most likely (maximum likelihood), and also
+    fits an ordinary constant copula of the same family so the two can be
+    compared. Use it when you suspect the link between two series is stronger
+    in some periods than others.
 
     Parameters
     ----------
-    u : array_like, shape (n, 2)
-        Pseudo-observations. Anything outside :math:`(0,1)` is converted with
-        :func:`~rcopula.pseudo_obs` first, so raw innovations are accepted --
-        but see the warning in the module docstring about *which* series to
-        pass.
+    u : array_like of float, shape (n, 2)
+        Two series in time order (oldest first). Ideally pseudo-observations
+        strictly between 0 and 1. If any value is 0, 1 or outside that range,
+        the data are converted with :func:`~rcopula.pseudo_obs` first, so raw
+        innovations are accepted -- but see the warning in the module docstring
+        about *which* series to pass.
     family : Copula
-        The bivariate family whose parameter varies.
-    driver, forcing, lags, index, bounds
-        As for :class:`DynamicCopula`.
-    start : sequence of 3 floats, optional
-        Starting ``(omega, alpha, beta)``. The default starts from a persistent
-        recursion centred on the constant maximum-likelihood estimate, which is
-        the standard choice and matters: this likelihood is not concave.
+        The bivariate family whose parameter varies, for example
+        ``rcopula.GaussianCopula(0.0)``. Its starting parameter values do not
+        matter; they are replaced by the constant fit.
+    driver : {"patton", "gas"}, default "patton"
+        Which recursion; as for :class:`DynamicCopula`.
+    forcing : {"auto", "normal-product", "abs-difference"}, default "auto"
+        Patton's forcing term; as for :class:`DynamicCopula`.
+    lags : int, default 10
+        Moving-average window for the Patton driver; at least 1.
+    index : int, default 0
+        Which entry of ``family.params`` varies.
+    bounds : tuple of (float, float) or None, default None
+        Working range of the varying parameter; ``None`` uses the family's
+        domain, as for :class:`DynamicCopula`.
+    start : array_like of float, shape (3,), or None, default None
+        Starting ``(omega, alpha, beta)`` for the optimiser. The default tries
+        three starts, led by a persistent recursion centred on the constant
+        maximum-likelihood estimate, which is the standard choice and matters:
+        this likelihood is not concave.
 
     Returns
     -------
     DynamicFitResult
+        Estimated ``coefficients``, fitted ``model`` and parameter ``path``,
+        ``loglik``, the constant fit's ``constant_loglik`` and
+        ``constant_param``, ``n_obs``, ``converged`` and ``message``. Call
+        ``.summary()`` for a report or ``.constancy_test()`` for the comparison.
+
+    Raises
+    ------
+    ValueError
+        If ``u`` does not have shape ``(n, 2)``. A ``family`` that is not
+        bivariate is also rejected (by the constant fit or by
+        :class:`DynamicCopula`).
+
+    Notes
+    -----
+    Optimisation is Nelder-Mead on the negative log-likelihood. Coefficients
+    with ``|beta| >= 0.9999`` are rejected as non-stationary. Fitting is slow
+    for families without a vectorised density (see :class:`DynamicCopula`).
 
     Examples
     --------
@@ -1059,21 +1316,40 @@ def fit_dynamic(
 
 @dataclass
 class DccResult:
-    """A filtered dynamic conditional correlation model.
+    """The result of :func:`fit_dcc`: a correlation matrix for every time step.
+
+    Holds the estimated DCC coefficients and the whole path of correlation
+    matrices they imply, so you can see how the dependence between every pair
+    of variables moved through the sample. You do not normally build one
+    yourself.
+
+    Every constructor argument is the field of the same name listed under
+    ``Attributes``.
 
     Attributes
     ----------
-    correlations : ndarray, shape (n, d, d)
-        The correlation matrix at each observation.
-    a, b : float
-        The DCC coefficients. ``a`` is the news impact, ``b`` the persistence.
+    correlations : numpy.ndarray of float, shape (n, d, d)
+        The correlation matrix at each observation; ``correlations[t]`` is
+        symmetric with a unit diagonal.
+    a : float
+        The DCC news-impact coefficient: how strongly the latest observation
+        moves the correlations. Non-negative.
+    b : float
+        The DCC persistence coefficient: how much of the previous correlation
+        carries over. Non-negative, with ``a + b < 1``.
     loglik : float
         Copula log-likelihood, i.e. of the Gaussian (or t) copula density at the
         filtered correlations -- *not* the joint likelihood of the data.
-    unconditional : ndarray, shape (d, d)
+    unconditional : numpy.ndarray of float, shape (d, d)
         The target correlation matrix the recursion reverts to.
     df : float or None
-        Degrees of freedom, if a t copula was used.
+        Degrees of freedom, if a t copula was used; ``None`` for Gaussian.
+    converged : bool
+        Whether the optimiser reported success.
+    n_obs : int
+        Number of observations, ``n``.
+    persistence : float
+        ``a + b`` (a read-only property; see below).
     """
 
     correlations: NDArray[np.float64]
@@ -1087,18 +1363,62 @@ class DccResult:
 
     @property
     def persistence(self) -> float:
-        """``a + b``. At 1 the recursion has a unit root and never reverts."""
+        """How long shocks to correlation last: ``a + b``.
+
+        At 1 the recursion has a unit root and never reverts; values close to 1
+        (0.95-0.99 is common for daily data) mean slow mean reversion.
+
+        Returns
+        -------
+        float
+            ``a + b``, between 0 and 1.
+        """
         return float(self.a + self.b)
 
     def pair(self, i: int, j: int) -> NDArray[np.float64]:
-        """The correlation between coordinates ``i`` and ``j`` over time."""
+        """Get the correlation between variables ``i`` and ``j`` at every time step.
+
+        Parameters
+        ----------
+        i : int
+            Column index of the first variable, ``0 <= i < d``.
+        j : int
+            Column index of the second variable, ``0 <= j < d``.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n,)
+            ``correlations[:, i, j]``.
+
+        Raises
+        ------
+        IndexError
+            If ``i`` or ``j`` is out of range.
+
+        Examples
+        --------
+        >>> import rcopula as rc
+        >>> from rcopula.dynamic import fit_dcc
+        >>> u = rc.GaussianCopula(0.5, dim=3, dispstr="ex").rvs(200, random_state=0)
+        >>> fit_dcc(u).pair(0, 2).shape
+        (200,)
+        """
         return np.asarray(self.correlations[:, i, j])
 
     def copulas(self) -> list[Copula]:
-        """One copula per observation, for downstream use.
+        """Turn the correlation path into one ordinary copula object per time step.
 
+        Each entry is a Gaussian copula (or a t copula with ``df`` degrees of
+        freedom) with unstructured correlation equal to ``correlations[t]``, so
+        you can sample from or evaluate the model in force at any date.
         Building ``n`` copula objects is not free; do it when the models are
         wanted individually, not to compute a likelihood.
+
+        Returns
+        -------
+        list of Copula, length n
+            :class:`~rcopula.GaussianCopula` objects if ``df`` is ``None``,
+            otherwise :class:`~rcopula.StudentCopula`, each of dimension ``d``.
         """
         from rcopula.core.elliptical import P2p
 
@@ -1115,7 +1435,16 @@ class DccResult:
         return out
 
     def summary(self) -> str:
-        """A printable report."""
+        """Produce a plain-text report of the DCC fit, ready to print.
+
+        Lists ``a``, ``b``, their sum, the copula log-likelihood, and the mean
+        and range of the correlation between the first two variables.
+
+        Returns
+        -------
+        str
+            A multi-line report.
+        """
         return "\n".join(
             [
                 f"Dynamic conditional correlation, d = {self.correlations.shape[1]}"
@@ -1203,26 +1532,41 @@ def fit_dcc(
     df: float | None = None,
     start: tuple[float, float] = (0.03, 0.95),
 ) -> DccResult:
-    r"""Fit Engle's DCC to the copula of ``u``.
+    r"""Estimate a correlation matrix that changes over time, for two or more series.
 
-    The multivariate answer to :class:`DynamicCopula`: instead of one parameter
-    moving, the whole correlation matrix does, driven by the outer product of
-    the last observation.
+    This is Engle's dynamic conditional correlation (DCC) model, applied to the
+    copula of ``u``. It is the multivariate answer to :class:`DynamicCopula`:
+    instead of one parameter moving, the whole correlation matrix does, driven
+    by the outer product of the last observation. Only two numbers, ``a`` and
+    ``b``, are estimated, however many series there are.
 
     Parameters
     ----------
-    u : array_like, shape (n, d)
-        Pseudo-observations. Values outside :math:`(0,1)` trigger a conversion.
-    df : float, optional
-        Fit a t copula with this many degrees of freedom instead of a Gaussian
-        one. Not estimated -- profile it by calling this over a grid, which is
-        what practitioners do anyway because the df likelihood is flat.
-    start : (float, float)
-        Starting ``(a, b)``.
+    u : array_like of float, shape (n, d)
+        ``d >= 2`` series in time order (oldest first), ideally
+        pseudo-observations strictly between 0 and 1. If any value is 0, 1 or
+        outside that range, the data are converted with
+        :func:`~rcopula.pseudo_obs` first.
+    df : float or None, default None
+        Fit a t copula with this many degrees of freedom (a positive number)
+        instead of a Gaussian one. Not estimated -- profile it by calling this
+        over a grid, which is what practitioners do anyway because the df
+        likelihood is flat.
+    start : tuple of (float, float), default (0.03, 0.95)
+        Starting ``(a, b)`` for the optimiser; both non-negative with
+        ``a + b < 1``.
 
     Returns
     -------
     DccResult
+        ``correlations`` (shape ``(n, d, d)``), coefficients ``a`` and ``b``,
+        ``loglik``, the ``unconditional`` target matrix, ``df``, ``converged``
+        and ``n_obs``.
+
+    Raises
+    ------
+    ValueError
+        If ``u`` is not two-dimensional with at least two columns.
 
     Notes
     -----

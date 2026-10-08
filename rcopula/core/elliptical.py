@@ -65,11 +65,39 @@ def _lower_indices(dim: int) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
 
 
 def p2P(param: ArrayLike, dim: int) -> NDArray[np.float64]:
-    """Build a correlation matrix from its lower triangle (R's ``p2P``).
+    """Turn a flat list of pairwise correlations into a full correlation matrix.
 
+    Use this to go from the parameter vector of an unstructured
+    (``dispstr="un"``) Gaussian or t copula to the ``d x d`` matrix it
+    describes. It is R's ``p2P``; :func:`P2p` is the inverse.
+
+    Parameters
+    ----------
+    param : array_like of float, shape (d * (d - 1) / 2,)
+        The below-diagonal entries, one per pair of variables. Any shape is
+        accepted and flattened; only the total count matters. Values are copied
+        in as given -- nothing checks that they lie in ``[-1, 1]`` or that the
+        result is positive definite.
+    dim : int
+        Size ``d`` of the matrix to build.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (dim, dim)
+        Symmetric matrix with ones on the diagonal.
+
+    Raises
+    ------
+    ValueError
+        If ``param`` does not hold exactly ``dim * (dim - 1) / 2`` values.
+
+    Notes
+    -----
     Entries fill the lower triangle column by column, as R does, so for
     ``dim=4`` the parameter vector is
-    ``(rho_12, rho_13, rho_14, rho_23, rho_24, rho_34)``.
+    ``(rho_12, rho_13, rho_14, rho_23, rho_24, rho_34)``. This is *not* the
+    row-by-row order of ``numpy.tril_indices``; the two agree only up to
+    ``dim=3``.
 
     Examples
     --------
@@ -93,7 +121,22 @@ def p2P(param: ArrayLike, dim: int) -> NDArray[np.float64]:
 
 
 def P2p(matrix: ArrayLike) -> NDArray[np.float64]:
-    """Extract the lower triangle of a correlation matrix (R's ``P2p``).
+    """Flatten a correlation matrix into the list of its pairwise correlations.
+
+    The inverse of :func:`p2P`: it reads the below-diagonal entries of a
+    ``d x d`` matrix, column by column (R's order), into a vector. It is R's
+    ``P2p``.
+
+    Parameters
+    ----------
+    matrix : array_like of float, shape (d, d)
+        A square matrix, normally a correlation matrix. Only the strictly lower
+        triangle is read; nothing checks symmetry.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (d * (d - 1) / 2,)
+        ``(m[1, 0], m[2, 0], ..., m[d-1, 0], m[2, 1], ...)``.
 
     Examples
     --------
@@ -130,7 +173,54 @@ def _build_sigma(rho: NDArray[np.float64], dispstr: str, dim: int) -> NDArray[np
 
 
 class EllipticalCopula(Copula):
-    """Shared machinery for the Gaussian and Student-t copulas."""
+    """Common base for copulas built from a correlation matrix (Gaussian and t).
+
+    You normally use :class:`GaussianCopula` or :class:`StudentCopula`
+    directly; this class holds what they share -- the correlation structure,
+    the dependence measures and calibration from a target tau or rho. It is
+    not meant to be instantiated itself.
+
+    Parameters
+    ----------
+    params : float or array_like of float, default nan
+        The correlation parameter(s), each in ``[-1, 1]``. How many are
+        needed depends on ``dispstr`` (see below). ``nan`` -- the default --
+        means "to be estimated", so ``GaussianCopula()`` is a family ready for
+        :func:`~rcopula.fit.fit`; a single ``nan`` expands to as many as
+        ``dispstr`` requires.
+    dim : int, default 2
+        Number of variables ``d``; at least 2.
+    dispstr : {"ex", "ar1", "toep", "un"}, default "ex"
+        How the correlation matrix is built from ``params`` (R's
+        ``dispstr``):
+
+        * ``"ex"`` (exchangeable): one value shared by every pair. Must be at
+          least ``-1 / (d - 1)``.
+        * ``"ar1"`` (autoregressive): one value ``r``; pair ``(i, j)`` gets
+          ``r ** |i - j|``.
+        * ``"toep"`` (Toeplitz): ``d - 1`` values, one per distance
+          ``|i - j|``.
+        * ``"un"`` (unstructured): ``d * (d - 1) / 2`` values, one per pair,
+          in the order used by :func:`p2P`.
+    free : array_like of bool or None, default None
+        Keyword-only. Which parameters :func:`~rcopula.fit.fit` may change;
+        ``False`` holds that parameter at its given value. ``None`` frees all.
+
+    Attributes
+    ----------
+    dispstr : str
+        The correlation structure, as passed.
+    param_names : tuple of str
+        ``("rho",)`` for ``"ex"``/``"ar1"``, ``("rho.1", ..., "rho.{d-1}")``
+        for ``"toep"``, and ``("rho.21", "rho.31", ...)`` for ``"un"``.
+
+    Raises
+    ------
+    ValueError
+        If ``dispstr`` is not one of the four codes, ``params`` has the wrong
+        length or is out of range, or the implied correlation matrix is not
+        positive definite.
+    """
 
     #: Number of parameters beyond the correlation block (t adds ``df``).
     _n_extra: int = 0
@@ -171,11 +261,29 @@ class EllipticalCopula(Copula):
 
     @property
     def rho_params(self) -> NDArray[np.float64]:
-        """The correlation parameters, excluding any extra (e.g. ``df``)."""
+        """Just the correlation parameters, without the t copula's ``df``.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n_corr,)
+            The first ``n_corr`` entries of :attr:`params`, where ``n_corr``
+            depends on :attr:`dispstr` (1 for ``"ex"``/``"ar1"``, ``d - 1`` for
+            ``"toep"``, ``d * (d - 1) / 2`` for ``"un"``). Read-only view.
+        """
         return self._params[: self._n_corr]
 
     def sigma(self) -> NDArray[np.float64]:
-        """The implied ``d x d`` correlation matrix (R's ``getSigma``).
+        """Return the full correlation matrix that the parameters describe.
+
+        Expands the (possibly structured) correlation parameters into the
+        ``d x d`` matrix -- R's ``getSigma``. Useful for inspecting a fitted
+        model or passing the matrix to other code.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (d, d)
+            Symmetric correlation matrix with ones on the diagonal. Contains
+            ``nan`` if the parameters are still unspecified.
 
         Examples
         --------
@@ -193,6 +301,15 @@ class EllipticalCopula(Copula):
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Allowed range ``(lower, upper)`` for each correlation parameter.
+
+        Returns
+        -------
+        list of tuple of (float, float), length n_corr
+            ``(-1 / (d - 1), 1)`` for the exchangeable structure and
+            ``(-1, 1)`` otherwise. Positive definiteness of the whole matrix is
+            checked separately when the copula is built.
+        """
         # The exchangeable structure needs rho >= -1/(d-1) to stay positive
         # definite; the others are only box-bounded here, with definiteness
         # enforced separately.
@@ -232,10 +349,28 @@ class EllipticalCopula(Copula):
     # -- dependence measures -------------------------------------------
 
     def tau(self) -> Any:
-        r"""Kendall's tau, :math:`(2/\pi)\arcsin(\rho)`.
+        r"""Kendall's tau: a rank correlation between -1 and 1 implied by the copula.
 
-        Returns a float when there is a single correlation parameter, and the
-        vector of pairwise values otherwise (matching R). The identity holds for
+        Kendall's tau is the probability that two random draws are ordered the
+        same way in both variables minus the probability they are ordered
+        oppositely. Here it follows exactly from the correlation,
+        :math:`\tau = (2/\pi)\arcsin(\rho)`.
+
+        Returns
+        -------
+        float or numpy.ndarray of float, shape (d * (d - 1) / 2,)
+            A float when ``dim=2`` or ``dispstr="ex"`` (every pair shares one
+            value); otherwise one value per pair, in :func:`P2p` order
+            (matching R).
+
+        Raises
+        ------
+        ValueError
+            If the parameters are still unspecified (``nan``).
+
+        Notes
+        -----
+        The identity holds for
         *every* elliptical copula, Gaussian and t alike — which is exactly why
         tau alone cannot distinguish them.
         """
@@ -248,29 +383,137 @@ class EllipticalCopula(Copula):
         )
 
     def rho(self) -> Any:
-        r"""Spearman's rho, :math:`(6/\pi)\arcsin(\rho/2)`."""
+        r"""Spearman's rho: the correlation of the variables' ranks implied by the copula.
+
+        Spearman's rho is the ordinary correlation of the uniform-scale
+        variables, between -1 and 1. For the Gaussian copula it is
+        :math:`(6/\pi)\arcsin(\rho/2)`; :class:`StudentCopula` overrides this
+        because the formula does not hold for the t copula.
+
+        Returns
+        -------
+        float or numpy.ndarray of float, shape (d * (d - 1) / 2,)
+            A float when ``dim=2`` or ``dispstr="ex"``; otherwise one value per
+            pair, in :func:`P2p` order.
+
+        Raises
+        ------
+        ValueError
+            If the parameters are still unspecified (``nan``).
+        """
         self._require_specified()
         vals = 6.0 / np.pi * np.arcsin(P2p(self.sigma()) / 2.0)
         return float(vals[0]) if self.dispstr == "ex" or self._dim == 2 else vals
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> EllipticalCopula:
-        r"""Calibrate from Kendall's tau: :math:`\rho = \sin(\pi\tau/2)`."""
+        r"""Build a copula whose Kendall's tau equals the value you ask for.
+
+        Handy for setting the strength of dependence on an interpretable rank
+        scale rather than as a raw correlation. Uses the exact inversion
+        :math:`\rho = \sin(\pi\tau/2)` (R's ``iTau``).
+
+        Parameters
+        ----------
+        tau : float
+            Target Kendall's tau, strictly between -1 and 1.
+        dim : int, default 2
+            Number of variables.
+        **kwargs
+            Passed to the constructor, e.g. ``dispstr`` or (for the t copula)
+            ``df``. Only one correlation value is produced, so the result must
+            use a one-parameter structure (``"ex"`` or ``"ar1"``, or any
+            structure when ``dim=2``).
+
+        Returns
+        -------
+        EllipticalCopula
+            A new copula of the calling class.
+
+        Raises
+        ------
+        ValueError
+            If ``tau`` is not in ``(-1, 1)``, or the resulting correlation is
+            not admissible for ``dim`` (e.g. too negative for ``"ex"``).
+        """
         if not -1.0 < tau < 1.0:
             raise ValueError(f"tau must lie in (-1, 1), got {tau}")
         return cls(np.sin(np.pi * tau / 2.0), dim, **kwargs)
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> EllipticalCopula:
-        r"""Calibrate from Spearman's rho: :math:`\rho_P = 2\sin(\pi\rho_S/6)`."""
+        r"""Build a copula whose Spearman's rho equals the value you ask for.
+
+        Uses the Gaussian-copula inversion
+        :math:`\rho_P = 2\sin(\pi\rho_S/6)` (R's ``iRho``).
+        :class:`StudentCopula` overrides this with a numerical inversion,
+        because the formula is not valid for the t copula.
+
+        Parameters
+        ----------
+        rho : float
+            Target Spearman's rho, strictly between -1 and 1.
+        dim : int, default 2
+            Number of variables.
+        **kwargs
+            Passed to the constructor, e.g. ``dispstr``. As for
+            :meth:`from_tau`, the structure must take a single correlation.
+
+        Returns
+        -------
+        EllipticalCopula
+            A new copula of the calling class.
+
+        Raises
+        ------
+        ValueError
+            If ``rho`` is not in ``(-1, 1)``, or the resulting correlation is
+            not admissible for ``dim``.
+        """
         if not -1.0 < rho < 1.0:
             raise ValueError(f"rho must lie in (-1, 1), got {rho}")
         return cls(2.0 * np.sin(np.pi * rho / 6.0), dim, **kwargs)
 
 
 class GaussianCopula(EllipticalCopula):
-    r"""Gaussian (normal) copula.
+    r"""The Gaussian (normal) copula: the dependence structure of a multivariate normal.
 
+    It links variables through a correlation matrix, exactly as a multivariate
+    normal does, but lets each variable keep whatever marginal distribution
+    you choose. It is the standard default and is easy to fit and interpret,
+    but it assumes extreme values in different variables are essentially
+    unrelated (see below); use :class:`StudentCopula` when joint extremes
+    matter.
+
+    Parameters
+    ----------
+    params : float or array_like of float, default nan
+        Correlation parameter(s) in ``[-1, 1]``; how many depends on
+        ``dispstr``. ``nan`` means "to be estimated".
+    dim : int, default 2
+        Number of variables ``d``; at least 2.
+    dispstr : {"ex", "ar1", "toep", "un"}, default "ex"
+        Correlation structure: exchangeable (1 parameter), autoregressive
+        (1), Toeplitz (``d - 1``) or unstructured (``d * (d - 1) / 2``). See
+        :class:`EllipticalCopula`.
+    free : array_like of bool or None, default None
+        Keyword-only mask of parameters :func:`~rcopula.fit.fit` may change.
+
+    Attributes
+    ----------
+    dispstr : str
+        The correlation structure.
+    params : numpy.ndarray of float
+        The correlation parameters (read-only).
+
+    Raises
+    ------
+    ValueError
+        For an unknown ``dispstr``, the wrong number of parameters, values out
+        of range, or a correlation matrix that is not positive definite.
+
+    Notes
+    -----
     :math:`C(\mathbf{u}) = \Phi_\Sigma(\Phi^{-1}(u_1), \dots, \Phi^{-1}(u_d))`.
 
     **No tail dependence in either tail**, for any correlation short of 1. That
@@ -326,14 +569,76 @@ class GaussianCopula(EllipticalCopula):
         return GaussianCopula(params, self._dim, self.dispstr, free=free)
 
     def lambda_(self) -> TailDependence:
-        """Zero in both tails — the Gaussian copula's defining limitation."""
+        """Tail dependence: always zero in both tails for the Gaussian copula.
+
+        Tail dependence is the chance that one variable is extreme given that
+        another is equally extreme, in the limit. The Gaussian copula has none
+        for any correlation below 1 -- its defining limitation.
+
+        Returns
+        -------
+        TailDependence
+            ``TailDependence(lower=0.0, upper=0.0)``.
+
+        Raises
+        ------
+        ValueError
+            If the parameters are still unspecified (``nan``).
+        """
         self._require_specified()
         return TailDependence(lower=0.0, upper=0.0)
 
 
 class StudentCopula(EllipticalCopula):
-    r"""Student-t copula.
+    r"""The Student-t copula: like the Gaussian, but extremes tend to happen together.
 
+    It uses a correlation matrix like :class:`GaussianCopula` plus a
+    degrees-of-freedom parameter ``df`` that controls how often variables hit
+    extremes at the same time: small ``df`` means strong joint extremes, large
+    ``df`` approaches the Gaussian. It is the usual choice for financial
+    returns, where crashes are shared.
+
+    Parameters
+    ----------
+    params : float or array_like of float, default nan
+        Correlation parameter(s) in ``[-1, 1]``, as for
+        :class:`GaussianCopula`. May optionally include ``df`` as one extra
+        final element, in which case the ``df`` keyword is ignored. ``nan``
+        means "to be estimated".
+    dim : int, default 2
+        Number of variables ``d``; at least 2.
+    dispstr : {"ex", "ar1", "toep", "un"}, default "ex"
+        Correlation structure; see :class:`EllipticalCopula`.
+    df : float, default 4.0
+        Keyword-only. Degrees of freedom, any positive real (at least 0.01);
+        need not be an integer.
+    df_fixed : bool, default False
+        Keyword-only. If ``True``, :func:`~rcopula.fit.fit` keeps ``df`` at its
+        given value and estimates only the correlations. Ignored when ``free``
+        is given.
+    free : array_like of bool or None, default None
+        Keyword-only mask of parameters (correlations then ``df``) that
+        :func:`~rcopula.fit.fit` may change.
+
+    Attributes
+    ----------
+    df : float
+        Degrees of freedom.
+    df_fixed : bool
+        Whether ``df`` was requested fixed.
+    dispstr : str
+        The correlation structure.
+    params : numpy.ndarray of float
+        Correlation parameters followed by ``df`` (read-only).
+
+    Raises
+    ------
+    ValueError
+        For an unknown ``dispstr``, the wrong number of parameters, values out
+        of range, or a correlation matrix that is not positive definite.
+
+    Notes
+    -----
     :math:`C(\mathbf{u}) = t_{\nu,\Sigma}(t_\nu^{-1}(u_1), \dots)`.
 
     Symmetric tail dependence in both tails,
@@ -406,11 +711,25 @@ class StudentCopula(EllipticalCopula):
 
     @property
     def df(self) -> float:
-        """Degrees of freedom."""
+        """Degrees of freedom: smaller means more joint extremes.
+
+        Returns
+        -------
+        float
+            The last entry of :attr:`params`; ``nan`` if not yet estimated.
+        """
         return float(self._params[-1])
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Allowed range ``(lower, upper)`` for each parameter.
+
+        Returns
+        -------
+        list of tuple of (float, float), length n_corr + 1
+            The correlation bounds of :class:`EllipticalCopula`, followed by
+            ``(0.01, inf)`` for ``df``.
+        """
         return [*super().param_bounds, (1e-2, np.inf)]
 
     def _quantile(self, u, params):
@@ -456,6 +775,29 @@ class StudentCopula(EllipticalCopula):
         return StudentCopula(params, self._dim, self.dispstr, df_fixed=self.df_fixed, free=free)
 
     def lambda_(self) -> TailDependence:
+        r"""Tail dependence: how likely joint extremes are, equal in both tails.
+
+        Tail dependence is the chance that one variable is extreme given that
+        another is equally extreme, in the limit. For the t copula it is the
+        same in the lower and upper tail and positive for every finite ``df``.
+
+        Returns
+        -------
+        TailDependence
+            ``lower == upper``, each in ``[0, 1]``, from
+            :math:`2\, t_{\nu+1}(-\sqrt{(\nu+1)(1-\rho)/(1+\rho)})`.
+
+        Raises
+        ------
+        ValueError
+            If the parameters are still unspecified (``nan``).
+
+        Notes
+        -----
+        Only the first pairwise correlation (variables 1 and 2) is used, so
+        for a non-exchangeable structure with ``dim > 2`` the result describes
+        that pair only.
+        """
         self._require_specified()
         nu = self.df
         rho = float(P2p(self.sigma())[0])
@@ -463,8 +805,26 @@ class StudentCopula(EllipticalCopula):
         return TailDependence(lower=float(value), upper=float(value))
 
     def rho(self) -> Any:
-        r"""Spearman's rho, by quadrature.
+        r"""Spearman's rho: the correlation of the variables' ranks, computed numerically.
 
+        Spearman's rho is the ordinary correlation of the uniform-scale
+        variables, between -1 and 1. The t copula has no closed form for it, so
+        it is computed by numerical integration (accurate to about twelve
+        digits).
+
+        Returns
+        -------
+        float or numpy.ndarray of float, shape (d * (d - 1) / 2,)
+            A float when ``dim=2`` or ``dispstr="ex"``; otherwise one value per
+            pair, in :func:`P2p` order.
+
+        Raises
+        ------
+        ValueError
+            If the parameters are still unspecified (``nan``).
+
+        Notes
+        -----
         Kendall's tau is :math:`\frac{2}{\pi}\arcsin\rho` for *every* elliptical
         copula, so the t copula inherits the Gaussian expression. **Spearman's
         rho does not.** The relation
@@ -497,14 +857,70 @@ class StudentCopula(EllipticalCopula):
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> StudentCopula:
+        r"""Build a t copula whose Kendall's tau equals the value you ask for.
+
+        Uses :math:`\rho = \sin(\pi\tau/2)`, which holds for every elliptical
+        copula; ``df`` does not affect tau, so set it through ``kwargs``.
+
+        Parameters
+        ----------
+        tau : float
+            Target Kendall's tau, strictly between -1 and 1.
+        dim : int, default 2
+            Number of variables.
+        **kwargs
+            Passed to the constructor, e.g. ``df=3`` or ``dispstr="ar1"``. The
+            structure must take a single correlation.
+
+        Returns
+        -------
+        StudentCopula
+
+        Raises
+        ------
+        ValueError
+            If ``tau`` is not in ``(-1, 1)``.
+
+        Examples
+        --------
+        >>> from rcopula import StudentCopula
+        >>> cop = StudentCopula.from_tau(0.5, df=3)
+        >>> float(round(cop.tau(), 12)), cop.df
+        (0.5, 3.0)
+        """
         if not -1.0 < tau < 1.0:
             raise ValueError(f"tau must lie in (-1, 1), got {tau}")
         return cls(np.sin(np.pi * tau / 2.0), dim, **kwargs)
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> StudentCopula:
-        r"""Calibrate from Spearman's rho, by inverting :meth:`rho` numerically.
+        r"""Build a t copula whose Spearman's rho equals the value you ask for.
 
+        Because the t copula's Spearman's rho has no closed form, the
+        correlation is found numerically (by bisection on :meth:`rho`), so this
+        takes a few seconds.
+
+        Parameters
+        ----------
+        rho : float
+            Target Spearman's rho, strictly between -1 and 1.
+        dim : int, default 2
+            Number of variables.
+        **kwargs
+            Passed to the constructor. ``df`` (default 4.0) is also used in the
+            inversion, since the answer depends on it.
+
+        Returns
+        -------
+        StudentCopula
+
+        Raises
+        ------
+        ValueError
+            If ``rho`` is not in ``(-1, 1)``.
+
+        Notes
+        -----
         The Gaussian relation :math:`\rho_P = 2\sin(\pi\rho_S/6)` -- which R
         uses, and which this method used to use -- is not valid for a t copula,
         so the inversion is done against the quadrature value instead. It starts

@@ -15,8 +15,10 @@ unchanged.
 :class:`KhoudrajiCopula`    Break exchangeability with a shape per coordinate.
 :class:`MixtureCopula`      Convex combination -- both tails at once.
 :class:`NestedArchimedean`  A tree: dependence that varies by branch.
+:func:`fit_nested`          Estimate a nested tree's parameters from data.
 :func:`marginal_copula`     The copula of a subset of the coordinates.
-:func:`opower`              Raise a generator to an outer power: a second dial.
+:class:`OuterPowerCopula`   A generator raised to an outer power.
+:func:`opower`              Shorthand for :class:`OuterPowerCopula`.
 ==========================  ==================================================
 """
 

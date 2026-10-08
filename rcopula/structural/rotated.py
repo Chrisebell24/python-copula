@@ -72,16 +72,53 @@ _DEGREES: dict[int, tuple[bool, bool]] = {
 
 
 class RotatedCopula(Copula):
-    """A copula with some coordinates reflected.
+    """Turn an existing copula around so its strong dependence sits in a different corner.
+
+    Reflecting coordinate ``j`` means replacing each value ``u_j`` by
+    ``1 - u_j`` (a small value becomes a large one). Use this when a family has
+    the right *shape* but the wrong orientation: for example Clayton ties
+    variables together when they are all small (lower tail), and reflecting
+    every coordinate gives a copula that ties them together when they are all
+    large (upper tail) -- usually what you want for joint losses. In two
+    dimensions, reflecting one coordinate turns positive dependence into
+    negative, which Clayton and Gumbel cannot otherwise express.
+
+    The result has exactly the base copula's parameters, so it can be fitted,
+    evaluated and sampled like any other copula.
 
     Parameters
     ----------
     base : Copula
-        The copula being reflected.
-    flip : bool, sequence of bool, or int
+        The copula being reflected, with any dimension ``d >= 2``. Its
+        parameters may be ``nan`` (to be fitted).
+    flip : bool, array_like of bool with shape (d,), or int, default True
         Which coordinates to reflect. A single ``bool`` applies to all of them,
-        so ``flip=True`` is the survival copula. In two dimensions an ``int`` in
-        ``{0, 90, 180, 270}`` selects a rotation by that many degrees.
+        so ``flip=True`` (the default) is the survival copula. A sequence of
+        ``d`` booleans picks coordinates individually. In two dimensions an
+        ``int`` in ``{0, 90, 180, 270}`` selects a rotation by that many
+        degrees (90 reflects the second coordinate, 270 the first, 180 both).
+    free : array_like of bool, shape (n_params,), or None, default None
+        Keyword-only. Which parameters are estimated when fitting; ``None``
+        keeps the base copula's mask.
+
+    Attributes
+    ----------
+    base : Copula
+        The copula being reflected. Never itself a :class:`RotatedCopula` --
+        nested rotations are collapsed on construction.
+    flip : numpy.ndarray of bool, shape (d,)
+        Read-only mask of reflected coordinates.
+    name : str
+        ``"Rotated <base name>"``.
+    param_names : tuple of str
+        The base copula's parameter names.
+
+    Raises
+    ------
+    ValueError
+        If ``flip`` is a sequence whose length is not ``d``, if it is an
+        ``int`` but ``d != 2``, or if the ``int`` is not one of
+        ``0, 90, 180, 270``.
 
     Notes
     -----
@@ -161,23 +198,61 @@ class RotatedCopula(Copula):
 
     @property
     def flip(self) -> NDArray[np.bool_]:
-        """Boolean mask of reflected coordinates."""
+        """Which coordinates are reflected.
+
+        Returns
+        -------
+        numpy.ndarray of bool, shape (d,)
+            Read-only mask; ``True`` where ``u_j`` is replaced by ``1 - u_j``.
+        """
         return self._flip
 
     @property
     def degrees(self) -> int:
-        """Rotation in degrees; bivariate only."""
+        """The rotation expressed in degrees, as vine libraries label it (two dimensions only).
+
+        Returns
+        -------
+        int
+            One of ``0``, ``90``, ``180``, ``270``. 90 means the second
+            coordinate is reflected, 270 the first, 180 both.
+
+        Raises
+        ------
+        ValueError
+            If the copula is not bivariate.
+
+        Examples
+        --------
+        >>> from rcopula import ClaytonCopula
+        >>> from rcopula.structural import RotatedCopula
+        >>> RotatedCopula(ClaytonCopula(2.0), [True, False]).degrees
+        270
+        """
         if self.dim != 2:
             raise ValueError(f"the degree convention is bivariate; this copula has dim={self.dim}")
         return next(d for d, f in _DEGREES.items() if np.array_equal(np.array(f), self._flip))
 
     @property
     def is_survival(self) -> bool:
-        """True when every coordinate is reflected."""
+        """Whether this is the survival copula, i.e. every coordinate is reflected.
+
+        Returns
+        -------
+        bool
+            ``True`` when every coordinate is reflected.
+        """
         return bool(self._flip.all())
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Allowed range of each parameter -- the same as the base copula's.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            One ``(lower, upper)`` pair per parameter.
+        """
         return self.base.param_bounds
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> Copula:
@@ -246,12 +321,25 @@ class RotatedCopula(Copula):
         return -1.0 if int(self._flip.sum()) % 2 else 1.0
 
     def tau(self) -> float:
-        """Kendall's tau. Exact in ``d = 2``; the base's value when ``d > 2``.
+        """Return Kendall's tau, a rank correlation between -1 and 1, after reflection.
+
+        Exact in ``d = 2``; the base's value when ``d > 2`` and all or none of
+        the coordinates are reflected.
 
         In two dimensions concordance simply flips sign with each reflection.
         Beyond two dimensions the scalar tau of an exchangeable family survives
         only when *all* or *no* coordinates are reflected; a partial reflection
         makes the pairwise taus differ, so there is no single number to report.
+
+        Returns
+        -------
+        float
+            Kendall's tau of the rotated copula.
+
+        Raises
+        ------
+        NotImplementedError
+            For a partial reflection with ``d > 2``.
         """
         if self.dim == 2:
             return self._sign() * self.base.tau()
@@ -263,7 +351,21 @@ class RotatedCopula(Copula):
         )
 
     def rho(self) -> float:
-        """Spearman's rho, with the same conventions as :meth:`tau`."""
+        """Return Spearman's rho, a rank correlation between -1 and 1, after reflection.
+
+        Same conventions as :meth:`tau`: in two dimensions the sign flips with
+        each reflected coordinate.
+
+        Returns
+        -------
+        float
+            Spearman's rho of the rotated copula.
+
+        Raises
+        ------
+        NotImplementedError
+            For a partial reflection with ``d > 2``.
+        """
         if self.dim == 2:
             return self._sign() * self.base.rho()
         if self._flip.all() or not self._flip.any():
@@ -274,7 +376,10 @@ class RotatedCopula(Copula):
         )
 
     def lambda_(self) -> TailDependence:
-        r"""Tail dependence after reflection.
+        r"""Return how strongly the variables move together in extremes, after reflection.
+
+        The lower (upper) tail-dependence coefficient is the limiting chance
+        that one variable is extremely small (large) given that another is.
 
         Reflecting **every** coordinate swaps the two coefficients: the survival
         copula's lower tail is the base's upper tail. Reflecting **none** leaves
@@ -288,6 +393,11 @@ class RotatedCopula(Copula):
         package. The one exception is the Frechet lower bound :math:`W`, whose
         entire mass sits on that anti-diagonal -- and reflecting it gives
         :math:`M`, which is comonotone -- so it is handled explicitly.
+
+        Returns
+        -------
+        TailDependence
+            Named tuple ``(lower, upper)`` of floats in ``[0, 1]``.
         """
         lower, upper = self.base.lambda_()
         if not self._flip.any():
@@ -300,12 +410,42 @@ class RotatedCopula(Copula):
     # -- calibration ---------------------------------------------------
 
     def calibrated(self, measure: str, value: float) -> Copula:
-        """Calibrate the wrapped family so the *rotated* copula hits the target.
+        """Return a new rotated copula whose tau or rho equals a target value.
+
+        The wrapped family is calibrated so that the *rotated* copula hits the
+        target (the sign is flipped for you where the rotation reverses
+        concordance). The rotation itself is kept.
 
         This is why the instance-level hook exists: a classmethod cannot know
         which family is being rotated. It is what makes ``method="itau"`` and
         ``"irho"`` work on rotated copulas, and what supplies the starting value
         for ``"mpl"``.
+
+        Parameters
+        ----------
+        measure : {"tau", "rho"}
+            Which rank correlation to match.
+        value : float
+            Target value of that measure for the rotated copula.
+
+        Returns
+        -------
+        Copula
+            A :class:`RotatedCopula` with the same ``flip`` and new parameters.
+
+        Raises
+        ------
+        ValueError
+            If ``measure`` is not ``"tau"`` or ``"rho"``, or if the base family
+            cannot reach the (sign-adjusted) value.
+
+        Examples
+        --------
+        >>> from rcopula import ClaytonCopula
+        >>> from rcopula.structural import RotatedCopula
+        >>> template = RotatedCopula(ClaytonCopula(1.0), 90)
+        >>> float(round(template.calibrated("tau", -0.4).tau(), 12))
+        -0.4
         """
         if measure not in ("tau", "rho"):
             raise ValueError(f"measure must be 'tau' or 'rho', got {measure!r}")
@@ -314,9 +454,35 @@ class RotatedCopula(Copula):
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> Copula:
-        """Calibrate the base family so the *rotated* copula has this tau.
+        """Build a rotated copula with a given Kendall's tau.
 
-        ``base`` (a copula class) and ``flip`` are passed through as keywords.
+        The base family is calibrated so that the *rotated* copula has this tau;
+        for a 90- or 270-degree rotation that means a negative tau gives a valid
+        positive-dependence base.
+
+        Parameters
+        ----------
+        tau : float
+            Target Kendall's tau of the rotated copula, in ``(-1, 1)``.
+        dim : int, default 2
+            Number of variables.
+        **kwargs
+            ``base`` (required): the copula *class* to rotate, e.g.
+            ``ClaytonCopula``. ``flip`` (bool, array_like of bool or int,
+            default ``True``): as in the constructor. Anything else is passed
+            to ``base.from_tau``.
+
+        Returns
+        -------
+        Copula
+            A :class:`RotatedCopula`.
+
+        Raises
+        ------
+        TypeError
+            If ``base`` is not given.
+        ValueError
+            If ``flip`` is invalid or the base family cannot reach the value.
 
         Examples
         --------
@@ -336,7 +502,33 @@ class RotatedCopula(Copula):
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> Copula:
-        """As :meth:`from_tau`, for Spearman's rho."""
+        """Build a rotated copula with a given Spearman's rho.
+
+        Exactly like :meth:`from_tau`, but matching Spearman's rho.
+
+        Parameters
+        ----------
+        rho : float
+            Target Spearman's rho of the rotated copula, in ``(-1, 1)``.
+        dim : int, default 2
+            Number of variables.
+        **kwargs
+            ``base`` (required): the copula *class* to rotate. ``flip``
+            (default ``True``): as in the constructor. Anything else is passed
+            to ``base.from_rho``.
+
+        Returns
+        -------
+        Copula
+            A :class:`RotatedCopula`.
+
+        Raises
+        ------
+        TypeError
+            If ``base`` is not given.
+        ValueError
+            If ``flip`` is invalid or the base family cannot reach the value.
+        """
         base_cls = kwargs.pop("base", None)
         flip = kwargs.pop("flip", True)
         if base_cls is None:
@@ -348,6 +540,15 @@ class RotatedCopula(Copula):
     # -- presentation --------------------------------------------------
 
     def describe(self) -> str:
+        """Return a one-line, human-readable description of the rotated copula.
+
+        Returns
+        -------
+        str
+            For example ``"90-degree rotated Clayton ..."`` in two dimensions,
+            or ``"survival ..."`` / ``"reflected on [0, 2] ..."`` otherwise,
+            followed by the base copula's own description.
+        """
         if self.dim == 2:
             label = f"{self.degrees}-degree rotated"
         elif self.is_survival:
@@ -384,11 +585,26 @@ def _as_flip(flip: ArrayLike | int | bool, dim: int) -> NDArray[np.bool_]:
 
 
 def survival(copula: Copula) -> RotatedCopula:
-    r"""The survival copula :math:`\hat C` -- every coordinate reflected.
+    r"""Flip a copula so its lower-tail behaviour becomes upper-tail behaviour.
+
+    Returns the survival copula :math:`\hat C`: the copula with every
+    coordinate reflected (``u -> 1 - u``), and lower and upper tails swapped.
+    It is shorthand for ``RotatedCopula(copula, True)``.
 
     :math:`\hat C(\mathbf u)` is the copula of :math:`(1-U_1,\dots,1-U_d)`, and
     it is what you want whenever the risk lives in the **upper** tail: joint
     large losses, joint large claims, joint large flows.
+
+    Parameters
+    ----------
+    copula : Copula
+        Any copula, of any dimension.
+
+    Returns
+    -------
+    RotatedCopula
+        The survival copula, with the same parameters as ``copula``. Applying
+        :func:`survival` twice gives back the original copula's behaviour.
 
     Examples
     --------

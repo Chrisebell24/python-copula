@@ -156,8 +156,34 @@ def _as_ranks(u: ArrayLike) -> NDArray[np.float64]:
 
 
 def multivariate_spearman(u: ArrayLike) -> float:
-    r"""Schmid and Schmidt's multivariate Spearman's rho.
+    r"""Measure how strongly a whole group of columns moves together, as one number.
 
+    This is Schmid and Schmidt's multivariate Spearman's rho: a rank
+    correlation for three or more variables at once. It is 0 when the columns
+    are independent and 1 when they move in perfect lockstep (in rank terms),
+    and equals ordinary Spearman's rho for two columns. :func:`select_partners`
+    uses it for ``method="extended"``.
+
+    Parameters
+    ----------
+    u : array_like or pandas.DataFrame of float, shape (n, d)
+        Observations, one column per variable, ``d >= 2``. Raw data or
+        pseudo-observations both work: ranks are always taken first.
+
+    Returns
+    -------
+    float
+        The average of the three coefficients below. 1 means perfect
+        co-movement, 0 independence; negative values mean the columns tend to
+        move against each other (the lower bound depends on ``d``).
+
+    Raises
+    ------
+    ValueError
+        If ``u`` has fewer than 2 columns.
+
+    Notes
+    -----
     Three separate generalisations of the bivariate coefficient, averaged. Each
     reduces to ordinary Spearman's rho when :math:`d = 2`, and each measures
     something slightly different in higher dimensions -- the first two the
@@ -174,15 +200,6 @@ def multivariate_spearman(u: ArrayLike) -> float:
                   \textstyle\sum_{k<l}\sum_j (1-U_{kj})(1-U_{lj})
 
     with :math:`h(d) = (d+1)/(2^d - d - 1)`.
-
-    Parameters
-    ----------
-    u : array_like, shape (n, d)
-        Pseudo-observations, or raw data (ranks are taken).
-
-    Returns
-    -------
-    float
 
     Examples
     --------
@@ -221,8 +238,27 @@ def multivariate_spearman(u: ArrayLike) -> float:
 
 
 def diagonal_distance(u: ArrayLike) -> float:
-    r"""Mean Euclidean distance from the hyper-diagonal of the unit hypercube.
+    r"""Measure how far ranked data sit from the "all move together" line (small = related).
 
+    Technically, the mean Euclidean distance of the pseudo-observations from
+    the hyper-diagonal of the unit hypercube. :func:`select_partners` uses it
+    (negated) for ``method="geometric"``.
+
+    Parameters
+    ----------
+    u : array_like or pandas.DataFrame of float, shape (n, d)
+        Observations, one column per variable. Raw data or pseudo-observations
+        both work: ranks are always taken first.
+
+    Returns
+    -------
+    float
+        Mean distance, ``>= 0``. Zero means every row lies on the diagonal
+        (perfect co-movement); independent columns give a clearly positive
+        value (about 0.47 for ``d = 4``).
+
+    Notes
+    -----
     Perfectly concordant observations lie exactly on the line from
     :math:`(0,\dots,0)` to :math:`(1,\dots,1)`; independent ones scatter away
     from it. **Small means strongly related**, which is the opposite convention
@@ -251,7 +287,7 @@ def diagonal_distance(u: ArrayLike) -> float:
 
 
 def tail_concentration(u: ArrayLike, quantile: float | None = None) -> float:
-    r"""How much more often the coordinates are jointly extreme than by chance.
+    r"""Measure how much more often all columns are extreme at the same time than chance would give.
 
     Counts observations in the lower and upper corners of the unit hypercube and
     divides by what independence would put there. One means no more joint
@@ -261,15 +297,28 @@ def tail_concentration(u: ArrayLike, quantile: float | None = None) -> float:
 
     Parameters
     ----------
-    u : array_like, shape (n, d)
-    quantile : float, optional
-        Corner size. By default it is **chosen from the data**, which matters
-        more than it sounds -- see the note below.
+    u : array_like or pandas.DataFrame of float, shape (n, d)
+        Observations, one column per variable. Raw data or pseudo-observations
+        both work: ranks are always taken first.
+    quantile : float or None, default None
+        Corner size ``q``, strictly between 0 and 0.5: a row counts as jointly
+        low if every rank is ``<= q`` and jointly high if every rank is
+        ``>= 1 - q``. ``None`` **chooses it from the data** as
+        ``min(0.25, (40 / n) ** (1 / d))``, so the corner is expected to hold
+        about 40 rows under independence -- which matters more than it
+        sounds; see the note below.
 
     Returns
     -------
     float
-        Both corners combined, relative to independence.
+        Both corners combined, relative to independence:
+        ``(P(all low) + P(all high)) / (2 q**d)``. 1 means no more joint
+        extremes than chance, larger means more, 0 means none observed.
+
+    Raises
+    ------
+    ValueError
+        If ``quantile`` is not strictly between 0 and 0.5.
 
     Notes
     -----
@@ -358,26 +407,48 @@ def select_pairs(
     top: int | None = None,
     names: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Rank every pair of columns by one selection criterion.
+    """Score every possible pair of columns and list them from most to least related.
+
+    The first step of a pairs-trading strategy: given returns for many
+    instruments, find the pairs worth trading. Pick the criterion with
+    ``method``; the copula-specific ones are ``"tail"`` (pairs that crash
+    together) and ``"qq"``.
 
     Parameters
     ----------
-    data : DataFrame or array_like, shape (n, k)
-        Returns, one column per instrument. Column names are carried through.
-    method : {"distance", "pearson", "spearman", "kendall", "tail", "qq"}
-        See the module docstring.
-    top : int, optional
-        Keep only this many rows.
-    names : list of str, optional
-        Column names, when ``data`` is a plain array.
+    data : pandas.DataFrame or array_like of float, shape (n, k)
+        Returns, one row per period and one column per instrument, ``k >= 2``.
+        DataFrame column names are carried through to the output.
+    method : {"distance", "pearson", "spearman", "kendall", "tail", "qq"}, default "kendall"
+        The selection criterion; see the module docstring for what each
+        measures. ``"distance"`` and ``"pearson"`` use the raw values; the
+        others use ranks.
+    top : int or None, default None, keyword-only
+        Keep only the best ``top`` pairs. ``None`` (or 0) keeps all
+        ``k(k-1)/2``.
+    names : list of str or None, default None, keyword-only
+        Column names to use when ``data`` is a plain array (length ``k``).
+        Ignored for a DataFrame. ``None`` names the columns ``x0, x1, ...``.
 
     Returns
     -------
-    DataFrame
-        Columns ``first``, ``second``, ``score``, ``rank``, sorted best first.
-        ``score`` is oriented so that larger is always better, whichever
-        criterion was used -- the distance and QQ rules are negated for this
-        reason, so their scores are non-positive.
+    pandas.DataFrame
+        One row per pair, sorted best first, with columns:
+
+        - ``first`` (column label): the first instrument of the pair.
+        - ``second`` (column label): the second instrument.
+        - ``score`` (float): the criterion value. Oriented so that larger is
+          always better, whichever criterion was used -- the distance and QQ
+          rules are negated for this reason, so their scores are non-positive.
+        - ``rank`` (int): 1 for the best pair, 2 for the next, and so on.
+
+        ``out.attrs["method"]`` records the criterion used.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not one of the six names, or ``data`` has fewer than
+        two columns.
 
     Notes
     -----
@@ -464,7 +535,10 @@ def select_partners(
     n_candidates: int = 50,
     names: list[str] | None = None,
 ) -> dict[str, Any]:
-    r"""Find the partners that best complete a quadruple around ``target``.
+    r"""Find the few other columns that move most closely with a chosen target column.
+
+    Used to build a group (typically a target plus three partners) for a vine
+    or four-dimensional copula trading strategy.
 
     A vine or a :math:`d`-dimensional copula strategy needs a group, not a pair.
     Searching every triple of 499 remaining names is 20 million combinations per
@@ -474,23 +548,52 @@ def select_partners(
 
     Parameters
     ----------
-    data : DataFrame or array_like, shape (n, k)
+    data : pandas.DataFrame or array_like of float, shape (n, k)
+        Returns, one row per period and one column per instrument. Needs at
+        least ``n_partners + 1`` columns.
     target : str or int
-        Column name, or index.
-    method : {"traditional", "extended", "geometric", "extremal"}
-    n_partners : int
-        Partners to choose. Three gives the quadruple the literature uses.
-    n_candidates : int
-        Pre-screening width. Larger is more thorough and grows as
-        :math:`\binom{n_{\text{candidates}}}{n_{\text{partners}}}`.
-    names : list of str, optional
+        The column to find partners for: a column label, or (if an ``int``)
+        its position. Note that a Python ``int`` is always read as a
+        position, even if the DataFrame has integer column labels.
+    method : {"traditional", "extended", "geometric", "extremal"}, default "extended", keyword-only
+        How a candidate group is scored: ``"traditional"`` sums the pairwise
+        Spearman correlations, ``"extended"`` uses
+        :func:`multivariate_spearman`, ``"geometric"`` uses
+        :func:`diagonal_distance` (smaller is better), ``"extremal"`` uses
+        :func:`tail_concentration`. See the module docstring.
+    n_partners : int, default 3, keyword-only
+        How many partners to choose, at least 1. Three gives the quadruple the
+        literature uses.
+    n_candidates : int, default 50, keyword-only
+        Pre-screening width: only the ``n_candidates`` columns with the
+        largest absolute rank correlation to the target are searched (never
+        fewer than ``n_partners``). Larger is more thorough and the work grows
+        as :math:`\binom{n_{\text{candidates}}}{n_{\text{partners}}}`.
+    names : list of str or None, default None, keyword-only
+        Column names to use when ``data`` is a plain array. Ignored for a
+        DataFrame. ``None`` names the columns ``x0, x1, ...``.
 
     Returns
     -------
     dict
-        ``"target"``, ``"partners"``, ``"score"``, ``"method"``, and
-        ``"considered"`` -- how many combinations were actually evaluated, so
-        the pre-screening is visible rather than implicit.
+        With keys:
+
+        - ``"target"`` (column label): the target, as a label even if given
+          by position.
+        - ``"partners"`` (list of column labels): the best partners, length
+          ``n_partners``.
+        - ``"score"`` (float): the winning group's score, oriented so larger
+          is better (``"geometric"`` is negated, so it is non-positive).
+        - ``"method"`` (str): the method used.
+        - ``"considered"`` (int): how many combinations were actually
+          evaluated, so the pre-screening is visible rather than implicit.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not one of the four names, ``target`` is not a
+        column, ``n_partners < 1``, or there are fewer than ``n_partners``
+        columns besides the target.
 
     Notes
     -----

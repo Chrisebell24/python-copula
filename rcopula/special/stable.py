@@ -47,17 +47,42 @@ __all__ = ["retstable", "rlog_series", "rsibuya", "rstable_positive", "sinc"]
 
 
 def sinc(x: NDArray[np.float64] | float) -> NDArray[np.float64]:
-    """``sin(x) / x``, continuous at zero where it equals 1.
+    """Compute ``sin(x) / x`` safely, returning 1 at ``x = 0`` instead of dividing by zero.
 
-    Appears in Zolotarev's representation of the stable density.
+    This is the unnormalised sinc function (note: ``numpy.sinc`` is the
+    *normalised* ``sin(pi x) / (pi x)``). It appears in Zolotarev's
+    representation of the stable density. Near zero a Taylor approximation
+    ``1 - x**2 / 6`` is used.
+
+    Parameters
+    ----------
+    x : float or numpy.ndarray of float, any shape
+        Arguments, in radians.
+
+    Returns
+    -------
+    numpy.ndarray of float64, same shape as ``x``
+        ``sin(x) / x``, elementwise (0-d for a scalar input).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> float(sinc(0.0)), bool(np.isclose(sinc(np.pi / 2), 2 / np.pi))
+    (1.0, True)
     """
     x = np.asarray(x, dtype=np.float64)
     return np.where(np.abs(x) < 1e-8, 1.0 - x**2 / 6.0, np.sin(x) / np.where(x == 0, 1, x))
 
 
 def rstable_positive(size: int, alpha: float, rng: np.random.Generator) -> NDArray[np.float64]:
-    r"""Draw from the positive stable law :math:`S(\alpha, 1, \gamma, 0; 1)`
-    with :math:`\gamma = \cos(\pi\alpha/2)^{1/\alpha}`.
+    r"""Draw random positive numbers from a stable law; used to simulate the Gumbel copula.
+
+    Precisely, draws from the positive stable law
+    :math:`S(\alpha, 1, \gamma, 0; 1)` with
+    :math:`\gamma = \cos(\pi\alpha/2)^{1/\alpha}`. A "frailty" is a shared
+    random factor: every coordinate of a Gumbel sample is generated from the
+    same draw of it, which is what makes them dependent. You only need this if
+    you are writing your own Archimedean sampler.
 
     This is the frailty distribution of the Gumbel copula with
     :math:`\alpha = 1/\theta`. Its Laplace transform is
@@ -72,11 +97,17 @@ def rstable_positive(size: int, alpha: float, rng: np.random.Generator) -> NDArr
         Stability index in ``(0, 1]``. ``alpha = 1`` degenerates to the constant
         ``1`` (the independence case, ``theta = 1``).
     rng : numpy.random.Generator
+        Source of randomness, e.g. ``numpy.random.default_rng(0)``.
 
     Returns
     -------
-    ndarray
+    numpy.ndarray of float64, shape (size,)
         Strictly positive draws.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is not in ``(0, 1]``.
 
     Notes
     -----
@@ -122,8 +153,9 @@ def rstable_positive(size: int, alpha: float, rng: np.random.Generator) -> NDArr
 def rlog_series(
     size: int, p: float, rng: np.random.Generator, log1mp: float | None = None
 ) -> NDArray[np.float64]:
-    r"""Draw from the logarithmic series distribution with parameter ``p``.
+    r"""Draw random positive integers from the logarithmic series law; used to simulate Frank.
 
+    The logarithmic series distribution with parameter ``p`` puts probability
     :math:`P(V = k) = -p^k / (k \log(1 - p))` for :math:`k = 1, 2, \dots`.
     This is the frailty of the Frank copula with :math:`p = 1 - e^{-\theta}`.
 
@@ -136,15 +168,27 @@ def rlog_series(
         Number of draws.
     p : float
         Series parameter in ``(0, 1]``.
-    rng : Generator
+    rng : numpy.random.Generator
         Source of randomness.
-    log1mp : float, optional
+    log1mp : float or None, default None
         A separately computed :math:`\log(1 - p)`. Supply it whenever ``p`` was
         formed as ``1 - e^{-\theta}``: past ``theta`` around 37 that expression
         rounds to exactly 1, so ``log1p(-p)`` becomes ``-inf`` and the sampler
         fails outright -- even though the quantity it actually needs is just
         ``-theta``, known exactly. The Frank copula reaches that at
         ``tau = 0.92``, well inside the range people fit.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (size,)
+        Integer-valued draws, each ``>= 1``, stored as floats.
+
+    Raises
+    ------
+    ValueError
+        If ``p`` is not in ``(0, 1]``, or if ``log(1 - p)`` is not finite and
+        negative (for example ``p`` has rounded to 1 and ``log1mp`` was not
+        given).
 
     Examples
     --------
@@ -211,15 +255,37 @@ def rlog_series(
 
 
 def rsibuya(size: int, alpha: float, rng: np.random.Generator) -> NDArray[np.float64]:
-    r"""Draw from the Sibuya distribution with parameter ``alpha`` in ``(0, 1]``.
+    r"""Draw random positive integers from the Sibuya law; used to simulate the Joe copula.
 
+    The Sibuya distribution with parameter ``alpha`` in ``(0, 1]`` has
     :math:`P(V = k) = \binom{k - 1 - \alpha}{k - 1}\frac{\alpha}{k}`, with
     generating function :math:`1 - (1 - t)^{\alpha}`. This is the frailty of the
     Joe copula with :math:`\alpha = 1/\theta`.
 
-    Sampled by the inversion method of Hofert (2008): with
-    :math:`U \sim \mathrm{Unif}(0,1)`, return 1 if
-    :math:`U \le \alpha`, else invert the tail using the Beta relationship.
+    Sampled by inversion (Hofert 2008): with
+    :math:`U \sim \mathrm{Unif}(0,1)`, return 1 if :math:`U \le \alpha`,
+    else find the largest ``k`` whose exact survival probability
+    :math:`P(V \ge k)` is at least :math:`1 - U`, starting from the tail
+    asymptote and correcting with a short monotone search.
+
+    Parameters
+    ----------
+    size : int
+        Number of draws.
+    alpha : float
+        Parameter in ``(0, 1]``. ``alpha = 1`` gives the constant ``1``.
+    rng : numpy.random.Generator
+        Source of randomness.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (size,)
+        Integer-valued draws, each ``>= 1``, stored as floats.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is not in ``(0, 1]``.
 
     Examples
     --------
@@ -305,9 +371,10 @@ def retstable(
     h: float,
     rng: np.random.Generator,
 ) -> NDArray[np.float64]:
-    r"""Draw from the **exponentially tilted** positive stable distribution.
+    r"""Draw random positive numbers from a tilted stable law; used to simulate nested Clayton.
 
-    Defined by its Laplace transform,
+    This is the **exponentially tilted** positive stable distribution. It is
+    defined by its Laplace transform,
 
     .. math::
         \mathbb{E}\bigl[e^{-tV}\bigr]
@@ -325,12 +392,25 @@ def retstable(
     alpha : float
         Stability index in ``(0, 1]``. At ``alpha = 1`` the law is degenerate at
         ``v0``.
-    v0 : float or ndarray
-        The multiplier in the exponent. May vary per draw, which is what the
-        nested sampler needs -- each observation carries its own outer frailty.
+    v0 : float or numpy.ndarray of float, shape (m,)
+        The multiplier in the exponent, ``>= 0``. May vary per draw, which is
+        what the nested sampler needs -- each observation carries its own outer
+        frailty.
     h : float
-        Tilt. ``h = 0`` gives the untilted stable.
-    rng : Generator
+        Tilt, ``>= 0``. ``h = 0`` gives the untilted stable.
+    rng : numpy.random.Generator
+        Source of randomness.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (size,) or (m,)
+        Non-negative draws; ``(m,)`` when ``v0`` is an array (it is flattened
+        first).
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is not in ``(0, 1]``, ``h < 0``, or any ``v0 < 0``.
 
     Notes
     -----

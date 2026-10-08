@@ -57,15 +57,50 @@ _MAX_LOG_ODDS = 30.0
 
 
 class MixtureCopula(Copula):
-    """A convex combination of copulas.
+    """Blend several copulas with fixed proportions, e.g. 40% Clayton and 60% Gumbel.
+
+    A mixture behaves like "pick component ``i`` with probability ``w_i``, then
+    draw from it". Its CDF and density are the weighted averages of the
+    components'. Use it when no single family has the shape you need -- most
+    often to get dependence in *both* the lower and the upper tail at once,
+    which neither Clayton nor Gumbel (nor any elliptical copula) can give
+    alone.
+
+    The weights are parameters too, so :func:`~rcopula.fit.fit` can estimate
+    them together with the components' parameters.
 
     Parameters
     ----------
     copulas : sequence of Copula
-        Two or more components, all of the same dimension.
-    weights : array_like, optional
-        Mixing weights, non-negative and summing to one. Equal weights by
-        default.
+        Two or more components, all of the same dimension ``d``. Their
+        parameters may be ``nan`` (to be fitted).
+    weights : array_like of float, shape (k,), or None, default None
+        Mixing weights for the ``k`` components, non-negative and summing to
+        one. ``None`` gives equal weights ``1/k``.
+    free : array_like of bool, shape (n_params,), or None, default None
+        Keyword-only. Which parameters are estimated when fitting; ``None``
+        means all of them.
+
+    Attributes
+    ----------
+    copulas : list of Copula
+        The components, in the order given.
+    weights : numpy.ndarray of float64, shape (k,)
+        The mixing weights (see :attr:`weights`).
+    n_components : int
+        Number of components ``k``.
+    name : str
+        ``"Mixture(<name 1>, <name 2>, ...)"``.
+    param_names : tuple of str
+        ``"c1.theta"``-style names for each component's parameters, then
+        ``"logodds1", ..., "logodds{k-1}"``.
+
+    Raises
+    ------
+    ValueError
+        If fewer than two components are given, the components differ in
+        dimension, the number of weights differs from the number of
+        components, or the weights are negative or do not sum to one.
 
     Notes
     -----
@@ -158,15 +193,48 @@ class MixtureCopula(Copula):
 
     @property
     def n_components(self) -> int:
+        """Number of copulas being mixed.
+
+        Returns
+        -------
+        int
+            ``len(self.copulas)``, at least 2.
+        """
         return len(self.copulas)
 
     @property
     def weights(self) -> NDArray[np.float64]:
-        """The mixing weights, recovered from the internal log-odds scale."""
+        """The share of each component in the mixture.
+
+        Recovered from the internal log-odds parameters, so it always reflects
+        the current (e.g. fitted) values.
+
+        Returns
+        -------
+        numpy.ndarray of float64, shape (k,)
+            Non-negative weights summing to one, in component order.
+
+        Examples
+        --------
+        >>> from rcopula import ClaytonCopula, GumbelCopula
+        >>> from rcopula.structural import MixtureCopula
+        >>> mix = MixtureCopula([ClaytonCopula(3.0), GumbelCopula(2.5)], [0.4, 0.6])
+        >>> mix.weights.round(12).tolist()
+        [0.4, 0.6]
+        """
         return _from_log_odds(self._params[self._n_component_params :])
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Allowed range of each parameter: the components' bounds, then the log-odds.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            One ``(lower, upper)`` pair per parameter. Each log-odds is bounded
+            to ``[-30, 30]``, beyond which a weight is 0 or 1 to double
+            precision.
+        """
         return [
             *(b for c in self.copulas for b in c.param_bounds),
             *([(-_MAX_LOG_ODDS, _MAX_LOG_ODDS)] * (self.n_components - 1)),
@@ -228,11 +296,24 @@ class MixtureCopula(Copula):
     # -- dependence ----------------------------------------------------
 
     def tau(self) -> float:
-        """Kendall's tau, by quadrature -- it is **not** a weighted average.
+        """Return Kendall's tau of the mixture, a rank correlation between -1 and 1.
 
-        Tau is quadratic in the copula, so mixing two families with the same tau
+        Computed by quadrature -- it is **not** the weighted average of the
+        components' taus. Tau is quadratic in the copula, so mixing two families with the same tau
         generally changes it. Averaging the components' values is the natural
         guess and it is wrong; see the class docstring.
+
+        Returns
+        -------
+        float
+            Kendall's tau.
+
+        Raises
+        ------
+        ValueError
+            If any parameter is unspecified (``nan``).
+        NotImplementedError
+            If ``dim != 2``.
         """
         self._require_specified()
         if self._dim != 2:
@@ -240,21 +321,41 @@ class MixtureCopula(Copula):
         return tau_by_partials(self)
 
     def rho(self) -> float:
-        r"""Spearman's rho -- exactly the weighted average.
+        r"""Return Spearman's rho of the mixture: exactly the weighted average of the components'.
 
         :math:`\rho = 12\int\int C - 3` is affine in :math:`C`, so mixing the
         copulas mixes their rhos. No integration needed.
+
+        Returns
+        -------
+        float
+            ``sum(w_i * rho_i)``.
+
+        Raises
+        ------
+        ValueError
+            If any parameter is unspecified (``nan``).
         """
         self._require_specified()
         values = [c.rho() for c in self.copulas]
         return float(np.dot(self.weights, np.atleast_1d(values).ravel()[: self.n_components]))
 
     def lambda_(self) -> TailDependence:
-        r"""Tail dependence -- exactly the weighted average, in both tails.
+        r"""Return the chance of joint extremes in each tail, averaged over the components.
 
         Each coefficient is a limit of a quantity affine in :math:`C`, so it
         mixes. This is what lets a Clayton-Gumbel mixture have dependence in
         *both* corners while each component has it in only one.
+
+        Returns
+        -------
+        TailDependence
+            Named tuple ``(lower, upper)`` of floats in ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If any parameter is unspecified (``nan``).
         """
         self._require_specified()
         w = self.weights
@@ -265,19 +366,48 @@ class MixtureCopula(Copula):
         )
 
     def beta(self) -> float:
-        """Blomqvist's beta, which depends on ``C`` only at the centre."""
+        """Return Blomqvist's beta (medial correlation): the weighted average of the components'.
+
+        Blomqvist's beta depends on ``C`` only at the centre, ``C(1/2, 1/2)``,
+        so it mixes linearly.
+
+        Returns
+        -------
+        float
+            ``sum(w_i * beta_i)``.
+
+        Raises
+        ------
+        ValueError
+            If any parameter is unspecified (``nan``).
+        """
         self._require_specified()
         return float(np.dot(self.weights, [c.beta() for c in self.copulas]))
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> Copula:
-        """Not available: a mixture has more parameters than tau can identify."""
+        """Not available: a mixture has more parameters than one tau value can identify.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Fit the mixture to data instead, or calibrate each
+            component separately and choose the weights yourself.
+        """
         raise NotImplementedError(
             "a mixture has more parameters than Kendall's tau can pin down; fit "
             "it, or calibrate the components and choose the weights"
         )
 
     def describe(self) -> str:
+        """Return a multi-line, human-readable summary: one line per component with its weight.
+
+        Returns
+        -------
+        str
+            A header line followed by ``"  <weight> x <component description>"``
+            rows.
+        """
         rows = "\n".join(
             f"  {w:.4f} x {c.describe()}" for w, c in zip(self.weights, self.copulas, strict=True)
         )

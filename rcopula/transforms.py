@@ -66,29 +66,40 @@ def _numeric_h(copula: Copula, u: NDArray[np.float64], given: int) -> NDArray[np
 
 
 def conditional_cdf(copula: Copula, u: ArrayLike, given: int = 1) -> NDArray[np.float64]:
-    r"""Conditional distribution :math:`P(U_j \le u_j \mid U_{given} = u_{given})`.
+    r"""Probability that one variable is at most its value, given the other variable's value.
 
-    The h-function. For a bivariate copula, ``given=1`` returns
-    :math:`h(u_1 \mid u_2) = \partial C/\partial u_2` and ``given=0`` returns
-    the other conditional.
-
-    Analytic for Archimedean, Gaussian and Student-t families; numerical
-    differentiation elsewhere.
+    This is the conditional distribution of a bivariate copula, often called
+    the h-function: :math:`P(U_j \le u_j \mid U_{given} = u_{given})`. It
+    answers "given where variable B is, how unusual is variable A?" -- a value
+    near 0 means A is unusually low for that B, near 1 unusually high. It is
+    also the building block of sampling, vine copulas and the Rosenblatt
+    transform.
 
     Parameters
     ----------
     copula : Copula
-        Bivariate copula.
-    u : array_like
-        ``(n, 2)`` points in the unit square.
-    given : int
-        Which coordinate to condition on.
+        A bivariate (``dim=2``) copula with its parameters set. Archimedean,
+        Gaussian and Student-t families use exact formulas; every other family
+        uses numerical differentiation of its CDF.
+    u : array_like of float, shape (n, 2)
+        Points in the unit square, one per row. A single point may be passed
+        as a 1-D sequence of length 2. Values are clipped to
+        ``[1e-12, 1 - 1e-12]``.
+    given : {0, 1}, default 1
+        Index of the column to condition on. ``given=1`` returns
+        :math:`h(u_1 \mid u_2) = \partial C/\partial u_2`; ``given=0`` returns
+        the other conditional, :math:`P(U_2 \le u_2 \mid U_1 = u_1)`.
 
     Returns
     -------
-    ndarray
+    numpy.ndarray of float, shape (n,)
         Values in ``[0, 1]``. Under the true copula these are **uniform**,
         which is what makes them usable as a standardised signal.
+
+    Raises
+    ------
+    ValueError
+        If ``u`` does not have exactly two columns, or ``given`` is not 0 or 1.
 
     Examples
     --------
@@ -157,12 +168,44 @@ def conditional_cdf(copula: Copula, u: ArrayLike, given: int = 1) -> NDArray[np.
 def conditional_ppf(
     copula: Copula, w: ArrayLike, cond: ArrayLike, given: int = 1
 ) -> NDArray[np.float64]:
-    r"""Invert the h-function: find ``x`` with :math:`h(x \mid \text{cond}) = w`.
+    r"""Find the value of one variable that has a given conditional probability, given the other.
 
-    This is the conditional-distribution sampling method -- draw ``w`` uniform,
-    invert, and the pair ``(x, cond)`` follows the copula. Solved by vectorised
-    bisection, which handles every family uniformly and converges to 1e-15 in 50
-    halvings.
+    The inverse of :func:`conditional_cdf` (the inverse h-function): returns
+    ``x`` with :math:`h(x \mid \text{cond}) = w`. Its main use is simulation --
+    draw ``w`` uniform, invert, and the pair ``(x, cond)`` follows the copula --
+    including conditional scenarios where ``cond`` is fixed.
+
+    Parameters
+    ----------
+    copula : Copula
+        A bivariate (``dim=2``) copula with its parameters set.
+    w : float or array_like of float, shape (n,)
+        Target conditional probabilities, each in :math:`[0, 1]`.
+    cond : float or array_like of float, shape (n,)
+        Values of the conditioning variable, each in :math:`[0, 1]`. ``w`` and
+        ``cond`` are broadcast against each other, so either may be a scalar.
+    given : {0, 1}, default 1
+        Which coordinate ``cond`` occupies. ``given=1`` solves for the first
+        coordinate given the second; ``given=0`` solves for the second given
+        the first.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n,)
+        The solved values ``x``, each in ``(0, 1)``.
+
+    Raises
+    ------
+    ValueError
+        If ``copula`` is not bivariate or ``given`` is not 0 or 1 (raised by
+        :func:`conditional_cdf`).
+
+    Notes
+    -----
+    Solved by 60 steps of vectorised bisection on ``[1e-12, 1 - 1e-12]``, which
+    handles every family uniformly and takes the bracket below double precision.
+    Targets outside :math:`[0, 1]` are not rejected; they simply converge to the
+    nearest end of the bracket.
 
     Examples
     --------
@@ -195,8 +238,41 @@ def conditional_ppf(
 
 
 def rosenblatt(copula: Copula, u: ArrayLike) -> NDArray[np.float64]:
-    r"""Rosenblatt transform (R's ``cCopula``).
+    r"""Turn dependent copula data into independent uniform numbers, if the copula is right.
 
+    This is the Rosenblatt transform (R's ``cCopula``). Each column is replaced
+    by its conditional probability given all the columns before it. If the
+    data really came from ``copula``, the output columns are independent and
+    uniform on :math:`[0, 1]`; if not, they are visibly not. That turns a
+    goodness-of-fit question into a simpler test of independence and
+    uniformity.
+
+    Parameters
+    ----------
+    copula : Copula
+        The copula to test against, with its parameters set. Archimedean,
+        Gaussian and Student-t families work in any dimension; other families
+        only for ``dim=2``.
+    u : array_like of float, shape (n, d)
+        Observations on the copula scale (pseudo-observations), one row each.
+        ``d`` must equal ``copula.dim``. Values are clipped to
+        ``[1e-12, 1 - 1e-12]``.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n, d)
+        Transformed values in ``[0, 1]``. The first column equals the (clipped)
+        first column of ``u``.
+
+    Raises
+    ------
+    ValueError
+        If the number of columns of ``u`` differs from ``copula.dim``.
+    NotImplementedError
+        If ``copula`` is neither Archimedean nor elliptical and ``d > 2``.
+
+    Notes
+    -----
     Maps dependent uniforms to **independent** uniforms by conditioning
     successively:
 
@@ -297,24 +373,36 @@ _BISECTION_STEPS = 60
 
 
 def inverse_rosenblatt(copula: Copula, z: ArrayLike) -> NDArray[np.float64]:
-    r"""Inverse Rosenblatt transform: independent uniforms to copula draws.
+    r"""Turn independent uniform numbers into draws from a copula.
 
-    The other direction of :func:`rosenblatt`, and the reason it matters is
-    sampling. ``rvs`` draws its own randomness; this takes randomness you supply,
-    which is what lets a **quasi-random** point set be pushed through a copula --
-    see :mod:`rcopula.sampling`. It is also how conditional simulation works:
-    fix the first coordinates, vary the rest.
+    The inverse Rosenblatt transform, the reverse of :func:`rosenblatt`. Unlike
+    ``copula.rvs``, which makes its own randomness, this takes randomness you
+    supply. That lets you push a **quasi-random** point set through a copula
+    (see :mod:`rcopula.sampling`) or do conditional simulation: fix the first
+    coordinates and vary the rest.
 
     Parameters
     ----------
     copula : Copula
-    z : array_like, shape (n, d)
-        Independent uniforms.
+        The target copula, with its parameters set. Any family for which
+        :func:`rosenblatt` works (Archimedean and elliptical in any dimension,
+        others for ``dim=2``).
+    z : array_like of float, shape (n, d)
+        Independent uniforms on :math:`[0, 1]`, one row per draw. ``d`` must
+        equal ``copula.dim``. Values are clipped to ``[1e-12, 1 - 1e-12]``.
 
     Returns
     -------
-    ndarray, shape (n, d)
-        Draws from ``copula``.
+    numpy.ndarray of float, shape (n, d)
+        Draws from ``copula``, each in ``(0, 1)``.
+
+    Raises
+    ------
+    ValueError
+        If the number of columns of ``z`` differs from ``copula.dim``.
+    NotImplementedError
+        If :func:`rosenblatt` does not support ``copula`` (non-Archimedean,
+        non-elliptical with ``d > 2``).
 
     Notes
     -----
@@ -408,8 +496,39 @@ def inverse_rosenblatt(copula: Copula, z: ArrayLike) -> NDArray[np.float64]:
 
 
 def radial_simplex(copula: ArchimedeanCopula, u: ArrayLike) -> tuple[NDArray, NDArray]:
-    r"""Split an Archimedean sample into its radial and angular parts.
+    r"""Split Archimedean copula data into a "size" part and a "direction" part.
 
+    Every Archimedean copula sample can be written as a radial variable
+    :math:`R` (one number per row, how far out the point is) times a direction
+    :math:`S` that is uniform on the unit simplex. The direction part has the
+    same distribution for every Archimedean copula, so if it does not look
+    uniform, no Archimedean family fits the data. This is the decomposition of
+    McNeil and Neslehova (2009).
+
+    Parameters
+    ----------
+    copula : ArchimedeanCopula
+        Supplies the generator :math:`\psi`. Its parameter must be set.
+    u : array_like of float, shape (n, d)
+        Observations on the copula scale, strictly inside :math:`(0, 1)`. ``d``
+        must equal ``copula.dim``. A 1-D input is treated as a single row.
+
+    Returns
+    -------
+    radial : numpy.ndarray of float, shape (n,)
+        :math:`R = \sum_k \psi^{-1}(u_k)`, non-negative.
+    angular : numpy.ndarray of float, shape (n, d)
+        :math:`S`, whose rows sum to one. NaN in rows where :math:`R = 0`.
+
+    Raises
+    ------
+    TypeError
+        If ``copula`` is not an :class:`ArchimedeanCopula`.
+    ValueError
+        If the number of columns of ``u`` differs from ``copula.dim``.
+
+    Notes
+    -----
     McNeil and Neslehova showed that :math:`U \sim C` for an Archimedean copula
     with generator :math:`\psi` if and only if
 
@@ -423,19 +542,6 @@ def radial_simplex(copula: ArchimedeanCopula, u: ArrayLike) -> tuple[NDArray, ND
     That is the whole basis for testing *Archimedeanity* rather than testing one
     particular family: if the angular part is not uniform on the simplex, no
     Archimedean copula fits, whatever generator is tried.
-
-    Parameters
-    ----------
-    copula : ArchimedeanCopula
-        Supplies the generator. Its parameter must be set.
-    u : array_like, shape (n, d)
-
-    Returns
-    -------
-    radial : ndarray, shape (n,)
-        :math:`R`.
-    angular : ndarray, shape (n, d)
-        :math:`S`, whose rows sum to one.
 
     Examples
     --------
@@ -470,14 +576,47 @@ def radial_simplex(copula: ArchimedeanCopula, u: ArrayLike) -> tuple[NDArray, ND
 
 
 def htrafo(copula: ArchimedeanCopula, u: ArrayLike) -> NDArray[np.float64]:
-    r"""Hering-Hofert transform: Archimedean data to independent uniforms.
+    r"""Turn Archimedean copula data into independent uniforms, even in high dimensions.
 
-    The Rosenblatt transform (:func:`rosenblatt`) does the same job by
-    conditioning one coordinate at a time, which needs :math:`d-1` derivatives
-    of the generator and loses accuracy fast as :math:`d` grows. This transform
-    goes through the simplex decomposition instead, so it needs no high-order
-    derivatives at all and stays usable at :math:`d = 100` -- which is why it
-    exists.
+    This is the Hering-Hofert transform (R's ``htrafo``). It does the same job
+    as :func:`rosenblatt` -- if the data came from ``copula``, the output is
+    independent and uniform -- but it avoids high-order derivatives of the
+    generator, so it stays accurate at :math:`d = 100` where the Rosenblatt
+    transform breaks down. Use it for goodness-of-fit testing of Archimedean
+    models with many variables.
+
+    Parameters
+    ----------
+    copula : ArchimedeanCopula
+        The copula to test against, with its parameter set.
+    u : array_like of float, shape (n, d)
+        Observations on the copula scale, strictly inside :math:`(0, 1)`. ``d``
+        must equal ``copula.dim``.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n, d)
+        Transformed values in ``[0, 1]``. Columns ``0`` to ``d-2`` come from
+        the angular part, the last column from the radial part.
+
+    Raises
+    ------
+    TypeError
+        If ``copula`` is not an :class:`ArchimedeanCopula`.
+    ValueError
+        If the number of columns of ``u`` differs from ``copula.dim``.
+
+    See Also
+    --------
+    rosenblatt : the conditioning-based alternative, exact but derivative-hungry.
+    radial_simplex : the decomposition this is built on.
+
+    Notes
+    -----
+    The Rosenblatt transform conditions one coordinate at a time, which needs
+    :math:`d-1` derivatives of the generator and loses accuracy fast as :math:`d`
+    grows. This transform goes through the simplex decomposition instead, so it
+    needs no high-order derivatives at all -- which is why it exists.
 
     Writing :math:`S_j = \sum_{k \le j} \psi^{-1}(U_k)`,
 
@@ -492,20 +631,6 @@ def htrafo(copula: ArchimedeanCopula, u: ArrayLike) -> NDArray[np.float64]:
 
     The first :math:`d-1` components come from the angular part and the last
     from the radial part; since those are independent, so are the two groups.
-
-    Parameters
-    ----------
-    copula : ArchimedeanCopula
-    u : array_like, shape (n, d)
-
-    Returns
-    -------
-    ndarray, shape (n, d)
-
-    See Also
-    --------
-    rosenblatt : the conditioning-based alternative, exact but derivative-hungry.
-    radial_simplex : the decomposition this is built on.
 
     Examples
     --------
@@ -552,8 +677,35 @@ def htrafo(copula: ArchimedeanCopula, u: ArrayLike) -> NDArray[np.float64]:
 
 
 def radial_cdf(copula: ArchimedeanCopula, x: ArrayLike) -> NDArray[np.float64]:
-    r"""Distribution function of the radial part (R's ``pacR``).
+    r"""Probability that the radial ("size") part of an Archimedean sample is at most ``x``.
 
+    The distribution function of :math:`R` from :func:`radial_simplex` (R's
+    ``pacR``). Since the direction part is the same for every Archimedean
+    copula, this curve carries **all** the family-specific information, which
+    makes it the thing to compare between families or against data.
+
+    Parameters
+    ----------
+    copula : ArchimedeanCopula
+        The copula, with its parameter set.
+    x : float or array_like of float, any shape
+        Radii at which to evaluate, each non-negative.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (m,)
+        :math:`F_R(x)` in :math:`[0, 1]`, one value per element of ``x``
+        (flattened to 1-D).
+
+    Raises
+    ------
+    TypeError
+        If ``copula`` is not an :class:`ArchimedeanCopula`.
+    ValueError
+        If any element of ``x`` is negative.
+
+    Notes
+    -----
     :func:`radial_simplex` splits an Archimedean sample into a radial variable
     :math:`R = \sum_j \psi^{-1}(U_j)` and a point uniform on the simplex. The
     angular half is the same for every Archimedean copula in every dimension,
@@ -569,16 +721,6 @@ def radial_cdf(copula: ArchimedeanCopula, x: ArrayLike) -> NDArray[np.float64]:
         K(t) = P\{\psi(R) \le t\} = P\{R \ge \psi^{-1}(t)\},
         \qquad\text{so}\qquad
         F_R(x) = 1 - K(\psi(x)).
-
-    Parameters
-    ----------
-    copula : ArchimedeanCopula
-    x : array_like
-        Radii, non-negative.
-
-    Returns
-    -------
-    ndarray
 
     Examples
     --------
@@ -616,22 +758,36 @@ def radial_cdf(copula: ArchimedeanCopula, x: ArrayLike) -> NDArray[np.float64]:
 
 
 def radial_ppf(copula: ArchimedeanCopula, q: ArrayLike) -> NDArray[np.float64]:
-    r"""Quantile function of the radial part (R's ``qacR``).
+    r"""Find the radius below which a given fraction of an Archimedean sample's radial part falls.
 
-    The inverse of :func:`radial_cdf`, by the same identity: since
-    :math:`F_R(x) = 1 - K(\psi(x))`, the quantile is
-    :math:`\psi^{-1}(K^{-1}(1 - q))`, so it reduces to the Kendall function's
-    own quantile and needs no root-finding of its own.
+    The quantile (inverse) function of :func:`radial_cdf` (R's ``qacR``):
+    returns ``x`` with :math:`F_R(x) = q`.
 
     Parameters
     ----------
     copula : ArchimedeanCopula
-    q : array_like
-        Probabilities in :math:`[0, 1]`.
+        The copula, with its parameter set.
+    q : float or array_like of float, any shape
+        Probabilities, each in :math:`[0, 1]`.
 
     Returns
     -------
-    ndarray
+    numpy.ndarray of float, shape (m,)
+        Non-negative radii, one per element of ``q`` (flattened to 1-D).
+
+    Raises
+    ------
+    TypeError
+        If ``copula`` is not an :class:`ArchimedeanCopula`.
+    ValueError
+        If any element of ``q`` lies outside :math:`[0, 1]`.
+
+    Notes
+    -----
+    By the same identity as :func:`radial_cdf`: since
+    :math:`F_R(x) = 1 - K(\psi(x))`, the quantile is
+    :math:`\psi^{-1}(K^{-1}(1 - q))`, so it reduces to the Kendall function's
+    own quantile and needs no root-finding of its own.
 
     Examples
     --------

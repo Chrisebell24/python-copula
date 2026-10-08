@@ -10,7 +10,9 @@ golden fixtures mean anything.
 This module therefore provides its own, with the accuracy split by dimension:
 
 * ``d = 2``: **exact**, via Owen's T function. No quadrature at all.
-* ``d >= 3``: the **Genz separation-of-variables transformation** evaluated on a
+* ``d = 3``: a one-dimensional Gauss-Legendre integral of the exact bivariate
+  CDF, accurate to about 1e-14 (:func:`tvn_cdf`).
+* ``d >= 4``: the **Genz separation-of-variables transformation** evaluated on a
   scrambled Sobol sequence with a fixed seed. Randomised QMC converges far
   faster than plain Monte Carlo on this integrand and, with the seed pinned, is
   reproducible to the last bit.
@@ -58,7 +60,13 @@ _TVN_NODES = 60
 
 
 def bvn_cdf(h: ArrayLike, k: ArrayLike, rho: float) -> NDArray[np.float64]:
-    r"""Exact standard bivariate normal CDF :math:`\Phi_2(h, k; \rho)`.
+    r"""Return the probability that two correlated standard normals both fall below given limits.
+
+    This is the standard bivariate normal CDF :math:`\Phi_2(h, k; \rho)`
+    = :math:`P(X \le h,\ Y \le k)` for standard normal :math:`X, Y` with
+    correlation :math:`\rho`. The Gaussian copula's CDF in two dimensions is
+    exactly this function evaluated at normal quantiles, so it has to be exact
+    and repeatable; it is computed in closed form, with no random numbers.
 
     Uses the Owen (1956) decomposition
 
@@ -72,15 +80,22 @@ def bvn_cdf(h: ArrayLike, k: ArrayLike, rho: float) -> NDArray[np.float64]:
 
     Parameters
     ----------
-    h, k : array_like
-        Upper integration limits, broadcast against each other.
+    h, k : array_like of float
+        Upper limits for :math:`X` and :math:`Y`, broadcast against each other.
+        ``+-inf`` is allowed.
     rho : float
-        Correlation in ``[-1, 1]``.
+        Correlation in ``[-1, 1]``. The endpoints ``-1`` and ``1`` use their
+        closed forms.
 
     Returns
     -------
-    ndarray
+    numpy.ndarray of float64, broadcast shape of ``h`` and ``k``
         :math:`P(X \le h,\ Y \le k)`.
+
+    Raises
+    ------
+    ValueError
+        If ``rho`` lies outside ``[-1, 1]``.
 
     Examples
     --------
@@ -137,12 +152,31 @@ def bvn_cdf(h: ArrayLike, k: ArrayLike, rho: float) -> NDArray[np.float64]:
 
 
 def ndtr_(x: float) -> float:  # pragma: no cover - doctest helper
-    """Standard normal CDF, exposed so the doctest above reads cleanly."""
+    r"""Return the standard normal CDF at ``x`` as a Python float.
+
+    A doctest helper, exposed so the :func:`bvn_cdf` example reads cleanly; it
+    is not part of ``__all__``.
+
+    Parameters
+    ----------
+    x : float
+        Point at which to evaluate.
+
+    Returns
+    -------
+    float
+        :math:`\Phi(x) = P(Z \le x)` for a standard normal :math:`Z`.
+    """
     return float(ndtr(x))
 
 
 def tvn_cdf(upper: ArrayLike, corr: ArrayLike) -> NDArray[np.float64]:
-    r"""Trivariate normal CDF, to near machine precision.
+    r"""Return the probability that three correlated standard normals all fall below given limits.
+
+    This is the trivariate normal CDF :math:`\Phi_3(x_1, x_2, x_3; R)`, the
+    three-dimensional Gaussian-copula CDF on the normal scale. It is computed
+    to near machine precision and returns the same number on every call.
+    :func:`mvn_cdf` dispatches here when ``d = 3``.
 
     Conditioning on the third coordinate reduces the problem to a *one*
     dimensional integral of the **exact** bivariate CDF:
@@ -160,6 +194,27 @@ def tvn_cdf(upper: ArrayLike, corr: ArrayLike) -> NDArray[np.float64]:
     The integrand is analytic, so a fixed Gauss-Legendre rule reaches ~1e-14 --
     seven orders of magnitude better than the quasi-Monte-Carlo path this
     replaces at ``d = 3``, and comparable to R's TVPACK.
+
+    Parameters
+    ----------
+    upper : array_like of float, shape (n, 3) or (3,)
+        Upper integration limits, one row per point. Must be finite; use
+        :func:`mvn_cdf` for infinite limits.
+    corr : array_like of float, shape (3, 3)
+        Correlation matrix (unit diagonal). Only the three off-diagonal
+        entries ``corr[0, 1]``, ``corr[0, 2]`` and ``corr[1, 2]`` are read.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (n,)
+        :math:`P(X_1 \le x_1, X_2 \le x_2, X_3 \le x_3)` for each row.
+
+    Notes
+    -----
+    If a coordinate is perfectly correlated with the third
+    (:math:`|\rho_{13}| = 1` or :math:`|\rho_{23}| = 1`), the conditioning
+    integral is undefined and the Genz quasi-Monte-Carlo integrator is used
+    instead.
 
     Examples
     --------
@@ -239,27 +294,48 @@ def mvn_cdf(
     *,
     n_points: int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Multivariate normal CDF with unit variances.
+    r"""Return the probability that ``d`` correlated standard normals all fall below given limits.
+
+    This is the multivariate normal CDF with unit variances,
+    :math:`P(X_1 \le x_1, \dots, X_d \le x_d)` for
+    :math:`X \sim N(0, R)`. The Gaussian copula's CDF is this function
+    evaluated at normal quantiles. Unlike ``scipy.stats.multivariate_normal.cdf``
+    it returns the same number on every call, which reproducible research and
+    golden test fixtures need.
+
+    How it is computed depends on the dimension: ``d = 1`` is the normal CDF,
+    ``d = 2`` is exact (:func:`bvn_cdf`), ``d = 3`` is a near-exact quadrature
+    (:func:`tvn_cdf`), and ``d >= 4`` uses Genz's method on a fixed-seed
+    scrambled Sobol sequence.
 
     Parameters
     ----------
-    upper : array_like
-        ``(n, d)`` (or ``(d,)``) array of upper integration limits.
-    corr : array_like
-        ``(d, d)`` correlation matrix.
-    n_points : int, optional
-        Number of QMC points for ``d >= 3``. Defaults to ``2**14``.
+    upper : array_like of float, shape (n, d) or (d,)
+        Upper integration limits, one row per point. ``+inf`` removes that
+        coordinate's constraint; ``-inf`` (or ``nan``) gives probability 0.
+    corr : array_like of float, shape (d, d)
+        Correlation matrix (unit diagonal, positive definite for ``d >= 4``).
+    n_points : int or None, default None
+        Number of quasi-Monte-Carlo points, used only when ``d >= 4``.
+        ``None`` means ``2**16``.
 
     Returns
     -------
-    ndarray
+    numpy.ndarray of float64, shape (n,)
         ``P(X_1 <= upper_1, ..., X_d <= upper_d)`` for each row.
+
+    Raises
+    ------
+    ValueError
+        If ``upper`` does not have ``d`` columns.
+    numpy.linalg.LinAlgError
+        If ``d >= 4`` and ``corr`` is not positive definite.
 
     Notes
     -----
     Deterministic: repeated calls with the same arguments return bit-identical
-    results. ``d = 2`` is exact; higher dimensions carry a QMC error of roughly
-    1e-8 at the default point count.
+    results. ``d = 2`` is exact and ``d = 3`` is accurate to about 1e-14;
+    ``d >= 4`` carries a QMC error of roughly 1e-8 at the default point count.
 
     Examples
     --------
@@ -349,7 +425,12 @@ def mvt_cdf(
     *,
     n_points: int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Multivariate Student-t CDF with unit scale.
+    r"""Return the probability that a ``d``-dimensional Student-t vector falls below given limits.
+
+    This is the multivariate Student-t CDF with unit scale,
+    :math:`P(X_1 \le x_1, \dots, X_d \le x_d)` for
+    :math:`X \sim t_\nu(0, R)`. The Student-t copula's CDF is this function
+    evaluated at t quantiles. Like :func:`mvn_cdf` it is deterministic.
 
     Uses the radial mixture representation: if :math:`X \sim t_\nu(0, R)` then
     :math:`X = Z / \sqrt{W/\nu}` with :math:`Z \sim N(0, R)` and
@@ -362,14 +443,33 @@ def mvt_cdf(
 
     Parameters
     ----------
-    upper : array_like
-        ``(n, d)`` array of upper integration limits.
-    corr : array_like
-        ``(d, d)`` correlation matrix.
+    upper : array_like of float, shape (n, d) or (d,)
+        Upper integration limits, one row per point. ``+inf`` is allowed when
+        ``d <= 3``.
+    corr : array_like of float, shape (d, d)
+        Correlation matrix (unit diagonal).
     df : float
         Degrees of freedom, ``> 0``. May be non-integer.
-    n_points : int, optional
-        Number of QMC points. Defaults to ``2**14``.
+    n_points : int or None, default None
+        Number of quasi-Monte-Carlo points, used only when ``d >= 4``
+        (``d <= 3`` uses a fixed Gauss-Legendre rule). ``None`` means
+        ``2**16``.
+
+    Returns
+    -------
+    numpy.ndarray of float64, shape (n,)
+        ``P(X_1 <= upper_1, ..., X_d <= upper_d)`` for each row.
+
+    Raises
+    ------
+    ValueError
+        If ``df <= 0``, or if ``upper`` does not have ``d`` columns.
+
+    Notes
+    -----
+    Accuracy is about 1e-14 for ``d <= 3`` and ``df >= 2``, about 1e-7 for
+    ``df < 2`` with extreme limits, and limited by the QMC error (roughly
+    1e-7) for ``d >= 4``. Very small ``df`` (around 0.02) holds only ~4e-4.
 
     Examples
     --------

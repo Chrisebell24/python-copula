@@ -24,17 +24,46 @@ __all__ = ["CopulaFitResult"]
 
 
 class CopulaFitResult:
-    """Result of fitting a copula.
+    """Everything you get back after fitting a copula: estimates, uncertainty and fit quality.
+
+    You normally do not build this yourself -- :func:`rcopula.fit` returns
+    one. It holds the fitted copula, the estimated parameters, their standard
+    errors and confidence intervals, the log-likelihood with AIC/BIC for
+    comparing models, and a printable :meth:`summary`.
+
+    Parameters
+    ----------
+    copula : Copula
+        The fitted copula, with the estimated parameters already set.
+    params : array_like of float, shape (k,)
+        Estimated free (non-fixed) parameters. A scalar is turned into a
+        length-1 array.
+    param_names : sequence of str, length k
+        Names matching ``params``, in the same order.
+    loglik : float
+        Maximised log-likelihood (the pseudo-log-likelihood for ``"mpl"``).
+    n_obs : int
+        Number of observations (rows) the copula was fitted to.
+    method : str
+        Estimation method used, e.g. ``"mpl"``, ``"ml"``, ``"itau"``,
+        ``"irho"`` or ``"itau.mpl"``.
+    cov_params : ndarray of float, shape (k, k), or None, default None
+        Asymptotic covariance matrix of ``params``; ``None`` when it was not
+        computed.
+    converged : bool, default True
+        Whether the optimiser reported success.
+    message : str, default ""
+        Optimiser message, or a note for closed-form estimators.
 
     Attributes
     ----------
     copula : Copula
         The fitted copula, with estimated parameters in place.
-    params : ndarray
+    params : ndarray of float, shape (k,)
         Estimated free parameters.
-    param_names : tuple of str
+    param_names : tuple of str, length k
         Names matching ``params``.
-    cov_params : ndarray or None
+    cov_params : ndarray of float, shape (k, k), or None
         Asymptotic covariance matrix, or ``None`` when it was not computed.
     loglik : float
         Maximised log-likelihood (pseudo-likelihood for ``"mpl"``).
@@ -46,6 +75,25 @@ class CopulaFitResult:
         Whether the optimiser reported success.
     message : str
         Optimiser message, or a note for closed-form estimators.
+
+    See Also
+    --------
+    rcopula.fit : The function that produces this object.
+
+    Notes
+    -----
+    Follows the ``statsmodels`` Model/Results split: the copula you passed in
+    is not modified, and the fitted one lives in :attr:`copula`.
+
+    Examples
+    --------
+    >>> from rcopula import ClaytonCopula, fit
+    >>> u = ClaytonCopula(2.0).rvs(1000, random_state=0)
+    >>> res = fit(ClaytonCopula(), u)
+    >>> res.n_params
+    1
+    >>> res.conf_int().shape
+    (1, 2)
     """
 
     def __init__(
@@ -74,13 +122,29 @@ class CopulaFitResult:
 
     @property
     def n_params(self) -> int:
-        """Number of estimated parameters."""
+        """How many parameters were estimated.
+
+        Returns
+        -------
+        int
+            Number of free parameters, ``k`` (fixed parameters are not counted).
+        """
         return int(self.params.size)
 
     @property
     def bse(self) -> NDArray[np.float64] | None:
-        """Asymptotic standard errors, or ``None`` if unavailable.
+        """Standard error of each estimate: roughly how far it could be from the true value.
 
+        Computed as the square root of the diagonal of :attr:`cov_params`.
+
+        Returns
+        -------
+        ndarray of float, shape (k,), or None
+            Asymptotic standard errors, or ``None`` if the covariance matrix
+            was not computed.
+
+        Notes
+        -----
         This is what no other Python copula package offers.
         """
         if self.cov_params is None:
@@ -89,14 +153,29 @@ class CopulaFitResult:
 
     @property
     def tvalues(self) -> NDArray[np.float64] | None:
-        """Estimate divided by standard error."""
+        """Each estimate divided by its standard error (the z-statistic).
+
+        Returns
+        -------
+        ndarray of float, shape (k,), or None
+            ``params / bse``, or ``None`` without standard errors.
+        """
         se = self.bse
         return None if se is None else self.params / se
 
     @property
     def pvalues(self) -> NDArray[np.float64] | None:
-        """Two-sided p-values against a zero parameter.
+        """P-value per parameter: how surprising its estimate would be if the true value were zero.
 
+        Two-sided p-values from the normal approximation, ``2 * P(Z > |z|)``.
+
+        Returns
+        -------
+        ndarray of float, shape (k,), or None
+            Values in ``[0, 1]``, or ``None`` without standard errors.
+
+        Notes
+        -----
         Interpret with care: for most families zero is not a meaningful null
         (Gumbel's parameter space starts at 1), so these are informative only
         where zero really means independence.
@@ -106,19 +185,47 @@ class CopulaFitResult:
 
     @property
     def aic(self) -> float:
-        """Akaike information criterion, ``-2 loglik + 2 k``."""
+        """A fit score that penalises extra parameters; lower is better (AIC).
+
+        Akaike information criterion, ``-2 loglik + 2 k``. Use it to compare
+        models fitted to the same data.
+
+        Returns
+        -------
+        float
+        """
         return -2.0 * self.loglik + 2.0 * self.n_params
 
     @property
     def bic(self) -> float:
-        """Bayesian information criterion, ``-2 loglik + k log n``."""
+        """A fit score that penalises extra parameters more than AIC does; lower is better (BIC).
+
+        Bayesian information criterion, ``-2 loglik + k log n``. Use it to
+        compare models fitted to the same data.
+
+        Returns
+        -------
+        float
+        """
         return -2.0 * self.loglik + self.n_params * np.log(self.n_obs)
 
     def conf_int(self, alpha: float = 0.05) -> NDArray[np.float64] | None:
-        """Wald confidence intervals at level ``1 - alpha``.
+        """A plausible range (lower, upper) for each parameter.
 
-        Returns an ``(n_params, 2)`` array, or ``None`` without a covariance
-        matrix.
+        Wald confidence intervals at level ``1 - alpha``: estimate plus or
+        minus a normal quantile times the standard error.
+
+        Parameters
+        ----------
+        alpha : float, default 0.05
+            One minus the confidence level, strictly between 0 and 1;
+            ``0.05`` gives 95% intervals.
+
+        Returns
+        -------
+        ndarray of float, shape (k, 2), or None
+            Column 0 holds the lower bounds and column 1 the upper bounds, or
+            ``None`` without a covariance matrix.
         """
         se = self.bse
         if se is None:
@@ -129,7 +236,18 @@ class CopulaFitResult:
     # ------------------------------------------------------------------
 
     def summary(self) -> str:
-        """A printable summary table, in the spirit of R's ``summary.fitCopula``."""
+        """A human-readable text table of the fit, ready to print.
+
+        Shows the family, method, sample size, log-likelihood, AIC/BIC and a
+        row per parameter (estimate, standard error, z and p-value), in the
+        spirit of R's ``summary.fitCopula``. A warning line is added when the
+        optimiser did not converge.
+
+        Returns
+        -------
+        str
+            Multi-line text; pass it to ``print``.
+        """
         se = self.bse
 
         lines = [

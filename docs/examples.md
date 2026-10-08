@@ -39,6 +39,7 @@ pytest tests/test_examples.py     # run them all
 | 29 | How-to: risk management for a multi-desk book |
 | 30 | How-to: copula trading strategies, pairs to vine baskets |
 | 31 | How-to: valuing odd assets under different tails |
+| 32 | How-to: copulas for an 800-stock basket |
 
 ## Beyond finance
 

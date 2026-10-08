@@ -84,7 +84,27 @@ __all__ = [
 
 
 class MonteCarloPrice(NamedTuple):
-    """A simulated price with its Monte-Carlo standard error."""
+    """A simulated option price together with how noisy that estimate is.
+
+    Every Monte-Carlo pricer in this module returns one of these. Treat
+    ``price +/- 2 * standard_error`` as a rough 95% band: if two prices differ
+    by less than a couple of standard errors, the simulation cannot tell them
+    apart. Increase ``n`` in the pricer to shrink the error (it falls like
+    ``1 / sqrt(n)``).
+
+    Being a ``NamedTuple``, it unpacks as ``price, se, n = result``.
+
+    Attributes
+    ----------
+    price : float
+        Discounted present value of the option, in the same currency units as
+        the underlying prices (times the notional, where there is one).
+    standard_error : float
+        Monte-Carlo standard error of ``price``, same units. Measures
+        simulation noise only, not model error.
+    n : int
+        Number of simulated scenarios the estimate is based on.
+    """
 
     price: float
     standard_error: float
@@ -114,8 +134,36 @@ def _mc(payoff: NDArray[np.float64], rate: float, maturity: float) -> MonteCarlo
 
 
 def lognormal_terminal(forward: float, vol: float, maturity: float) -> Margin:
-    r"""Terminal distribution of an asset under Black-76, as a frozen margin.
+    r"""The distribution of an asset's price at expiry, assuming a flat Black-76 vol.
 
+    Use this as a margin (one per underlying) for the multi-asset pricers in
+    this module when you have a single at-the-money volatility per asset and
+    no smile. If you do have a smile, use :class:`SmileMargin` instead.
+
+    Parameters
+    ----------
+    forward : float
+        Forward price of the asset for delivery at ``maturity`` (currency
+        units). The distribution's mean equals this.
+    vol : float
+        Annualised Black-76 (lognormal) volatility as a decimal, e.g. ``0.25``
+        for 25%. Must be positive.
+    maturity : float
+        Time to expiry in years. Must be positive.
+
+    Returns
+    -------
+    scipy.stats frozen distribution
+        A frozen ``scipy.stats.lognorm`` for the terminal price :math:`S_T`,
+        with ``.cdf``, ``.ppf``, ``.rvs``, ``.mean`` etc.
+
+    Raises
+    ------
+    ValueError
+        If ``vol`` or ``maturity`` is not positive.
+
+    Notes
+    -----
     :math:`S_T = F \exp(\sigma\sqrt{T}\,Z - \sigma^2 T/2)`, so
     :math:`\mathbb{E}[S_T] = F` -- the martingale property that makes the
     resulting prices arbitrage-free.
@@ -135,8 +183,53 @@ def lognormal_terminal(forward: float, vol: float, maturity: float) -> Margin:
 
 
 class SmileMargin:
-    r"""Risk-neutral marginal distribution implied by a volatility smile.
+    r"""The distribution of an asset's price at expiry, read off its volatility smile.
 
+    Option prices across strikes tell you the market's (risk-neutral)
+    probability of the asset finishing at each level. This class turns a quoted
+    smile into that distribution, so a basket or rainbow option can be priced
+    with each underlying keeping the skew its own options show, instead of
+    assuming it is lognormal. Pass instances as ``margins`` to
+    :func:`basket_option`, :func:`rainbow_option`, :func:`basket_implied_vol`
+    and friends.
+
+    Parameters
+    ----------
+    strikes : array_like of float, shape (k,)
+        Strikes at which the smile is quoted, strictly increasing, in the same
+        currency units as ``forward``. At least four are needed. Cover the
+        range you care about: outside it the distribution is flat (see Notes).
+    vols : array_like of float, shape (k,)
+        Black-76 implied volatilities at those strikes, as decimals (``0.25``
+        for 25%).
+    forward : float
+        Forward price of the asset for delivery at ``maturity``.
+    maturity : float
+        Time to expiry in years.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+
+    Attributes
+    ----------
+    strikes : numpy.ndarray of float, shape (k,)
+        The quoted strikes.
+    vols : numpy.ndarray of float, shape (k,)
+        The quoted implied vols.
+    forward : float
+        Forward price.
+    maturity : float
+        Time to expiry in years.
+    rate : float
+        Discount rate.
+
+    Raises
+    ------
+    ValueError
+        If ``strikes`` and ``vols`` differ in length, fewer than four strikes
+        are given, or the strikes are not strictly increasing.
+
+    Notes
+    -----
     Breeden & Litzenberger (1978): the undiscounted call price determines the
     whole risk-neutral law, with
 
@@ -148,14 +241,11 @@ class SmileMargin:
     and the copula supplies the dependence -- which a single correlation number
     cannot do once the marginals are non-lognormal.
 
-    Parameters
-    ----------
-    strikes : array_like
-        Strikes at which the smile is quoted, increasing.
-    vols : array_like
-        Implied volatilities at those strikes.
-    forward, maturity, rate : float
-        Forward, time to expiry, and the discount rate.
+    The derivative is taken numerically on the quoted grid and the result is
+    clipped to [0, 1] and forced to be non-decreasing. Between strikes the CDF
+    is linearly interpolated; below the lowest and above the highest strike it
+    is held constant, so any probability the smile assigns beyond the quoted
+    range is concentrated at the end strikes.
 
     Examples
     --------
@@ -209,17 +299,58 @@ class SmileMargin:
         self._k_grid = k
 
     def cdf(self, x: ArrayLike) -> NDArray[np.float64]:
-        """Risk-neutral distribution function."""
+        """Probability that the asset finishes at or below ``x`` (risk-neutral CDF).
+
+        Parameters
+        ----------
+        x : array_like of float
+            Price level(s) at expiry, any shape.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``x``
+            Probabilities in [0, 1].
+        """
         return np.interp(np.asarray(x, dtype=np.float64), self._k_grid, self._cdf_grid)
 
     def ppf(self, q: ArrayLike) -> NDArray[np.float64]:
-        """Risk-neutral quantile function, by inverting the interpolated CDF."""
+        """The price level the asset finishes below with probability ``q`` (quantile).
+
+        This is the inverse of :meth:`cdf`, computed by inverting the
+        interpolated CDF. It is what the copula machinery calls to turn
+        uniform draws into prices.
+
+        Parameters
+        ----------
+        q : array_like of float
+            Probabilities in [0, 1], any shape.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``q``
+            Price levels, always within ``[strikes[0], strikes[-1]]``.
+        """
         qq = np.asarray(q, dtype=np.float64)
         # np.interp needs an increasing x; ties from the monotone fix are fine.
         return np.interp(qq, self._cdf_grid, self._k_grid)
 
     def pdf(self, x: ArrayLike) -> NDArray[np.float64]:
-        """Risk-neutral density, the second derivative of the call price."""
+        """How likely each price level at expiry is (risk-neutral density).
+
+        Equivalently, the (undiscounted) second derivative of the call price
+        with respect to strike. Computed numerically from the CDF grid and
+        floored at zero.
+
+        Parameters
+        ----------
+        x : array_like of float
+            Price level(s) at expiry, any shape.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``x``
+            Non-negative density values (probability per unit of price).
+        """
         density = np.gradient(self._cdf_grid, self._k_grid)
         return np.interp(np.asarray(x, dtype=np.float64), self._k_grid, np.maximum(density, 0.0))
 
@@ -243,7 +374,44 @@ def black76(
     rate: float = 0.0,
     kind: str = "call",
 ) -> float:
-    r"""Black-76 price of a European option on a forward.
+    r"""Price of a plain European call or put on one asset, using the Black-76 formula.
+
+    The single-asset building block: quote a forward, a strike and a vol, get
+    a price. Used here to check the multi-asset pricers and to convert prices
+    to implied vols.
+
+    Parameters
+    ----------
+    forward : float
+        Forward price of the underlying for delivery at ``maturity``.
+    strike : float
+        Option strike, same units as ``forward``.
+    vol : float
+        Annualised Black-76 (lognormal) volatility as a decimal. If zero or
+        negative, the discounted intrinsic value is returned.
+    maturity : float
+        Time to expiry in years. If zero or negative, the discounted intrinsic
+        value is returned.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+    kind : {"call", "put"}, default "call"
+        Option type.
+
+    Returns
+    -------
+    float
+        Discounted option price, in the units of ``forward``.
+
+    Raises
+    ------
+    ValueError
+        If ``kind`` is not ``"call"`` or ``"put"``.
+
+    Notes
+    -----
+    :math:`C = e^{-rT}[F N(d_1) - K N(d_2)]` with
+    :math:`d_{1,2} = [\ln(F/K) \pm \sigma^2 T/2] / (\sigma\sqrt{T})`
+    (Black, 1976).
 
     Examples
     --------
@@ -282,9 +450,39 @@ def margrabe(
     maturity: float,
     rate: float = 0.0,
 ) -> float:
-    r"""Exact price of an option to exchange asset 2 for asset 1.
+    r"""Exact price of the right to swap asset 2 for asset 1 at expiry (Margrabe formula).
 
-    Payoff :math:`\max(S_1 - S_2, 0)`. Margrabe (1978) showed this is
+    The payoff is whatever asset 1 is worth above asset 2, or nothing:
+    :math:`\max(S_1 - S_2, 0)`, a spread option with zero strike. It is exact
+    when both prices are lognormal with a constant correlation, which makes it
+    the benchmark for checking :func:`spread_option`.
+
+    Parameters
+    ----------
+    forward1 : float
+        Forward price of asset 1 (the one you receive).
+    forward2 : float
+        Forward price of asset 2 (the one you give up), same units.
+    vol1 : float
+        Annualised lognormal volatility of asset 1, as a decimal.
+    vol2 : float
+        Annualised lognormal volatility of asset 2, as a decimal.
+    correlation : float
+        Correlation of the two assets' log-returns, in [-1, 1].
+    maturity : float
+        Time to expiry in years.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+
+    Returns
+    -------
+    float
+        Discounted option price, in the units of the forwards. If the spread
+        volatility is zero, the discounted intrinsic value.
+
+    Notes
+    -----
+    Margrabe (1978) showed this is
     Black-Scholes with the *spread* volatility
 
     .. math::  \sigma^2 = \sigma_1^2 + \sigma_2^2 - 2\rho\sigma_1\sigma_2,
@@ -322,9 +520,40 @@ def kirk_spread(
     maturity: float,
     rate: float = 0.0,
 ) -> float:
-    r"""Kirk's (1995) approximation for a spread option, :math:`\max(S_1-S_2-K, 0)`.
+    r"""Fast approximate price of a spread option with a strike (Kirk's formula).
 
-    Treats :math:`S_2 + K` as a single lognormal asset, which is exact at
+    Payoff :math:`\max(S_1 - S_2 - K, 0)`: pays when asset 1 beats asset 2 by
+    more than ``strike``. The standard closed-form quick price for crack,
+    spark and calendar spreads; compare it with :func:`spread_option` to see
+    what a non-Gaussian dependence changes.
+
+    Parameters
+    ----------
+    forward1 : float
+        Forward price of the long asset.
+    forward2 : float
+        Forward price of the short asset, same units.
+    strike : float
+        Spread strike, same units. ``0`` reproduces :func:`margrabe`.
+    vol1 : float
+        Annualised lognormal volatility of asset 1, as a decimal.
+    vol2 : float
+        Annualised lognormal volatility of asset 2, as a decimal.
+    correlation : float
+        Correlation of the two assets' log-returns, in [-1, 1].
+    maturity : float
+        Time to expiry in years.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+
+    Returns
+    -------
+    float
+        Approximate discounted option price, in the units of the forwards.
+
+    Notes
+    -----
+    Kirk (1995) treats :math:`S_2 + K` as a single lognormal asset, which is exact at
     :math:`K = 0` (where it reduces to :func:`margrabe`) and stays accurate
     for moderate strikes. Widely used in energy markets, where spread options
     are the standard product.
@@ -358,7 +587,41 @@ def implied_volatility(
     rate: float = 0.0,
     kind: str = "call",
 ) -> float:
-    """Invert Black-76 for the volatility matching a quoted price.
+    """The volatility that makes Black-76 reproduce a given option price.
+
+    The usual way to quote an option price as a vol. Here it is also how
+    :func:`basket_implied_vol` turns simulated basket prices into a smile.
+
+    Parameters
+    ----------
+    price : float
+        Discounted option price to match, in the units of ``forward``.
+    forward : float
+        Forward price of the underlying.
+    strike : float
+        Option strike, same units.
+    maturity : float
+        Time to expiry in years.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+    kind : {"call", "put"}, default "call"
+        Option type of the quoted price.
+
+    Returns
+    -------
+    float
+        Annualised implied volatility as a decimal. Returns ``0.0`` when the
+        price is at or below discounted intrinsic value.
+
+    Raises
+    ------
+    ValueError
+        If no volatility in (1e-8, 10] reproduces ``price`` -- typically
+        because the price exceeds the no-arbitrage upper bound.
+
+    Notes
+    -----
+    Solved with Brent's method on ``black76(vol) - price``.
 
     Examples
     --------
@@ -410,8 +673,52 @@ def basket_option(
     n: int = 200_000,
     random_state: np.random.Generator | int | None = None,
 ) -> MonteCarloPrice:
-    r"""Option on a weighted basket, :math:`\max(\sum_i w_i S_i - K, 0)`.
+    r"""Monte-Carlo price of a call or put on a weighted basket of assets.
 
+    Payoff :math:`\max(\sum_i w_i S_i - K, 0)` for a call. Each asset's price
+    at expiry comes from its own margin; the copula decides how they move
+    together. Swap the copula (e.g. Gaussian for Student-t or Gumbel) to see
+    how much of the price is the dependence assumption.
+
+    Parameters
+    ----------
+    copula : Copula
+        Dependence between the ``d`` underlyings, e.g.
+        ``GaussianCopula(0.4, dim=3)``.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Terminal price distribution of each underlying, e.g. from
+        :func:`lognormal_terminal` or :class:`SmileMargin`. A single margin is
+        reused for every asset.
+    strike : float
+        Basket strike, in the units of the weighted basket value.
+    maturity : float
+        Time to expiry in years (used only for discounting).
+    weights : array_like of float, shape (d,), optional
+        Basket weights (number of units of each asset). Default is equal
+        weights ``1 / d``.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+    kind : {"call", "put"}, default "call"
+        Option type.
+    n : int, default 200_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator, for reproducible prices.
+
+    Returns
+    -------
+    MonteCarloPrice
+        ``(price, standard_error, n)``: discounted price, its simulation
+        standard error, and the scenario count.
+
+    Raises
+    ------
+    ValueError
+        If ``kind`` is not ``"call"`` or ``"put"``, or ``weights`` does not
+        have one entry per copula dimension.
+
+    Notes
+    -----
     The basket is where the dependence model earns its keep. A basket is *less*
     volatile than its components, by an amount that depends entirely on how they
     co-move -- and on how they co-move **in the tail**, which correlation alone
@@ -461,11 +768,50 @@ def rainbow_option(
     n: int = 200_000,
     random_state: np.random.Generator | int | None = None,
 ) -> MonteCarloPrice:
-    r"""Best-of or worst-of option on several assets.
+    r"""Monte-Carlo price of an option on the best (or worst) performer of several assets.
 
     Payoff :math:`\max(\max_i S_i - K, 0)` for ``on="best"``, or with
-    :math:`\min_i` for ``on="worst"``.
+    :math:`\min_i` for ``on="worst"`` (calls; puts flip the sign). Worst-of
+    structures are common in structured notes, so this is where an
+    over-optimistic dependence assumption is most expensive.
 
+    Parameters
+    ----------
+    copula : Copula
+        Dependence between the ``d`` underlyings.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Terminal price distribution of each underlying. A single margin is
+        reused for every asset. For best/worst comparisons to make sense the
+        assets should be on a common scale (e.g. all with the same forward, or
+        normalised to performance).
+    strike : float
+        Strike applied to the best or worst terminal price.
+    maturity : float
+        Time to expiry in years (used only for discounting).
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+    kind : {"call", "put"}, default "call"
+        Option type.
+    on : {"best", "worst"}, default "best"
+        Whether the payoff references the highest or lowest terminal price.
+    n : int, default 200_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator, for reproducible prices.
+
+    Returns
+    -------
+    MonteCarloPrice
+        ``(price, standard_error, n)``.
+
+    Raises
+    ------
+    ValueError
+        If ``on`` is not ``"best"``/``"worst"`` or ``kind`` is not
+        ``"call"``/``"put"``.
+
+    Notes
+    -----
     These are the payoffs most sensitive to dependence, and in opposite
     directions: a best-of is worth most when the assets are *independent*
     (many chances for one to finish high), a worst-of when they move
@@ -515,8 +861,42 @@ def spread_option(
     n: int = 200_000,
     random_state: np.random.Generator | int | None = None,
 ) -> MonteCarloPrice:
-    r"""Option on the spread between two assets, :math:`\max(S_1 - S_2 - K, 0)`.
+    r"""Monte-Carlo price of a call on the spread between two assets.
 
+    Payoff :math:`\max(S_1 - S_2 - K, 0)`: pays when asset 1 beats asset 2 by
+    more than the strike (e.g. a crack or spark spread). Unlike
+    :func:`kirk_spread`, any margins and any copula can be used. Only calls
+    are supported.
+
+    Parameters
+    ----------
+    copula : Copula
+        Bivariate (``dim=2``) dependence between the two assets.
+    margins : list of scipy.stats frozen distributions, length 2
+        Terminal price distributions of asset 1 (long) and asset 2 (short).
+    strike : float
+        Spread strike, in price units.
+    maturity : float
+        Time to expiry in years (used only for discounting).
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+    n : int, default 200_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator, for reproducible prices.
+
+    Returns
+    -------
+    MonteCarloPrice
+        ``(price, standard_error, n)``.
+
+    Raises
+    ------
+    ValueError
+        If the copula is not bivariate.
+
+    Notes
+    -----
     At :math:`K = 0` with a Gaussian copula and lognormal margins this is the
     Margrabe exchange option, which has an exact price -- so
     :func:`margrabe` is the check that this simulation is right.
@@ -582,12 +962,51 @@ def cms_convexity_adjustment(
     frequency: int = 2,
     model: str = "lognormal",
 ) -> float:
-    r"""Convexity adjustment for a constant-maturity swap rate.
+    r"""How much to add to a forward swap rate to get the expected CMS rate actually paid.
 
-    A CMS payoff references a swap rate but pays on a single date, not over the
-    swap's own schedule. The forward swap rate is a martingale under the
-    *annuity* measure, not the payment measure, so the expected rate that
-    actually gets paid is **higher** than the forward. The correction follows
+    A constant-maturity swap (CMS) pays a swap rate on a single date, not over
+    the swap's own schedule, and that timing mismatch makes the expected paid
+    rate **higher** than the forward swap rate. This returns that gap (the
+    convexity adjustment), which grows with vol, time to fixing and swap
+    tenor.
+
+    Parameters
+    ----------
+    forward : float
+        Forward swap rate, as a decimal (``0.05`` for 5%).
+    vol : float
+        Volatility of that rate: lognormal (a decimal, e.g. ``0.20``) by
+        default, or normal/absolute (in rate units, e.g. ``0.01`` for 100 bp)
+        if ``model="normal"``. Must be non-negative.
+    maturity : float
+        Time to the fixing, in years. Must be non-negative.
+    tenor : float
+        Tenor of the underlying swap, in years.
+    frequency : int, default 2
+        Fixed-leg payments per year.
+    model : {"lognormal", "normal"}, default "lognormal"
+        Dynamics assumed for the swap rate. Normal (Bachelier) is the market
+        standard for rates near or below zero, where a lognormal vol is
+        meaningless.
+
+    Returns
+    -------
+    float
+        The additive adjustment, in the same units as ``forward`` (multiply by
+        1e4 for basis points). ``0.0`` if ``vol`` or ``maturity`` is zero.
+
+    Raises
+    ------
+    ValueError
+        If ``model`` is unknown, ``vol`` or ``maturity`` is negative,
+        ``tenor`` is shorter than one coupon period, or the rate is so
+        negative that the bond price diverges.
+
+    Notes
+    -----
+    The forward swap rate is a martingale under the *annuity* measure, not the
+    payment measure, so the expected rate that actually gets paid is **higher**
+    than the forward. The correction follows
     from the fact that the bond's forward *price* is the martingale: expanding
     :math:`G(y_T)` to second order in
     :math:`\mathbb{E}[G(y_T)] = G(y_0)` gives
@@ -606,30 +1025,6 @@ def cms_convexity_adjustment(
     cancel -- the longer tenor carries the larger one, which is the whole
     directional content of the trade.
 
-    Parameters
-    ----------
-    forward : float
-        Forward swap rate, as a decimal.
-    vol : float
-        Lognormal (or normal, if ``model="normal"``) volatility of that rate.
-    maturity : float
-        Time to the fixing, in years.
-    tenor : float
-        Tenor of the underlying swap, in years.
-    frequency : int
-        Fixed-leg payments per year.
-    model : {"lognormal", "normal"}
-        Dynamics assumed for the swap rate. Normal (Bachelier) is the market
-        standard for rates near or below zero, where a lognormal vol is
-        meaningless.
-
-    Returns
-    -------
-    float
-        The additive adjustment, in the same units as ``forward``.
-
-    Notes
-    -----
     This is the second-order approximation. Hagan's replication approach prices
     the same quantity as a strip of swaptions and so captures the smile; that is
     more accurate but needs a full swaption surface. What this function gives is
@@ -678,8 +1073,43 @@ def cms_margin(
     frequency: int = 2,
     model: str = "lognormal",
 ) -> Margin:
-    """A CMS rate's terminal distribution, convexity-adjusted.
+    """The distribution of a CMS rate at its fixing, centred on the convexity-adjusted rate.
 
+    Use it as one margin of a copula model of two or more swap rates; this is
+    what :func:`cms_spread_option` does for each leg.
+
+    Parameters
+    ----------
+    forward : float
+        Forward swap rate, as a decimal.
+    vol : float
+        Volatility of the rate: lognormal (decimal) for ``model="lognormal"``,
+        absolute (rate units) for ``model="normal"``. Must be positive for the
+        lognormal model.
+    maturity : float
+        Time to the fixing, in years.
+    tenor : float
+        Tenor of the underlying swap, in years.
+    frequency : int, default 2
+        Fixed-leg payments per year.
+    model : {"lognormal", "normal"}, default "lognormal"
+        Shape of the distribution.
+
+    Returns
+    -------
+    scipy.stats frozen distribution
+        ``scipy.stats.lognorm`` (via :func:`lognormal_terminal`) or
+        ``scipy.stats.norm``, with mean ``forward +
+        cms_convexity_adjustment(...)``.
+
+    Raises
+    ------
+    ValueError
+        As :func:`cms_convexity_adjustment`; and, for the lognormal model, if
+        ``vol`` or ``maturity`` is not positive.
+
+    Notes
+    -----
     The mean is the forward swap rate plus
     :func:`cms_convexity_adjustment`; the shape is lognormal or normal
     according to ``model``. Plugging these into a copula is how a CMS spread
@@ -702,19 +1132,24 @@ def cms_margin(
 
 
 class CmsLeg(NamedTuple):
-    """One leg of a CMS spread: a swap rate with its own dynamics.
+    """One leg of a CMS spread option: which swap rate, and how volatile it is.
+
+    A small record passed in a list of two to :func:`cms_spread_option`, e.g.
+    ``CmsLeg(0.045, 0.22, 10.0)`` for a 10-year rate at 4.5% with 22%
+    lognormal vol.
 
     Attributes
     ----------
     forward : float
-        Forward swap rate.
+        Forward swap rate, as a decimal.
     vol : float
-        Volatility of that rate, on the scale implied by ``model``.
+        Volatility of that rate, on the scale implied by ``model``
+        (lognormal decimal, or absolute rate units for ``"normal"``).
     tenor : float
         Swap tenor in years -- the "constant maturity".
-    frequency : int
-        Fixed-leg payment frequency.
-    model : {"lognormal", "normal"}
+    frequency : int, default 2
+        Fixed-leg payments per year.
+    model : {"lognormal", "normal"}, default "lognormal"
         Marginal dynamics.
     """
 
@@ -736,12 +1171,48 @@ def cms_spread_option(
     n: int = 200_000,
     random_state: np.random.Generator | int | None = None,
 ) -> MonteCarloPrice:
-    r"""Option on the spread between two CMS rates.
+    r"""Monte-Carlo price of an option on the gap between two swap rates (a curve trade).
 
     Payoff :math:`N \max(y_1 - y_2 - K, 0)` on the two convexity-adjusted swap
     rates. The classic trade is 10-year minus 2-year: a bet on the slope of the
     curve rather than on its level.
 
+    Parameters
+    ----------
+    copula : Copula
+        Bivariate (``dim=2``) dependence between the two rates.
+    legs : list of CmsLeg, length 2
+        The two legs, in the order they appear in the spread
+        (``legs[0] - legs[1]``).
+    strike : float
+        Spread strike, as a decimal (``0.015`` for 150 bp).
+    maturity : float
+        Fixing date, in years; also used for discounting.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+    notional : float, default 1.0
+        Notional the rate spread is paid on.
+    kind : {"call", "put"}, default "call"
+        A call pays when the curve steepens beyond the strike; a put when it
+        flattens.
+    n : int, default 200_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator, for reproducible prices.
+
+    Returns
+    -------
+    MonteCarloPrice
+        ``(price, standard_error, n)``, in units of ``notional``.
+
+    Raises
+    ------
+    ValueError
+        If the copula is not bivariate, ``legs`` does not have exactly two
+        entries, or ``kind`` is not ``"call"``/``"put"``.
+
+    Notes
+    -----
     This is a case where the copula is doing real work. The two rates are
     strongly dependent but not lognormally so; the spread is a small difference
     of two large numbers, so its distribution is extremely sensitive to how the
@@ -750,22 +1221,6 @@ def cms_spread_option(
     Choosing the dependence structure explicitly at least makes the assumption
     visible -- and, in the Gaussian-copula/lognormal case, reduces to the
     Margrabe/Kirk answer that desks already use.
-
-    Parameters
-    ----------
-    copula : Copula
-        Bivariate dependence between the two rates.
-    legs : list of CmsLeg
-        The two legs, in the order they appear in the spread.
-    strike : float
-        Spread strike, as a decimal.
-    maturity : float
-        Fixing date, in years.
-    rate, notional : float
-        Discount rate and notional.
-    kind : {"call", "put"}
-        A call pays when the curve steepens beyond the strike; a put when it
-        flattens.
 
     Examples
     --------
@@ -824,18 +1279,56 @@ def basket_implied_vol(
     n: int = 200_000,
     random_state: np.random.Generator | int | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    r"""The basket's own implied-volatility smile, implied by the copula.
+    r"""The implied-volatility smile of a basket, given its components and a copula.
 
-    Prices the basket at each strike, then inverts Black-76 to express the
-    result as an implied volatility. This is the calculation a single
-    correlation number cannot do: give each component the marginal its **own
-    smile** implies (see :class:`SmileMargin`), choose a dependence structure,
-    and the basket smile falls out.
+    Prices a basket call at each strike by simulation, then converts each
+    price to a Black-76 implied vol. Use it to see what smile your component
+    smiles plus a dependence assumption imply for the basket, e.g. to compare
+    with quoted index options.
+
+    Parameters
+    ----------
+    copula : Copula
+        Dependence between the ``d`` components.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Terminal price distribution of each component (e.g.
+        :class:`SmileMargin`). A single margin is reused for every asset.
+    strikes : array_like of float, shape (k,)
+        Basket strikes at which to compute the implied vol.
+    maturity : float
+        Time to expiry in years.
+    weights : array_like of float, shape (d,), optional
+        Basket weights. Default is equal weights ``1 / d``.
+    rate : float, default 0.0
+        Continuously compounded discount rate, as a decimal.
+    n : int, default 200_000
+        Number of simulated scenarios (shared across all strikes).
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator, for reproducible results.
 
     Returns
     -------
-    strikes, vols : ndarray
-        The input strikes and the implied volatility at each.
+    strikes : numpy.ndarray of float, shape (k,)
+        The input strikes.
+    vols : numpy.ndarray of float, shape (k,)
+        Annualised implied volatility at each strike, as decimals.
+
+    Raises
+    ------
+    ValueError
+        If a simulated price cannot be inverted to a volatility (see
+        :func:`implied_volatility`).
+
+    Notes
+    -----
+    This is the calculation a single correlation number cannot do: give each
+    component the marginal its **own smile** implies (see
+    :class:`SmileMargin`), choose a dependence structure, and the basket smile
+    falls out.
+
+    The forward used in the inversion is the *simulated* basket mean, not the
+    analytic one, so Monte-Carlo noise in the mean does not show up as a
+    spurious skew. All strikes share the same simulated scenarios.
 
     Examples
     --------

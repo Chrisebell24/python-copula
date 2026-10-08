@@ -1,5 +1,9 @@
 r"""Insurance, actuarial and operational-risk utilities.
 
+Tools to simulate total claims, size reinsurance layers and catastrophe
+bonds, and compute operational-risk capital, with dependence between lines or
+cells described by a copula.
+
 Insurance is where copulas are least optional. An insurer's aggregate loss is a
 **compound** distribution -- a random number of claims, each of random size --
 and compound distributions have no closed form worth using, no elliptical
@@ -60,8 +64,23 @@ __all__ = [
 
 @runtime_checkable
 class Variate(Protocol):
-    """What a frequency or severity distribution must provide: the ability to draw.
+    """Anything you can draw random numbers from: the type of a frequency or severity input.
 
+    You rarely implement this yourself. Any ``scipy.stats`` frozen distribution
+    -- ``stats.poisson(50)`` for a claim count, ``stats.lognorm(1.5,
+    scale=1000)`` for a claim size -- already qualifies. It is a structural
+    type (a :class:`typing.Protocol`): any object with a matching ``rvs``
+    method is accepted, with no need to subclass.
+
+    Methods
+    -------
+    rvs(size, random_state)
+        Draw ``size`` random values. ``size`` is an int or tuple of ints;
+        ``random_state`` is a :class:`numpy.random.Generator`. Must return an
+        array_like of numbers with shape ``size``.
+
+    Notes
+    -----
     Deliberately weaker than :class:`~rcopula.distribution.Margin`, which needs
     ``cdf``/``pdf``/``ppf``. A compound distribution is built by *simulation*, so
     all that is required here is ``rvs`` -- satisfied by every ``scipy.stats``
@@ -72,7 +91,31 @@ class Variate(Protocol):
 
 
 class LayerStatistics(NamedTuple):
-    """Summary of a reinsurance layer."""
+    """Headline numbers for one reinsurance layer, as returned by :func:`layer_statistics`.
+
+    A named tuple, so fields can be read by name (``stats.expected_loss``) or
+    unpacked like an ordinary tuple. All monetary fields are in the same
+    currency units as the simulated losses they were computed from.
+
+    Attributes
+    ----------
+    attachment : float
+        Loss level at which the layer starts paying (the cedant's retention).
+    limit : float
+        Most the layer can pay; the layer covers losses from ``attachment`` to
+        ``attachment + limit``.
+    expected_loss : float
+        Average amount the layer pays per simulated period, in currency units.
+    attachment_probability : float
+        Probability (0 to 1) that the loss exceeds ``attachment``, i.e. the
+        layer pays anything at all.
+    exhaustion_probability : float
+        Probability (0 to 1) that the loss reaches ``attachment + limit``, i.e.
+        the layer pays out in full.
+    expected_loss_ratio : float
+        ``expected_loss / limit``: expected payout as a fraction of the limit,
+        the usual way layers of different size are compared.
+    """
 
     attachment: float
     limit: float
@@ -96,8 +139,42 @@ def aggregate_loss(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Simulate a compound frequency-severity aggregate loss.
+    r"""Simulate total yearly losses as a random number of claims of random size.
 
+    This is the compound (frequency-severity) aggregate loss: draw how many
+    claims occur, draw how large each one is, add them up. Use it to turn a
+    claim-count model and a claim-size model into a distribution of total loss
+    for a policy, a line of business, or an operational-risk cell, which you
+    can then feed to :func:`~rcopula.risk.value_at_risk`, :func:`layer_statistics`
+    and friends.
+
+    Parameters
+    ----------
+    frequency : Variate (e.g. scipy.stats frozen discrete distribution)
+        Number of claims per period, e.g. ``scipy.stats.poisson(50)``. Must
+        produce non-negative integers.
+    severity : Variate (e.g. scipy.stats frozen continuous distribution)
+        Size of each individual claim, in currency units, e.g.
+        ``scipy.stats.lognorm(1.5, scale=1000)``.
+    n : int, default 100_000
+        Number of simulated periods (scenarios).
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducibility. A Generator is used (and
+        advanced) as is; an int or None seeds a fresh one.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n,)
+        Total loss in each simulated period, in the units of ``severity``.
+        Periods with zero claims have a total of exactly 0.
+
+    Raises
+    ------
+    ValueError
+        If ``frequency`` produces a negative claim count.
+
+    Notes
+    -----
     :math:`S = \sum_{i=1}^{N} X_i` with :math:`N` from ``frequency`` and each
     :math:`X_i` from ``severity``. This is the actuarial workhorse: no closed
     form in general, but its first two moments are exact and worth checking
@@ -107,13 +184,6 @@ def aggregate_loss(
         \mathbb{E}[S] = \mathbb{E}[N]\,\mathbb{E}[X], \qquad
         \mathrm{Var}[S] = \mathbb{E}[N]\,\mathrm{Var}[X]
                           + \mathrm{Var}[N]\,\mathbb{E}[X]^2.
-
-    Parameters
-    ----------
-    frequency : frozen discrete distribution
-        Claim count, e.g. ``scipy.stats.poisson(50)``.
-    severity : frozen continuous distribution
-        Individual claim size, e.g. ``scipy.stats.lognorm(1.5, scale=1000)``.
 
     Examples
     --------
@@ -160,8 +230,57 @@ def operational_risk_capital(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> dict[str, float]:
-    r"""Operational-risk capital by the loss-distribution approach.
+    r"""How much capital to hold for operational losses across several risk cells.
 
+    This is the loss-distribution approach (LDA). You describe each cell --
+    for example "retail banking x external fraud" -- by a claim-count and a
+    loss-size distribution, choose a copula for how the cells' bad years
+    coincide, and get back the 99.9% aggregate loss, the capital it implies,
+    and how much diversification credit the dependence assumption allows.
+
+    Parameters
+    ----------
+    cells : list of (Variate, Variate) tuples, length d
+        One ``(frequency, severity)`` pair of frozen distributions per cell,
+        as for :func:`aggregate_loss`.
+    copula : Copula or None, default None
+        Dependence across cells; its ``dim`` must equal ``len(cells)``.
+        ``None`` means independence, which is the assumption that produces
+        the largest diversification credit.
+    alpha : float, default 0.999
+        Confidence level, between 0 and 1; 0.999 is the Basel
+        operational-risk standard.
+    n : int, default 100_000
+        Number of simulated years.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducibility.
+
+    Returns
+    -------
+    dict of str to float
+        All amounts in the units of the severity distributions.
+
+        ``"var"``
+            Value-at-risk of the total loss at level ``alpha``.
+        ``"expected_shortfall"``
+            Average total loss in the worst ``1 - alpha`` of years.
+        ``"expected_loss"``
+            Mean total loss (provisioned, not capitalised).
+        ``"capital"``
+            ``var - expected_loss``: the capital requirement.
+        ``"standalone_capital"``
+            Sum over cells of each cell's own VaR minus its own mean -- the
+            capital if no diversification were recognised.
+        ``"diversification_benefit"``
+            ``standalone_capital - capital``.
+
+    Raises
+    ------
+    ValueError
+        If ``cells`` is empty, or ``copula.dim`` does not equal ``len(cells)``.
+
+    Notes
+    -----
     Each *cell* -- a business line crossed with an event type -- gets its own
     compound distribution. The cells are then combined under ``copula``, by
     rank reordering, so **each cell's approved loss distribution is preserved
@@ -172,22 +291,6 @@ def operational_risk_capital(
     Capital is the difference between the aggregate VaR and the expected loss,
     which is the Basel definition -- expected loss is provisioned, not
     capitalised.
-
-    Parameters
-    ----------
-    cells : list of (frequency, severity)
-        One pair of frozen distributions per cell.
-    copula : Copula, optional
-        Dependence across cells. ``None`` means independence, which is the
-        assumption that produces the largest diversification credit.
-    alpha : float
-        Confidence level; 0.999 is the Basel operational-risk standard.
-
-    Returns
-    -------
-    dict
-        ``var``, ``expected_shortfall``, ``expected_loss``, ``capital``, and
-        ``diversification_benefit`` against the sum of standalone capitals.
 
     Examples
     --------
@@ -244,8 +347,35 @@ def operational_risk_capital(
 
 
 def excess_of_loss(losses: ArrayLike, attachment: float, limit: float) -> NDArray[np.float64]:
-    r"""Reinsurer's recovery on an excess-of-loss layer.
+    r"""How much a reinsurance layer pays back for each loss.
 
+    An excess-of-loss layer pays nothing until the loss passes the
+    ``attachment`` point, then pays the excess, up to at most ``limit``. Use it
+    to turn simulated gross losses into the reinsurer's recoveries (and, by
+    subtraction, the insurer's net losses).
+
+    Parameters
+    ----------
+    losses : array_like of float, any shape
+        Gross losses, in currency units (positive numbers are losses).
+    attachment : float
+        Retention: the loss level at which the layer starts paying. Must be
+        ``>= 0``.
+    limit : float
+        Maximum amount the layer pays. Must be ``> 0``.
+
+    Returns
+    -------
+    numpy.ndarray of float, same shape as ``losses``
+        Recovery for each loss, between 0 and ``limit``.
+
+    Raises
+    ------
+    ValueError
+        If ``attachment < 0`` or ``limit <= 0``.
+
+    Notes
+    -----
     A "``limit`` excess of ``attachment``" layer pays
     :math:`\min(\max(L - a, 0), \ell)`: nothing until the cedant's retention is
     exhausted, then pound for pound, then nothing once the limit is used up.
@@ -267,7 +397,33 @@ def excess_of_loss(losses: ArrayLike, attachment: float, limit: float) -> NDArra
 
 
 def layer_statistics(losses: ArrayLike, attachment: float, limit: float) -> LayerStatistics:
-    """Expected loss and attachment probabilities for a layer.
+    """Expected payout and the chance of being hit, for one reinsurance layer.
+
+    Summarises a ``limit`` excess of ``attachment`` layer against a set of
+    simulated losses: how much it pays on average, how often it pays
+    anything, and how often it pays out in full.
+
+    Parameters
+    ----------
+    losses : array_like of float, shape (n,)
+        Simulated gross losses, in currency units (positive numbers are
+        losses), e.g. from :func:`aggregate_loss`.
+    attachment : float
+        Loss level at which the layer starts paying. Must be ``>= 0``.
+    limit : float
+        Maximum amount the layer pays. Must be ``> 0``.
+
+    Returns
+    -------
+    LayerStatistics
+        Named tuple with fields ``attachment``, ``limit``, ``expected_loss``,
+        ``attachment_probability``, ``exhaustion_probability`` and
+        ``expected_loss_ratio``; see :class:`LayerStatistics`.
+
+    Raises
+    ------
+    ValueError
+        If ``attachment < 0`` or ``limit <= 0``.
 
     Examples
     --------
@@ -303,8 +459,46 @@ def reinsurance_premium(
     method: str = "expected_value",
     alpha: float = 0.99,
 ) -> float:
-    r"""Premium for an excess-of-loss layer.
+    r"""What to charge for a reinsurance layer: expected payout plus a risk loading.
 
+    Computes the reinsurer's recoveries on the layer from simulated losses
+    (see :func:`excess_of_loss`) and applies one of three classical premium
+    principles. Use the tail-based ``"expected_shortfall"`` method for high,
+    remote layers, where the mean alone understates the risk being sold.
+
+    Parameters
+    ----------
+    losses : array_like of float, shape (n,)
+        Simulated gross losses, in currency units (positive numbers are
+        losses).
+    attachment : float
+        Loss level at which the layer starts paying. Must be ``>= 0``.
+    limit : float
+        Maximum amount the layer pays. Must be ``> 0``.
+    loading : float, default 0.25
+        Risk loading :math:`\theta`. Its meaning depends on ``method``
+        (a markup on the mean, a multiple of the standard deviation, or a
+        weight on the tail); see below.
+    method : str, default "expected_value"
+        Premium principle to apply: one of ``"expected_value"``,
+        ``"standard_deviation"`` or ``"expected_shortfall"``.
+    alpha : float, default 0.99
+        Confidence level for the expected shortfall, between 0 and 1. Only
+        used when ``method="expected_shortfall"``.
+
+    Returns
+    -------
+    float
+        Premium, in the same currency units as ``losses``.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not one of the three names above, or if
+        ``attachment < 0`` or ``limit <= 0``.
+
+    Notes
+    -----
     Three classical principles:
 
     ``expected_value``
@@ -358,8 +552,66 @@ def catastrophe_bond(
     risk_free: float = 0.03,
     maturity: float = 1.0,
 ) -> dict[str, float]:
-    r"""Analyse a catastrophe bond with an indemnity trigger.
+    r"""Expected loss, hit probability and relative value of a catastrophe bond.
 
+    A cat bond pays a coupon but loses principal if the sponsor's
+    catastrophe losses are large. This function takes simulated sponsor
+    losses and an attachment/exhaustion range and returns the figures the
+    insurance-linked securities (ILS) market quotes, so different deals can be
+    compared on risk and price.
+
+    Parameters
+    ----------
+    losses : array_like of float, shape (n,)
+        Simulated sponsor losses over the risk period, in currency units
+        (positive numbers are losses).
+    attachment : float
+        Loss level at which principal starts to be written down. Must be
+        ``>= 0``.
+    exhaustion : float
+        Loss level at which all principal is lost. Must be greater than
+        ``attachment``.
+    coupon : float, default 0.06
+        Annual coupon rate as a decimal (0.06 = 6%).
+    risk_free : float, default 0.03
+        Annual risk-free rate as a decimal, continuously compounded for
+        discounting.
+    maturity : float, default 1.0
+        Term in years. Used only in ``"fair_price"``.
+
+    Returns
+    -------
+    dict of str to float
+        Rates and losses are fractions of principal (0.02 = 2%).
+
+        ``"expected_loss"``
+            Average fraction of principal lost.
+        ``"attachment_probability"``
+            Probability that the loss exceeds ``attachment`` (any principal
+            lost).
+        ``"exhaustion_probability"``
+            Probability that the loss reaches ``exhaustion`` (all principal
+            lost).
+        ``"conditional_severity"``
+            Average fraction of principal lost, given that some is lost
+            (0.0 if no scenario loses principal).
+        ``"spread"``
+            ``coupon - risk_free``.
+        ``"multiple"``
+            ``spread / expected_loss`` (``inf`` if the expected loss is 0).
+        ``"expected_return"``
+            ``spread - expected_loss``: excess return net of expected losses.
+        ``"fair_price"``
+            ``exp(-risk_free * maturity) * (1 + coupon * maturity -
+            expected_loss)``, per unit of principal.
+
+    Raises
+    ------
+    ValueError
+        Unless ``0 <= attachment < exhaustion``.
+
+    Notes
+    -----
     Principal is written down linearly between ``attachment`` and
     ``exhaustion``, so the investor is short a call spread on the sponsor's
     loss -- the mirror image of :func:`excess_of_loss`.

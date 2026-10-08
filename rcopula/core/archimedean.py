@@ -81,46 +81,196 @@ __all__ = [
 
 
 class ArchimedeanGenerator(ABC):
-    """A stateless Archimedean generator, parameterised by ``theta``."""
+    """The one-variable function that defines an Archimedean copula family.
+
+    An Archimedean copula is fully determined by a single decreasing function
+    of one variable, the *generator* :math:`\\psi`. This abstract class
+    collects everything a family must know about its generator: the function
+    itself, its inverse, the logs of its derivatives, its admissible
+    parameter range, closed-form dependence measures and how to sample it.
+
+    You only need this class to define a new Archimedean family; to *use* one,
+    take :class:`ClaytonCopula`, :class:`GumbelCopula`, :class:`FrankCopula`,
+    :class:`JoeCopula` or :class:`AMHCopula`, or wrap a generator in
+    :class:`ArchimedeanCopula`.
+
+    Every method is stateless: the parameter ``theta`` is passed in on each
+    call rather than stored on the object, so a likelihood optimiser can
+    evaluate many ``theta`` values without allocating anything.
+
+    Attributes
+    ----------
+    name : str
+        Human-readable family name, e.g. ``"Clayton"``.
+    param_name : str
+        Name of the single dependence parameter, ``"theta"`` by default.
+    """
 
     name: str = "generator"
     param_name: str = "theta"
 
     @abstractmethod
     def bounds(self, dim: int) -> tuple[float, float]:
-        """Admissible ``(lower, upper)`` for ``theta`` in the given dimension."""
+        """Return the allowed range of ``theta`` for a given dimension.
+
+        Some families allow negative dependence only in two dimensions, so the
+        range can shrink as ``dim`` grows.
+
+        Parameters
+        ----------
+        dim : int
+            Copula dimension, at least 2.
+
+        Returns
+        -------
+        tuple of (float, float)
+            ``(lower, upper)`` bounds for ``theta``; either may be infinite.
+        """
 
     @abstractmethod
     def psi(self, t: NDArray[np.float64], theta: float) -> NDArray[np.float64]:
-        """The generator :math:`\\psi(t)`."""
+        """Evaluate the generator :math:`\\psi(t)`.
+
+        Parameters
+        ----------
+        t : numpy.ndarray of float, any shape
+            Non-negative arguments.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``t``
+            Values in ``[0, 1]``; :math:`\\psi(0) = 1` and :math:`\\psi` decreases
+            towards 0.
+        """
 
     @abstractmethod
     def ipsi(self, u: NDArray[np.float64], theta: float) -> NDArray[np.float64]:
-        """The inverse generator :math:`\\psi^{-1}(u)`."""
+        """Evaluate the inverse generator :math:`\\psi^{-1}(u)`.
+
+        Parameters
+        ----------
+        u : numpy.ndarray of float, any shape
+            Values in ``[0, 1]``.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``u``
+            Non-negative values; :math:`\\psi^{-1}(1) = 0`.
+        """
 
     @abstractmethod
     def log_abs_dpsi(self, t: NDArray[np.float64], theta: float) -> NDArray[np.float64]:
-        """:math:`\\log|\\psi'(t)|`."""
+        """Return the log of the absolute first derivative, :math:`\\log|\\psi'(t)|`.
+
+        Parameters
+        ----------
+        t : numpy.ndarray of float, any shape
+            Non-negative arguments.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``t``
+            ``log|psi'(t)|``; ``-inf`` where the derivative is zero.
+        """
 
     @abstractmethod
     def log_abs_dpsi_d(self, t: NDArray[np.float64], theta: float, d: int) -> NDArray[np.float64]:
-        """:math:`\\log|\\psi^{(d)}(t)|`, the ``d``-th derivative."""
+        """Return the log of the absolute ``d``-th derivative, :math:`\\log|\\psi^{(d)}(t)|`.
+
+        This is the numerator of the ``d``-dimensional copula density.
+
+        Parameters
+        ----------
+        t : numpy.ndarray of float, any shape
+            Non-negative arguments.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+        d : int
+            Order of the derivative (the copula dimension), at least 1.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``t``
+            ``log|psi^(d)(t)|``.
+        """
 
     @abstractmethod
     def tau(self, theta: float) -> float:
-        """Population Kendall's tau."""
+        """Return Kendall's tau (a rank correlation in ``[-1, 1]``) implied by ``theta``.
+
+        Parameters
+        ----------
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+
+        Returns
+        -------
+        float
+            Population Kendall's tau.
+        """
 
     @abstractmethod
     def lambda_(self, theta: float) -> TailDependence:
-        """Tail-dependence coefficients."""
+        """Return how strongly extreme values co-occur (tail dependence) at ``theta``.
+
+        Parameters
+        ----------
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+
+        Returns
+        -------
+        TailDependence
+            Named tuple ``(lower, upper)`` of floats in ``[0, 1]``.
+        """
 
     @abstractmethod
     def rvs_frailty(self, size: int, theta: float, rng: np.random.Generator) -> NDArray[np.float64]:
-        """Draw the frailty :math:`V_0` whose Laplace transform is ``psi``."""
+        """Draw the random "frailty" variable used to simulate the copula.
+
+        The frailty :math:`V_0` is the positive random variable whose Laplace
+        transform is ``psi``; sampling uses :math:`U_j = \\psi(E_j / V_0)` with
+        independent standard exponentials :math:`E_j`. Only called when
+        :meth:`has_frailty` is true.
+
+        Parameters
+        ----------
+        size : int
+            Number of draws, non-negative.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+        rng : numpy.random.Generator
+            Source of randomness.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (size,)
+            Positive frailty draws.
+        """
 
     def has_frailty(self, theta: float) -> bool:
-        """Whether the Marshall-Olkin frailty representation applies at ``theta``.
+        """Report whether the fast frailty sampler can be used at this ``theta``.
 
+        Parameters
+        ----------
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+
+        Returns
+        -------
+        bool
+            ``True`` if the Marshall-Olkin frailty representation applies (the
+            default rule is ``theta > 0``); ``False`` means the copula is
+            sampled by conditional inversion instead.
+
+        Notes
+        -----
         Sampling an Archimedean copula as :math:`U_j = \\psi(E_j / V)` requires
         :math:`\\psi` to be *completely* monotone, i.e. a Laplace transform. That
         holds only on the positively-dependent half of Clayton, Frank and AMH.
@@ -131,10 +281,21 @@ class ArchimedeanGenerator(ABC):
         return theta > 0.0
 
     def is_independent(self, theta: float) -> bool:
-        """Whether this ``theta`` gives the independence copula.
+        """Report whether this ``theta`` means the variables are independent.
 
-        The degenerate point where most generators divide by zero, so callers
-        short-circuit rather than evaluate.
+        The independence point is where most generators divide by zero, so
+        callers short-circuit there rather than evaluate.
+
+        Parameters
+        ----------
+        theta : float
+            Dependence parameter.
+
+        Returns
+        -------
+        bool
+            ``True`` if ``theta`` gives the independence copula. The default
+            rule is ``theta == 0``; Gumbel and Joe use ``theta == 1``.
         """
         return theta == 0.0
 
@@ -150,35 +311,113 @@ class ArchimedeanGenerator(ABC):
     def rvs_log_frailty(
         self, size: int, theta: float, rng: np.random.Generator
     ) -> NDArray[np.float64]:
-        """:math:`\\log V_0`. Default: the log of :meth:`rvs_frailty`."""
+        """Draw the log of the frailty, :math:`\\log V_0`, without underflow.
+
+        Used at strong dependence, where the frailty itself can be too small to
+        represent. Default: the log of :meth:`rvs_frailty`.
+
+        Parameters
+        ----------
+        size : int
+            Number of draws, non-negative.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+        rng : numpy.random.Generator
+            Source of randomness.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (size,)
+            Log frailty draws (may be ``-inf`` in the default implementation
+            if a draw underflows).
+        """
         with np.errstate(divide="ignore"):
             return np.log(self.rvs_frailty(size, theta, rng))
 
     def psi_from_log_t(self, log_t: NDArray[np.float64], theta: float) -> NDArray[np.float64]:
-        """:math:`\\psi(e^{\\log t})`. Default: exponentiate, then call ``psi``."""
+        """Evaluate the generator when only ``log t`` is available, :math:`\\psi(e^{\\log t})`.
+
+        Lets families avoid forming a huge ``t``. Default: exponentiate, then
+        call :meth:`psi`.
+
+        Parameters
+        ----------
+        log_t : numpy.ndarray of float, any shape
+            Natural log of the generator argument.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``log_t``
+            Generator values in ``[0, 1]``.
+        """
         with np.errstate(over="ignore"):
             return self.psi(np.exp(log_t), theta)
 
     def log_cdf(self, u: NDArray[np.float64], theta: float, dim: int) -> NDArray[np.float64] | None:
-        """``log C(u)`` by a family-specific stable route, or ``None``.
+        """Return ``log C(u)`` by a numerically stable family-specific formula, if one exists.
 
         ``None`` means "no specialised form", and the caller falls back to
         ``psi(sum of psi^{-1})``.
+
+        Parameters
+        ----------
+        u : numpy.ndarray of float, shape (n, dim)
+            Points in the unit cube.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+        dim : int
+            Copula dimension.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n,), or None
+            Log of the copula CDF at each row, or ``None`` (the default).
         """
         return None
 
     def log_pdf(self, u: NDArray[np.float64], theta: float, dim: int) -> NDArray[np.float64] | None:
-        """``log c(u)`` by a family-specific stable route, or ``None``.
+        """Return ``log c(u)`` by a numerically stable family-specific formula, if one exists.
 
         ``None`` falls back to the generic
         ``log|psi^(d)| - sum log|psi'|``, which needs ``psi^{-1}`` evaluated
         explicitly and therefore inherits its overflow.
+
+        Parameters
+        ----------
+        u : numpy.ndarray of float, shape (n, dim)
+            Points strictly inside the unit cube.
+        theta : float
+            Dependence parameter, inside :meth:`bounds`.
+        dim : int
+            Copula dimension.
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (n,), or None
+            Log density at each row, or ``None`` (the default).
         """
         return None
 
     def rho(self, theta: float) -> float:
-        r"""Population Spearman's rho.
+        r"""Return Spearman's rho (a rank correlation in ``[-1, 1]``) implied by ``theta``.
 
+        Spearman's rho is the ordinary correlation of the ranks of the two
+        variables. It is always computed for the bivariate (``dim=2``) copula.
+
+        Parameters
+        ----------
+        theta : float
+            Dependence parameter, inside ``bounds(2)``.
+
+        Returns
+        -------
+        float
+            Population Spearman's rho, clipped to ``[-1, 1]``.
+
+        Notes
+        -----
         The generic implementation evaluates
         :math:`\rho = 12 \int_0^1\!\!\int_0^1 C(u,v)\,du\,dv - 3` on a tensor
         Gauss-Legendre grid. ``scipy.integrate.dblquad`` is a poor fit here: it
@@ -267,8 +506,28 @@ class ArchimedeanGenerator(ABC):
         return float(ladder[i]), float(ladder[i + 1])
 
     def itau(self, tau: float, dim: int = 2) -> float:
-        """Invert Kendall's tau for ``theta`` (R's ``iTau``).
+        """Find the ``theta`` that gives a target Kendall's tau (R's ``iTau``).
 
+        Parameters
+        ----------
+        tau : float
+            Target Kendall's tau, a rank correlation in ``[-1, 1]``. Must be
+            reachable by this family in dimension ``dim``.
+        dim : int, default 2
+            Copula dimension; it can restrict the reachable range.
+
+        Returns
+        -------
+        float
+            The parameter ``theta`` whose population tau equals ``tau``.
+
+        Raises
+        ------
+        ValueError
+            If ``tau`` is outside the range this family can reach.
+
+        Notes
+        -----
         The generic implementation is a bracketed root-find on the monotone
         ``tau(theta)`` curve; families with a closed form override it.
         """
@@ -276,7 +535,32 @@ class ArchimedeanGenerator(ABC):
         return float(brentq(lambda th: self.tau(th) - tau, a, b, xtol=1e-14, rtol=8.9e-16))
 
     def irho(self, rho: float, dim: int = 2) -> float:
-        """Invert Spearman's rho for ``theta`` (R's ``iRho``)."""
+        """Find the ``theta`` that gives a target Spearman's rho (R's ``iRho``).
+
+        Parameters
+        ----------
+        rho : float
+            Target Spearman's rho, a rank correlation in ``[-1, 1]``. Must be
+            reachable by this family.
+        dim : int, default 2
+            Copula dimension; it restricts the admissible ``theta`` range.
+
+        Returns
+        -------
+        float
+            The parameter ``theta`` whose population rho equals ``rho``.
+
+        Raises
+        ------
+        ValueError
+            If ``rho`` is outside the range this family can reach.
+
+        Notes
+        -----
+        A bracketed root-find on the monotone ``rho(theta)`` curve. Each
+        evaluation of ``rho`` is a 256x256 quadrature for families without a
+        closed form, so this is slower than :meth:`itau`.
+        """
         a, b = self._bracket(self.rho, rho, dim)
         return float(brentq(lambda th: self.rho(th) - rho, a, b, xtol=1e-12, rtol=8.9e-16))
 
@@ -952,7 +1236,43 @@ def _polylog_neg_int_over_z(
 
 
 class ArchimedeanCopula(Copula):
-    """A one-parameter Archimedean copula built from a generator."""
+    """A copula with one dependence parameter, built from an Archimedean generator.
+
+    Archimedean copulas describe dependence through a single decreasing
+    function (the generator, see :class:`ArchimedeanGenerator`) and a single
+    number ``theta``. They are exchangeable: swapping variables does not change
+    the copula. Most users want one of the named families
+    (:class:`ClaytonCopula`, :class:`GumbelCopula`, :class:`FrankCopula`,
+    :class:`JoeCopula`, :class:`AMHCopula`); use this class directly only to
+    plug in a generator of your own.
+
+    Parameters
+    ----------
+    generator : ArchimedeanGenerator
+        The generator defining the family.
+    theta : float, default nan
+        Dependence parameter, inside ``generator.bounds(dim)``. ``nan`` means
+        "not yet known": the copula can then be fitted but not evaluated.
+    dim : int, default 2
+        Number of variables, at least 2.
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated (``True``) or held fixed (``False``)
+        by :func:`~rcopula.fit.fit`. ``None`` means free.
+
+    Attributes
+    ----------
+    generator : ArchimedeanGenerator
+        The generator passed in.
+    name : str
+        Family name, taken from the generator.
+    theta : float
+        The dependence parameter.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2`` or ``theta`` is outside the admissible range.
+    """
 
     def __init__(
         self,
@@ -969,11 +1289,25 @@ class ArchimedeanCopula(Copula):
 
     @property
     def theta(self) -> float:
-        """The dependence parameter."""
+        """The dependence parameter ``theta`` as a plain float (``nan`` if not yet set).
+
+        Returns
+        -------
+        float
+            ``params[0]``.
+        """
         return float(self._params[0])
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """The allowed range of ``theta`` for this copula's dimension.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            A one-element list ``[(lower, upper)]`` from the generator's
+            :meth:`~ArchimedeanGenerator.bounds`.
+        """
         return [self.generator.bounds(self._dim)]
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> ArchimedeanCopula:
@@ -1071,25 +1405,109 @@ class ArchimedeanCopula(Copula):
     # -- dependence measures -------------------------------------------
 
     def tau(self) -> float:
+        """Return Kendall's tau, a rank correlation in ``[-1, 1]`` implied by ``theta``.
+
+        Kendall's tau is the probability that two random draws are ordered the
+        same way in both variables, minus the probability they are ordered
+        oppositely. It depends only on the copula, not on the margins.
+
+        Returns
+        -------
+        float
+            Population Kendall's tau of the bivariate margins.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is ``nan`` (not yet set).
+        """
         self._require_specified()
         return float(self.generator.tau(self.theta))
 
     def rho(self) -> float:
+        """Return Spearman's rho, the correlation of the ranks implied by ``theta``.
+
+        Returns
+        -------
+        float
+            Population Spearman's rho of the bivariate margins, in ``[-1, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is ``nan`` (not yet set).
+        """
         self._require_specified()
         return float(self.generator.rho(self.theta))
 
     def lambda_(self) -> TailDependence:
+        """Return how likely extreme values are to occur together (tail dependence).
+
+        ``lower`` is the chance that one variable is extremely small given the
+        other is; ``upper`` is the same for extremely large values, both in the
+        limit.
+
+        Returns
+        -------
+        TailDependence
+            Named tuple ``(lower, upper)`` of floats in ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is ``nan`` (not yet set).
+        """
         self._require_specified()
         return self.generator.lambda_(self.theta)
 
     # -- generator passthroughs (R's psi / iPsi) -----------------------
 
     def psi(self, t: ArrayLike) -> NDArray[np.float64]:
-        """Evaluate the generator."""
+        """Evaluate the generator function :math:`\\psi(t)` at this copula's ``theta``.
+
+        The Python spelling of R's ``psi``.
+
+        Parameters
+        ----------
+        t : array_like of float, any shape
+            Non-negative arguments.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``t``
+            Generator values in ``[0, 1]``. ``nan`` if ``theta`` is unset.
+
+        Examples
+        --------
+        >>> from rcopula import ClaytonCopula
+        >>> c = ClaytonCopula(theta=1.0)
+        >>> c.psi([0.0, 1.0]).tolist()
+        [1.0, 0.5]
+        """
         return self.generator.psi(np.asarray(t, dtype=np.float64), self.theta)
 
     def ipsi(self, u: ArrayLike) -> NDArray[np.float64]:
-        """Evaluate the inverse generator."""
+        """Evaluate the inverse generator :math:`\\psi^{-1}(u)` at this copula's ``theta``.
+
+        The Python spelling of R's ``iPsi``.
+
+        Parameters
+        ----------
+        u : array_like of float, any shape
+            Values in ``[0, 1]``.
+
+        Returns
+        -------
+        numpy.ndarray of float, same shape as ``u``
+            Non-negative values. ``nan`` if ``theta`` is unset.
+
+        Examples
+        --------
+        >>> from rcopula import ClaytonCopula
+        >>> c = ClaytonCopula(theta=1.0)
+        >>> c.ipsi([1.0, 0.5]).tolist()
+        [0.0, 1.0]
+        """
         return self.generator.ipsi(np.asarray(u, dtype=np.float64), self.theta)
 
 
@@ -1127,18 +1545,96 @@ class _ConcreteArchimedean(ArchimedeanCopula):
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> _ConcreteArchimedean:
-        """Calibrate to a target Kendall's tau (R's ``iTau``)."""
+        """Build a copula of this family whose Kendall's tau equals a target value (R's ``iTau``).
+
+        Handy when you know roughly how strongly variables move together (as a
+        rank correlation) and want the matching ``theta``.
+
+        Parameters
+        ----------
+        tau : float
+            Target Kendall's tau, a rank correlation in ``[-1, 1]``. Must be
+            reachable by the family in dimension ``dim``.
+        dim : int, default 2
+            Number of variables, at least 2.
+        **kwargs : Any
+            Passed to the constructor (e.g. ``free``).
+
+        Returns
+        -------
+        ClaytonCopula, GumbelCopula, FrankCopula, JoeCopula or AMHCopula
+            A new instance of the calling class.
+
+        Raises
+        ------
+        ValueError
+            If ``tau`` cannot be reached by this family in dimension ``dim``.
+        """
         return cls(cls.generator_instance.itau(tau, dim), dim, **kwargs)
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> _ConcreteArchimedean:
-        """Calibrate to a target Spearman's rho (R's ``iRho``)."""
+        """Build a copula of this family whose Spearman's rho equals a target value (R's ``iRho``).
+
+        Spearman's rho is the correlation of the ranks. Slower than
+        :meth:`from_tau` for families without a closed form, since it inverts
+        a numerical integral.
+
+        Parameters
+        ----------
+        rho : float
+            Target Spearman's rho, in ``[-1, 1]``. Must be reachable by the
+            family.
+        dim : int, default 2
+            Number of variables, at least 2.
+        **kwargs : Any
+            Passed to the constructor (e.g. ``free``).
+
+        Returns
+        -------
+        ClaytonCopula, GumbelCopula, FrankCopula, JoeCopula or AMHCopula
+            A new instance of the calling class.
+
+        Raises
+        ------
+        ValueError
+            If ``rho`` cannot be reached by this family.
+        """
         return cls(cls.generator_instance.irho(rho, dim), dim, **kwargs)
 
 
 class ClaytonCopula(_ConcreteArchimedean):
-    r"""Clayton copula.
+    r"""Clayton copula: dependence that is strongest when values are jointly small.
 
+    Use it when joint *lows* matter more than joint highs -- for example
+    losses that crash together but rise independently. Larger ``theta`` means
+    stronger dependence; ``theta = 0`` is independence.
+
+    Parameters
+    ----------
+    theta : float, default nan
+        Dependence parameter. Must lie in ``[-1, inf)`` for ``dim=2`` and in
+        ``[0, inf)`` for ``dim > 2``. ``nan`` means "to be estimated".
+    dim : int, default 2
+        Number of variables, at least 2.
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated by :func:`~rcopula.fit.fit`
+        (``None`` means free).
+
+    Attributes
+    ----------
+    theta : float
+        The dependence parameter.
+    dim : int
+        Number of variables.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2`` or ``theta`` is outside the admissible range.
+
+    Notes
+    -----
     Generator :math:`\psi(t) = (1+t)^{-1/\theta}`, with
     :math:`\tau = \theta/(\theta+2)` and lower tail dependence
     :math:`\lambda_L = 2^{-1/\theta}`.
@@ -1172,8 +1668,37 @@ class ClaytonCopula(_ConcreteArchimedean):
 
 
 class GumbelCopula(_ConcreteArchimedean):
-    r"""Gumbel-Hougaard copula.
+    r"""Gumbel-Hougaard copula: dependence that is strongest when values are jointly large.
 
+    Use it when joint *highs* (e.g. simultaneous large claims or floods)
+    matter most. It allows only positive dependence; ``theta = 1`` is
+    independence and larger ``theta`` is stronger. It is also an extreme-value
+    copula.
+
+    Parameters
+    ----------
+    theta : float, default nan
+        Dependence parameter, ``theta >= 1``. ``nan`` means "to be estimated".
+    dim : int, default 2
+        Number of variables, at least 2.
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated by :func:`~rcopula.fit.fit`
+        (``None`` means free).
+
+    Attributes
+    ----------
+    theta : float
+        The dependence parameter.
+    dim : int
+        Number of variables.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2`` or ``theta < 1``.
+
+    Notes
+    -----
     Generator :math:`\psi(t) = \exp(-t^{1/\theta})`, with
     :math:`\tau = 1 - 1/\theta` and upper tail dependence
     :math:`\lambda_U = 2 - 2^{1/\theta}`. Requires ``theta >= 1``.
@@ -1194,8 +1719,38 @@ class GumbelCopula(_ConcreteArchimedean):
 
 
 class FrankCopula(_ConcreteArchimedean):
-    r"""Frank copula.
+    r"""Frank copula: symmetric dependence with no extra clustering of extremes.
 
+    Use it when dependence looks the same for lows and highs and extremes are
+    not unusually likely to coincide. In two dimensions it covers both
+    negative (``theta < 0``) and positive (``theta > 0``) dependence;
+    ``theta = 0`` is independence.
+
+    Parameters
+    ----------
+    theta : float, default nan
+        Dependence parameter. Any real number for ``dim=2``; ``theta >= 0``
+        for ``dim > 2``. ``nan`` means "to be estimated".
+    dim : int, default 2
+        Number of variables, at least 2.
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated by :func:`~rcopula.fit.fit`
+        (``None`` means free).
+
+    Attributes
+    ----------
+    theta : float
+        The dependence parameter.
+    dim : int
+        Number of variables.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2`` or ``theta`` is outside the admissible range.
+
+    Notes
+    -----
     Generator :math:`\psi(t) = -\log(1 - (1-e^{-\theta})e^{-t})/\theta`.
     Radially symmetric, no tail dependence, and the full range
     :math:`\tau \in (-1, 1)` is attainable in ``dim=2``.
@@ -1216,8 +1771,36 @@ class FrankCopula(_ConcreteArchimedean):
 
 
 class JoeCopula(_ConcreteArchimedean):
-    r"""Joe copula.
+    r"""Joe copula: dependence concentrated in joint large values, more so than Gumbel.
 
+    Use it, like :class:`GumbelCopula`, when joint highs matter, especially
+    if upper-tail clustering is pronounced relative to the overall
+    dependence. Positive dependence only; ``theta = 1`` is independence.
+
+    Parameters
+    ----------
+    theta : float, default nan
+        Dependence parameter, ``theta >= 1``. ``nan`` means "to be estimated".
+    dim : int, default 2
+        Number of variables, at least 2.
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated by :func:`~rcopula.fit.fit`
+        (``None`` means free).
+
+    Attributes
+    ----------
+    theta : float
+        The dependence parameter.
+    dim : int
+        Number of variables.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2`` or ``theta < 1``.
+
+    Notes
+    -----
     Generator :math:`\psi(t) = 1 - (1 - e^{-t})^{1/\theta}`, ``theta >= 1``.
     Upper-tail dependent, :math:`\lambda_U = 2 - 2^{1/\theta}`.
 
@@ -1235,8 +1818,36 @@ class JoeCopula(_ConcreteArchimedean):
 
 
 class AMHCopula(_ConcreteArchimedean):
-    r"""Ali-Mikhail-Haq copula.
+    r"""Ali-Mikhail-Haq (AMH) copula: a simple family for weak dependence only.
 
+    Use it when dependence is mild: Kendall's tau can only range from about
+    -0.18 to 1/3. ``theta = 0`` is independence.
+
+    Parameters
+    ----------
+    theta : float, default nan
+        Dependence parameter. Must lie in ``[-1, 1]`` for ``dim=2`` and in
+        ``[0, 1]`` for ``dim > 2``. ``nan`` means "to be estimated".
+    dim : int, default 2
+        Number of variables, at least 2. (R's ``amhCopula`` allows only 2.)
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated by :func:`~rcopula.fit.fit`
+        (``None`` means free).
+
+    Attributes
+    ----------
+    theta : float
+        The dependence parameter.
+    dim : int
+        Number of variables.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2`` or ``theta`` is outside the admissible range.
+
+    Notes
+    -----
     Generator :math:`\psi(t) = (1-\theta)/(e^{t}-\theta)`. Reaches only weak
     dependence, :math:`\tau \in [-0.1817, 1/3]`, and has no tail dependence.
 

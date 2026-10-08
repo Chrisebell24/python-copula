@@ -18,6 +18,7 @@ What is here:
 :func:`covar` / :func:`delta_covar`  Systemic risk: system VaR given a firm.
 :func:`marginal_expected_shortfall`  A firm's loss in a system-wide crisis.
 :func:`stress_scenario`      Conditional simulation given a stressed factor.
+:func:`rank_reorder`         Impose a copula on fixed marginal samples.
 ===========================  =================================================
 
 **Sign convention.** Everything here works in *losses*: positive numbers are
@@ -88,7 +89,29 @@ __all__ = [
 
 
 class RiskSummary(NamedTuple):
-    """VaR and expected shortfall at one confidence level."""
+    """A VaR and expected-shortfall pair, both measured at the same confidence level.
+
+    A small named tuple, so it unpacks like a plain tuple
+    (``alpha, var, es = summary``) and also allows attribute access.
+
+    Attributes
+    ----------
+    alpha : float
+        Confidence level in ``(0, 1)``, e.g. ``0.99`` for 99%.
+    var : float
+        Value at Risk at ``alpha``, in the same units as the losses: the loss
+        exceeded on only ``1 - alpha`` of occasions.
+    expected_shortfall : float
+        Expected shortfall at ``alpha``, in the same units as the losses: the
+        average loss on those occasions when VaR is reached or exceeded.
+
+    Examples
+    --------
+    >>> from rcopula.risk import RiskSummary
+    >>> s = RiskSummary(0.99, 2.5, 3.1)
+    >>> s.var
+    2.5
+    """
 
     alpha: float
     var: float
@@ -102,14 +125,31 @@ class RiskSummary(NamedTuple):
 
 
 def value_at_risk(losses: ArrayLike, alpha: float = 0.99) -> float:
-    r"""Value at Risk: the ``alpha``-quantile of the loss distribution.
+    r"""The loss you should exceed on only ``1 - alpha`` of occasions (Value at Risk).
+
+    With ``alpha=0.99`` and daily losses, this is the loss that is beaten on
+    roughly one day in a hundred. Technically it is the ``alpha``-quantile of
+    the loss distribution (the "inverted CDF" quantile, so the result is
+    always one of the input values).
 
     Parameters
     ----------
-    losses : array_like
-        Simulated or realised losses. Positive means a loss.
-    alpha : float
-        Confidence level in ``(0, 1)``, e.g. ``0.99`` for 99% VaR.
+    losses : array_like of float, shape (n,)
+        Simulated or realised losses. Positive numbers are losses, negative
+        numbers are gains; if you have returns, pass ``-returns``. Any shape
+        is accepted and flattened.
+    alpha : float, default 0.99
+        Confidence level, strictly between 0 and 1, e.g. ``0.99`` for 99% VaR.
+
+    Returns
+    -------
+    float
+        The VaR, in the same units as ``losses``.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is not strictly inside ``(0, 1)``, or ``losses`` is empty.
 
     Notes
     -----
@@ -136,8 +176,34 @@ def value_at_risk(losses: ArrayLike, alpha: float = 0.99) -> float:
 
 
 def expected_shortfall(losses: ArrayLike, alpha: float = 0.99) -> float:
-    r"""Expected shortfall (CVaR): the mean loss given that VaR is exceeded.
+    r"""The average loss on the days when VaR is reached or exceeded (expected shortfall, CVaR).
 
+    Where VaR tells you where the tail starts, expected shortfall tells you how
+    bad the tail is on average. Use it as the headline tail-risk number; it is
+    the measure Basel III's market-risk rules (FRTB) use, at ``alpha=0.975``.
+
+    Parameters
+    ----------
+    losses : array_like of float, shape (n,)
+        Simulated or realised losses. Positive numbers are losses, negative
+        numbers are gains; if you have returns, pass ``-returns``. Any shape
+        is accepted and flattened.
+    alpha : float, default 0.99
+        Confidence level, strictly between 0 and 1.
+
+    Returns
+    -------
+    float
+        The expected shortfall, in the same units as ``losses``. It is always
+        at least as large as :func:`value_at_risk` at the same ``alpha``.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is not strictly inside ``(0, 1)``, or ``losses`` is empty.
+
+    Notes
+    -----
     .. math::  \mathrm{ES}_\alpha = \mathbb{E}[L \mid L \ge \mathrm{VaR}_\alpha].
 
     Unlike VaR this is **coherent** -- in particular subadditive, so it never
@@ -171,8 +237,40 @@ def rank_reorder(
     copula: Copula,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Impose a copula's dependence on given marginal samples, by reordering.
+    r"""Make separately simulated risks co-move as a copula says, without changing their values.
 
+    Use this when you already have simulated losses for each business line or
+    asset (for example from approved standalone models) and only need to decide
+    how they co-move. Each column keeps exactly the same values; only the order
+    of rows changes, so that the columns' ranks follow a draw from ``copula``.
+    This is the Iman-Conover style "rank reordering" used in capital
+    aggregation.
+
+    Parameters
+    ----------
+    samples : array_like of float, shape (n, d)
+        Marginal samples, one column per risk and one row per scenario.
+        The columns are treated independently; their current row order is
+        discarded.
+    copula : Copula
+        The dependence structure to impose. Its ``dim`` must equal ``d``.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for the copula draw that supplies the ranks. Pass an
+        int for reproducible results.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (n, d)
+        The reordered samples. Sorting any column gives back the sorted input
+        column exactly.
+
+    Raises
+    ------
+    ValueError
+        If the number of columns differs from ``copula.dim``.
+
+    Notes
+    -----
     Each column is sorted and then re-ordered to follow the ranks of a draw from
     ``copula``. The marginal distributions survive **exactly** -- the same values
     come back, only rearranged -- while the dependence becomes the copula's.
@@ -182,13 +280,6 @@ def rank_reorder(
     line and the question is only how to combine them. Refitting the margins to
     make a joint model tractable would change numbers that have been signed off;
     reordering does not touch them.
-
-    Parameters
-    ----------
-    samples : array_like
-        ``(n, d)`` marginal samples, one column per risk.
-    copula : Copula
-        The dependence structure to impose.
 
     Examples
     --------
@@ -230,27 +321,41 @@ def simulate_losses(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Simulate aggregate portfolio losses under a copula dependence model.
+    r"""Simulate total portfolio losses when the positions' losses are tied by a copula.
 
-    Draws from the copula, pushes each coordinate through its marginal loss
-    distribution, and combines with ``weights``.
+    This is the Monte Carlo engine behind the other functions here: feed its
+    output to :func:`value_at_risk` or :func:`expected_shortfall`. Each draw
+    picks a joint scenario from the copula (how the positions co-move), turns
+    each coordinate into a loss using that position's own loss distribution,
+    and adds them up with ``weights``.
 
     Parameters
     ----------
     copula : Copula
-        Dependence between the individual loss drivers.
-    margins : sequence of frozen distributions
-        Marginal *loss* distributions, one per position.
-    weights : array_like, optional
-        Position weights. Defaults to equal weighting summing to one. Pass
-        exposures directly for an unnormalised total.
-    n : int
-        Number of simulation draws.
+        Dependence between the individual loss drivers. Its ``dim`` is the
+        number of positions ``d``.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Marginal *loss* distributions, one per position (positive values are
+        losses). A single distribution is reused for every position.
+    weights : array_like of float, shape (d,), optional
+        Position weights or exposures. Defaults to equal weights ``1/d``
+        summing to one. Pass exposures directly (e.g. notionals) for an
+        unnormalised total in currency units.
+    n : int, default 100_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducibility.
 
     Returns
     -------
-    ndarray
-        ``n`` aggregate losses.
+    numpy.ndarray of float, shape (n,)
+        Simulated aggregate losses, one per scenario.
+
+    Raises
+    ------
+    ValueError
+        If ``weights`` does not have exactly ``d`` entries, or a list of
+        ``margins`` has the wrong length.
 
     Examples
     --------
@@ -284,17 +389,56 @@ def diversification_benefit(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> dict[str, float]:
-    r"""How much the dependence structure costs relative to comonotonicity.
+    r"""How much expected shortfall you save because positions do not all crash together.
 
+    Compares the portfolio's expected shortfall under your copula with the
+    "no diversification" case in which all positions move in lockstep (the
+    comonotone copula, where each position is at the same percentile of its
+    own loss distribution). The gap is the diversification benefit.
+
+    Parameters
+    ----------
+    copula : Copula
+        The dependence model to evaluate. Its ``dim`` is the number of
+        positions ``d``.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Marginal *loss* distributions, one per position. A single distribution
+        is reused for every position.
+    alpha : float, default 0.99
+        Confidence level for expected shortfall, strictly between 0 and 1.
+    weights : array_like of float, shape (d,), optional
+        Position weights or exposures. Defaults to equal weights ``1/d``.
+    n : int, default 100_000
+        Number of simulated scenarios for each of the two portfolios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator. An int seeds both simulations identically.
+
+    Returns
+    -------
+    dict of str to float
+        ``"es"``
+            Expected shortfall under ``copula``, in loss units.
+        ``"es_comonotone"``
+            Expected shortfall with no diversification (comonotone copula).
+        ``"benefit"``
+            ``es_comonotone - es``: the absolute reduction, in loss units.
+        ``"benefit_pct"``
+            The reduction as a percentage of ``es_comonotone`` (0 to 100 in
+            normal use; ``0.0`` if ``es_comonotone`` is zero).
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is outside ``(0, 1)`` or ``weights`` has the wrong length.
+
+    Notes
+    -----
     Under the comonotone copula, risk measures are simply additive across
     positions -- that is the worst case, and the benchmark regulators use for a
     "no diversification" capital charge. The benefit is the shortfall against it.
 
-    Returns
-    -------
-    dict
-        ``es``, ``es_comonotone``, ``benefit`` (the absolute reduction) and
-        ``benefit_pct``.
+    Both figures are Monte Carlo estimates, so ``benefit`` carries simulation
+    noise; for heavy-tailed margins it can come out slightly negative.
 
     Examples
     --------
@@ -335,8 +479,43 @@ def risk_contributions(
     n: int = 100_000,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Euler allocation of expected shortfall to individual positions.
+    r"""Split the portfolio's expected shortfall into one share per position (Euler rule).
 
+    Use this to charge risk capital to desks or assets: the shares add up to
+    the portfolio's expected shortfall, and a position's share reflects how
+    much it loses in the portfolio's worst scenarios, not its standalone risk.
+
+    Parameters
+    ----------
+    copula : Copula
+        Dependence between the positions' losses. Its ``dim`` is the number
+        of positions ``d``.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Marginal *loss* distributions, one per position. A single distribution
+        is reused for every position.
+    weights : array_like of float, shape (d,), optional
+        Position weights or exposures. Defaults to equal weights ``1/d``.
+    alpha : float, default 0.99
+        Confidence level for expected shortfall, strictly between 0 and 1.
+    n : int, default 100_000
+        Number of simulated scenarios.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator. Using the same seed and ``n`` as
+        :func:`simulate_losses` reproduces the same scenarios.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (d,)
+        Each position's contribution to expected shortfall, in loss units.
+        The entries sum to the portfolio's expected shortfall.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha`` is outside ``(0, 1)``.
+
+    Notes
+    -----
     Each position's contribution is its **average loss conditional on the
     portfolio being in its own tail**, weighted by exposure:
 
@@ -386,24 +565,49 @@ def covar(
     beta: float = 0.95,
     band: float = 0.05,
 ) -> float:
-    r"""CoVaR: the system's VaR conditional on a firm being in distress.
+    r"""The system's VaR on days when one firm is in distress (CoVaR).
 
-    :math:`\mathrm{CoVaR}_{\alpha|\beta}` is the ``alpha``-quantile of the
-    system loss, conditional on the firm's own loss sitting at its
-    ``beta``-quantile (Adrian & Brunnermeier 2016).
+    A systemic-risk measure: how bad do losses across the whole market (or a
+    banking system, or a portfolio) get when this particular firm is having a
+    bad day? Compare it with the system's ordinary VaR, or use
+    :func:`delta_covar` for the difference.
 
     Parameters
     ----------
-    system, firm : array_like
-        Paired loss series.
-    alpha : float
-        Confidence level for the system's VaR.
-    beta : float
-        The firm's distress quantile.
-    band : float
-        Half-width of the conditioning window, as a quantile fraction.
-        Conditioning on an exact quantile has probability zero, so a window is
-        unavoidable; ``0.05`` keeps roughly 10% of the sample.
+    system : array_like of float, shape (n,)
+        Loss series for the system (index, sector, portfolio). Positive
+        numbers are losses.
+    firm : array_like of float, shape (n,)
+        Loss series for the firm, paired row-by-row with ``system`` (same
+        dates or same simulated scenarios).
+    alpha : float, default 0.95
+        Confidence level for the system's VaR, strictly between 0 and 1.
+    beta : float, default 0.95
+        The firm's distress level, as a quantile of its own losses: ``0.95``
+        means "the firm is at its 95th-percentile loss".
+    band : float, default 0.05
+        Half-width of the conditioning window, as a quantile fraction: rows
+        where the firm's loss lies between its ``beta - band`` and
+        ``beta + band`` quantiles are kept. Conditioning on an exact quantile
+        has probability zero, so a window is unavoidable; ``0.05`` keeps
+        roughly 10% of the sample.
+
+    Returns
+    -------
+    float
+        CoVaR, in the units of ``system``.
+
+    Raises
+    ------
+    ValueError
+        If ``system`` and ``firm`` have different lengths, fewer than 10 rows
+        fall in the conditioning window, or ``alpha`` is outside ``(0, 1)``.
+
+    Notes
+    -----
+    :math:`\mathrm{CoVaR}_{\alpha|\beta}` is the ``alpha``-quantile of the
+    system loss, conditional on the firm's own loss sitting at its
+    ``beta``-quantile (Adrian & Brunnermeier 2016).
 
     Examples
     --------
@@ -442,8 +646,39 @@ def delta_covar(
     beta: float = 0.95,
     band: float = 0.05,
 ) -> float:
-    r"""ΔCoVaR: the firm's *marginal* contribution to system risk.
+    r"""How much the system's VaR rises when a firm goes from normal to distressed (ΔCoVaR).
 
+    It is :func:`covar` at the firm's distress level ``beta`` minus
+    :func:`covar` at the firm's median (``beta=0.5``), so it measures the
+    firm's *marginal* contribution to system risk.
+
+    Parameters
+    ----------
+    system : array_like of float, shape (n,)
+        Loss series for the system. Positive numbers are losses.
+    firm : array_like of float, shape (n,)
+        Loss series for the firm, paired row-by-row with ``system``.
+    alpha : float, default 0.95
+        Confidence level for the system's VaR, strictly between 0 and 1.
+    beta : float, default 0.95
+        The firm's distress level, as a quantile of its own losses.
+    band : float, default 0.05
+        Half-width of the conditioning window in quantile units; see
+        :func:`covar`.
+
+    Returns
+    -------
+    float
+        ΔCoVaR, in the units of ``system``. Near zero when the firm's losses
+        are unrelated to the system's.
+
+    Raises
+    ------
+    ValueError
+        For the same reasons as :func:`covar`.
+
+    Notes
+    -----
     The difference between the system's VaR when the firm is in distress and
     when it is at its median. This is the quantity Adrian & Brunnermeier argue
     should drive systemic capital surcharges -- a firm can be small and safe on
@@ -465,8 +700,35 @@ def delta_covar(
 
 
 def marginal_expected_shortfall(firm: ArrayLike, system: ArrayLike, alpha: float = 0.95) -> float:
-    r"""MES: a firm's average loss when the *system* is in its tail.
+    r"""A firm's average loss on the system's worst days (marginal expected shortfall, MES).
 
+    Use it to ask "how much would this firm lose in a market-wide crisis?":
+    take the days when the system's loss is at or beyond its VaR, and average
+    the firm's loss over those days.
+
+    Parameters
+    ----------
+    firm : array_like of float, shape (n,)
+        Loss series for the firm. Positive numbers are losses.
+    system : array_like of float, shape (n,)
+        Loss series for the system, paired row-by-row with ``firm``.
+    alpha : float, default 0.95
+        Confidence level that defines the system's "worst days", strictly
+        between 0 and 1.
+
+    Returns
+    -------
+    float
+        MES, in the units of ``firm``.
+
+    Raises
+    ------
+    ValueError
+        If ``firm`` and ``system`` have different lengths, or ``alpha`` is
+        outside ``(0, 1)``.
+
+    Notes
+    -----
     .. math::
         \mathrm{MES}_\alpha = \mathbb{E}[L_{\text{firm}}
                               \mid L_{\text{system}} \ge \mathrm{VaR}_\alpha].
@@ -504,7 +766,7 @@ def stress_scenario(
     band: float = 0.02,
     random_state: np.random.Generator | int | None = None,
 ) -> NDArray[np.float64]:
-    r"""Simulate the portfolio conditional on some factors being stressed.
+    r"""Simulate every factor given that some of them are pushed to stressed levels.
 
     Answers "if factor 0 hits its 99th percentile, what happens to the rest?"
     -- with the *dependence structure* supplying the answer rather than an
@@ -512,17 +774,37 @@ def stress_scenario(
 
     Parameters
     ----------
-    stressed : dict
-        Maps column index to the quantile to condition on, e.g.
-        ``{0: 0.99}`` for a 99th-percentile shock to the first factor.
-    band : float
-        Half-width of the conditioning window in quantile units.
+    copula : Copula
+        Dependence between the factors. Its ``dim`` is the number of factors
+        ``d``.
+    margins : scipy.stats frozen distribution or list of them, length d
+        Marginal distribution of each factor, used to convert the retained
+        draws to the factors' own units. A single distribution is reused for
+        every factor.
+    stressed : dict of int to float
+        Maps a factor's column index (0-based) to the quantile to condition
+        on, e.g. ``{0: 0.99}`` for a 99th-percentile shock to the first
+        factor. Must name at least one factor.
+    n : int, default 200_000
+        Number of scenarios simulated *before* filtering.
+    band : float, default 0.02
+        Half-width of the conditioning window in quantile units: a draw is
+        kept when each stressed factor lies within ``level +/- band``.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for reproducibility.
 
     Returns
     -------
-    ndarray
-        The retained draws, on the marginal scale. Fewer than ``n`` rows: only
-        the draws satisfying the conditioning survive.
+    numpy.ndarray of float, shape (m, d)
+        The retained scenarios, in the factors' own units (via ``margins``).
+        ``m`` is smaller than ``n``: only the draws satisfying the
+        conditioning survive (about ``2 * band * n`` for one stressed factor).
+
+    Raises
+    ------
+    ValueError
+        If ``stressed`` is empty, names an index outside ``0..d-1``, or fewer
+        than 10 draws survive the conditioning.
 
     Notes
     -----

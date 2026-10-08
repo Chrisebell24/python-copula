@@ -51,7 +51,10 @@ _TIMEOUT = 60
 
 @dataclass(frozen=True)
 class DatasetSpec:
-    """Where a dataset comes from, and what it is for.
+    """A catalogue entry describing one downloadable dataset: its source, licence and columns.
+
+    You get these from :func:`available`; you do not normally build one.
+    The class is a frozen (read-only) dataclass.
 
     Attributes
     ----------
@@ -67,7 +70,7 @@ class DatasetSpec:
         Digest of the raw bytes, checked on every fetch. ``None`` means the
         upstream file is not byte-stable (a live query endpoint), in which case
         the shape is checked instead.
-    reader : str
+    reader : {"usgs_rdb", "ghcn_csv", "csv"}
         Which parser to use.
     columns : tuple of str
         The columns the loader returns, in order.
@@ -218,7 +221,16 @@ _REGISTRY: dict[str, DatasetSpec] = {
 
 
 def available() -> dict[str, DatasetSpec]:
-    """Every dataset that can be loaded, keyed by name.
+    """List the datasets that :func:`load` can fetch, with their source and licence.
+
+    No network access is needed; this only reads the built-in catalogue.
+
+    Returns
+    -------
+    dict of str to DatasetSpec
+        Dataset name (the argument to :func:`load`) to its description. The
+        dictionary is a fresh copy, so changing it does not affect the
+        catalogue.
 
     Examples
     --------
@@ -233,10 +245,16 @@ def available() -> dict[str, DatasetSpec]:
 
 
 def cache_dir() -> Path:
-    """Where fetched files are kept.
+    """Return the folder where downloaded dataset files are stored.
 
     Honours ``RCOPULA_DATA`` if set, otherwise ``XDG_CACHE_HOME``, otherwise
-    ``~/.cache``.
+    ``~/.cache``. In the last two cases the folder is ``rcopula`` inside that
+    base directory. The folder is not created here; :func:`load` creates it.
+
+    Returns
+    -------
+    pathlib.Path
+        The cache directory (it may not exist yet).
 
     Examples
     --------
@@ -251,7 +269,17 @@ def cache_dir() -> Path:
 
 
 def clear_cache() -> int:
-    """Delete every cached file. Returns how many were removed."""
+    """Delete every downloaded dataset file from the cache folder.
+
+    The next :func:`load` call for a dataset will download it again. Only
+    files directly inside :func:`cache_dir` are removed; subfolders are left
+    alone.
+
+    Returns
+    -------
+    int
+        How many files were removed (0 if the folder does not exist).
+    """
     directory = cache_dir()
     if not directory.exists():
         return 0
@@ -305,31 +333,41 @@ def load(
     refresh: bool = False,
     **kwargs: Any,
 ) -> pd.DataFrame:
-    """Load a dataset, fetching and caching it on first use.
+    """Load one of the example datasets as a pandas DataFrame, downloading it the first time.
+
+    The raw file is saved in :func:`cache_dir`, so later calls work offline.
+    Files with a recorded SHA-256 digest are checked when downloaded, so a
+    silently changed upstream file is caught rather than used.
 
     Parameters
     ----------
     name : str
-        A key from :func:`available`.
-    download : bool
+        A key from :func:`available`, e.g. ``"nwis_peaks"``.
+    download : bool, default True
         If ``False``, use the cache only and raise rather than reach the
         network. Useful in tests and offline builds.
-    refresh : bool
+    refresh : bool, default False
         Re-fetch even if a cached copy exists.
+    **kwargs : Any
+        Passed to the dataset's parser. No current parser uses them.
 
     Returns
     -------
-    DataFrame
-        With the columns named in the spec, rows containing missing values in
-        those columns dropped, and the index reset.
+    pandas.DataFrame
+        With the columns named in the spec (``available()[name].columns``),
+        rows containing missing values in those columns dropped, and the
+        index reset. ``frame.attrs`` holds ``"dataset"``, ``"licence"`` and
+        ``"citation"`` strings.
 
     Raises
     ------
     KeyError
         If ``name`` is not in the registry -- listing what is.
     OSError
-        If the download fails its digest check, or if it is needed and
-        ``download=False``.
+        If the download fails its digest check, the file cannot be parsed
+        into the expected columns, or a download is needed and
+        ``download=False``. Network failures surface as
+        :class:`urllib.error.URLError`, itself a subclass of ``OSError``.
 
     Examples
     --------

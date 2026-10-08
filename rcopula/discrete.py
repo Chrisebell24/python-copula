@@ -123,10 +123,23 @@ _MASS_FLOOR = 1e-300
 
 @runtime_checkable
 class DiscreteMargin(Protocol):
-    """What a discrete margin must provide.
+    """The methods a discrete marginal distribution needs for the functions in this module.
 
-    Satisfied by every discrete ``scipy.stats`` frozen distribution
-    (``poisson``, ``nbinom``, ``binom``, ``geom``, ``randint``, ...).
+    This is a typing protocol, not a class to instantiate: any object with
+    ``cdf``, ``pmf`` and ``ppf`` methods qualifies. It is satisfied by every
+    discrete ``scipy.stats`` frozen distribution (``poisson``, ``nbinom``,
+    ``binom``, ``geom``, ``randint``, ...), e.g. ``scipy.stats.poisson(3.0)``.
+
+    The methods are, for an array of values ``x`` or probabilities ``q``:
+
+    - ``cdf(x)`` -- ``P(X <= x)``, array of float in ``[0, 1]``;
+    - ``pmf(x)`` -- ``P(X = x)``, array of float in ``[0, 1]``;
+    - ``ppf(q)`` -- the quantile function, the smallest ``x`` with
+      ``cdf(x) >= q``.
+
+    Because this is a ``runtime_checkable`` protocol,
+    ``isinstance(margin, DiscreteMargin)`` checks only that the three methods
+    exist.
     """
 
     def cdf(self, x: ArrayLike) -> Any: ...
@@ -165,7 +178,12 @@ def discrete_pmf(
     x: ArrayLike,
     margins: list[Any],
 ) -> NDArray[np.float64]:
-    r"""Exact probability mass of a copula model with discrete margins.
+    r"""Compute the exact probability of each observed row of counts under a copula model.
+
+    Use this when every variable is discrete (counts, categories coded as
+    integers, ...). It returns :math:`P(X_1 = x_1, \dots, X_d = x_d)` for each
+    row, combining the copula (the dependence) with the given marginal
+    distributions.
 
     Computes the :math:`2^d`-term inclusion-exclusion sum in the module
     docstring. This is the C-volume of the rectangle
@@ -176,14 +194,26 @@ def discrete_pmf(
     Parameters
     ----------
     copula : Copula
-    x : array_like, shape (n, d)
-        Observed values, on the margins' own scale.
-    margins : list of frozen discrete distributions
-        One per dimension.
+        Any ``d``-dimensional copula from this package, e.g.
+        ``GaussianCopula(0.6)``.
+    x : array_like of float or int, shape (n, d) or (d,)
+        Observed values, on the margins' own scale (e.g. the counts
+        themselves, not ranks). A single row may be given as shape ``(d,)``.
+    margins : list of DiscreteMargin, length d
+        One frozen discrete distribution per column, e.g.
+        ``[scipy.stats.poisson(3.0), scipy.stats.poisson(2.0)]``.
 
     Returns
     -------
-    ndarray, shape (n,)
+    numpy.ndarray of float, shape (n,)
+        Probability of each row, in ``[0, 1]``. Tiny negative values from
+        floating-point cancellation are set to zero.
+
+    Raises
+    ------
+    ValueError
+        If ``x`` does not have ``copula.dim`` columns, or ``margins`` does not
+        have ``copula.dim`` entries.
 
     Notes
     -----
@@ -236,7 +266,11 @@ def mixed_pdf(
     *,
     step: float = 1e-5,
 ) -> NDArray[np.float64]:
-    r"""Density for a mix of discrete and continuous margins.
+    r"""Compute the likelihood of each row when some variables are discrete and one is continuous.
+
+    For example, a continuous measurement paired with a yes/no outcome. The
+    result is a probability for the discrete coordinates and a density for
+    the continuous one, which is what a likelihood for such data needs.
 
     The joint density of a mixed vector is a *partial* derivative: differentiate
     the copula along the continuous coordinates and difference it along the
@@ -257,18 +291,33 @@ def mixed_pdf(
     Parameters
     ----------
     copula : Copula
-    x : array_like, shape (n, d)
-    margins : list of frozen distributions
-        Discrete ones must provide ``pmf``; continuous ones ``pdf``.
+        Any ``d``-dimensional copula from this package.
+    x : array_like of float, shape (n, d) or (d,)
+        Observed values on the margins' own scale.
+    margins : list of frozen scipy.stats distributions, length d
+        Discrete ones must provide ``cdf`` and ``pmf``; continuous ones
+        ``cdf`` and ``pdf``.
     discrete : array_like of bool, shape (d,)
-        Which coordinates are discrete.
-    step : float
+        Which coordinates are discrete (``True``) and which continuous
+        (``False``). At most one may be ``False`` unless all are.
+    step : float, default 1e-5
         Finite-difference step for the continuous derivatives, on the copula
         scale. Only used when the copula has no analytic conditional CDF.
+        Currently ignored: every family goes through an analytic conditional
+        CDF, and the argument is kept for API stability.
 
     Returns
     -------
-    ndarray, shape (n,)
+    numpy.ndarray of float, shape (n,)
+        The joint mass-density of each row, non-negative.
+
+    Raises
+    ------
+    ValueError
+        If ``discrete``, ``x`` or ``margins`` does not match ``copula.dim``.
+    NotImplementedError
+        If more than one coordinate is continuous while at least one is
+        discrete.
 
     Notes
     -----
@@ -345,7 +394,32 @@ def mixed_pdf(
 
 
 def discrete_loglik(copula: Copula, x: ArrayLike, margins: list[Any]) -> float:
-    """Log-likelihood of ``x`` under a copula with discrete margins.
+    """Score how well a copula with discrete margins explains the data (higher is better).
+
+    Returns the log-likelihood: the sum over rows of the log of
+    :func:`discrete_pmf`. Comparing it across parameter values (or, with
+    care, families) shows which explains the data best; :func:`fit_discrete`
+    maximises it.
+
+    Parameters
+    ----------
+    copula : Copula
+        Any ``d``-dimensional copula from this package.
+    x : array_like of float or int, shape (n, d)
+        Observed values on the margins' own scale.
+    margins : list of DiscreteMargin, length d
+        One frozen discrete distribution per column.
+
+    Returns
+    -------
+    float
+        The log-likelihood. Rows with probability below ``1e-300`` contribute
+        ``log(1e-300)`` (about -691) rather than minus infinity.
+
+    Raises
+    ------
+    ValueError
+        As for :func:`discrete_pmf`.
 
     Examples
     --------
@@ -365,18 +439,28 @@ def discrete_loglik(copula: Copula, x: ArrayLike, margins: list[Any]) -> float:
 
 @dataclass
 class DiscreteFitResult:
-    """A copula fitted to discrete data by exact maximum likelihood.
+    """The result of fitting a copula to discrete data: the fitted copula plus fit statistics.
+
+    Returned by :func:`fit_discrete`; you normally do not construct it
+    yourself. Call :meth:`summary` for a readable report.
 
     Attributes
     ----------
     copula : Copula
-        At the estimated parameters.
-    params : ndarray
+        The copula at the estimated parameters.
+    params : numpy.ndarray of float, shape (p,)
+        All of the copula's parameters (free and fixed), in the order of
+        ``copula.param_names``.
     loglik : float
+        Log-likelihood at the estimate.
     n_obs : int
+        Number of observations (rows) used.
     converged : bool
+        Whether the optimiser reported success.
     independent_loglik : float
         The same margins under independence, for a likelihood ratio.
+    message : str, default ""
+        The optimiser's status message; useful when ``converged`` is False.
     """
 
     copula: Copula
@@ -389,21 +473,39 @@ class DiscreteFitResult:
 
     @property
     def n_params(self) -> int:
-        """Free parameters estimated."""
+        """Number of copula parameters that were estimated (not held fixed).
+
+        Returns
+        -------
+        int
+        """
         return int(np.sum(self.copula.free))
 
     @property
     def aic(self) -> float:
-        """Akaike information criterion."""
+        """Akaike information criterion, ``2 * n_params - 2 * loglik``; lower is better.
+
+        Returns
+        -------
+        float
+        """
         return float(2 * self.n_params - 2 * self.loglik)
 
     @property
     def bic(self) -> float:
-        """Bayesian information criterion."""
+        """Bayesian information criterion, ``n_params * log(n_obs) - 2 * loglik``; lower is better.
+
+        Returns
+        -------
+        float
+        """
         return float(self.n_params * np.log(self.n_obs) - 2 * self.loglik)
 
     def independence_test(self) -> tuple[float, float]:
-        """Likelihood ratio against independence.
+        """Test whether the variables are dependent at all, against the independence model.
+
+        This is a likelihood-ratio test. A small p-value is evidence of
+        dependence.
 
         Unlike the constancy test in :mod:`rcopula.dynamic`, this null is
         interior for every family here, so the chi-squared reference is the
@@ -411,7 +513,11 @@ class DiscreteFitResult:
 
         Returns
         -------
-        statistic, pvalue
+        statistic : float
+            ``2 * (loglik - independent_loglik)``, floored at zero.
+        pvalue : float
+            Upper-tail probability of a chi-squared distribution with
+            ``n_params`` degrees of freedom.
         """
         from scipy import stats as _stats
 
@@ -419,7 +525,16 @@ class DiscreteFitResult:
         return float(statistic), float(_stats.chi2(self.n_params).sf(statistic))
 
     def summary(self) -> str:
-        """A printable report."""
+        """Return a printable text report of the fit.
+
+        Includes the parameter estimates, log-likelihood, AIC/BIC, the
+        likelihood-ratio test against independence, and a warning if the
+        optimiser did not converge.
+
+        Returns
+        -------
+        str
+        """
         statistic, pvalue = self.independence_test()
         lines = [
             f"{self.copula.describe()} fitted to discrete margins",
@@ -452,7 +567,7 @@ def fit_discrete(
     *,
     start: ArrayLike | None = None,
 ) -> DiscreteFitResult:
-    """Fit a copula to discrete data by maximising the exact mass function.
+    """Estimate a copula's parameters from discrete data (counts, codes), by maximum likelihood.
 
     The margins are taken as given -- fit them separately, which is the
     inference-functions-for-margins two-step and is what everyone does. The
@@ -460,17 +575,27 @@ def fit_discrete(
 
     Parameters
     ----------
-    x : array_like, shape (n, d)
-        Observed counts or codes.
+    x : array_like of float or int, shape (n, d)
+        Observed counts or codes, on the margins' own scale.
     copula : Copula
-        The family to fit. Its current parameters are the starting point.
-    margins : list of frozen discrete distributions
-    start : array_like, optional
-        Override the starting parameters.
+        The family to fit, with ``dim == d``. Its current parameters are the
+        starting point, and any parameters it marks as fixed stay fixed.
+    margins : list of DiscreteMargin, length d
+        One already-fitted frozen discrete distribution per column.
+    start : array_like of float or None, default None
+        Starting values for the *free* parameters only, overriding the
+        copula's current ones. ``None`` uses the copula's current values.
 
     Returns
     -------
     DiscreteFitResult
+        The fitted copula, its parameters, log-likelihood, convergence flag
+        and the log-likelihood under independence.
+
+    Raises
+    ------
+    ValueError
+        If ``x`` or ``margins`` does not match ``copula.dim``.
 
     Notes
     -----
@@ -561,7 +686,13 @@ def distributional_transform(
     random_state: Any = None,
     replicates: int = 1,
 ) -> NDArray[np.float64]:
-    r"""Turn discrete observations into exactly uniform pseudo-observations.
+    r"""Turn discrete observations into values between 0 and 1 by adding controlled randomness.
+
+    Each count is replaced by a random point inside the probability interval
+    it occupies, so the result is exactly uniform and can be fed to any
+    method that assumes continuous data (fitting, plots, tests). The
+    randomness is part of the answer, so repeat with different seeds and
+    compare.
 
     The distributional transform randomises within each atom,
 
@@ -574,19 +705,29 @@ def distributional_transform(
 
     Parameters
     ----------
-    x : array_like, shape (n, d)
-    margins : list of frozen distributions
-        Continuous margins are passed through unchanged.
-    random_state : None, int or Generator
-    replicates : int
-        Draw this many independent transforms and return their average on the
-        copula scale. Averaging reduces the randomisation noise but biases the
-        result towards the middle of each atom, so the default is 1 and anything
-        else is a deliberate trade.
+    x : array_like of float or int, shape (n, d) or (d,)
+        Observed values on the margins' own scale.
+    margins : list of frozen scipy.stats distributions, length d
+        One per column. A margin with a ``pmf`` method is treated as discrete;
+        any other (continuous) margin is simply passed through its ``cdf``.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator for the randomisation.
+    replicates : int, default 1
+        Draw this many independent transforms (at least 1) and return their
+        average on the copula scale. Averaging reduces the randomisation noise
+        but biases the result towards the middle of each atom, so the default
+        is 1 and anything else is a deliberate trade.
 
     Returns
     -------
-    ndarray, shape (n, d)
+    numpy.ndarray of float, shape (n, d)
+        Pseudo-observations, clipped to ``[1e-12, 1 - 1e-12]``.
+
+    Raises
+    ------
+    ValueError
+        If ``margins`` does not have one entry per column of ``x``, or
+        ``replicates < 1``.
 
     Examples
     --------
@@ -623,7 +764,10 @@ def distributional_transform(
 
 
 def tau_upper_bound(margins: list[Any], *, support: int = 200) -> float:
-    r"""The largest Kendall's tau-b these discrete margins can attain.
+    r"""Compute the largest rank correlation (Kendall's tau-b) two discrete margins allow.
+
+    Use it to judge a measured correlation between discrete variables: a tau
+    of 0.1 may already be the strongest dependence the margins permit.
 
     Evaluates :math:`\tau_b` at the comonotone coupling, which is where it is
     maximised. Since :math:`\tau_b` divides by
@@ -640,15 +784,24 @@ def tau_upper_bound(margins: list[Any], *, support: int = 200) -> float:
 
     Parameters
     ----------
-    margins : list of two frozen discrete distributions
-    support : int
-        How far up the lattice to evaluate. The tail beyond this contributes
-        less than its mass, so the default is generous for anything with a
-        finite mean.
+    margins : list of DiscreteMargin, length 2
+        Two frozen discrete distributions supported on the non-negative
+        integers ``0, 1, 2, ...``.
+    support : int, default 200
+        How far up the lattice to evaluate: values ``0, ..., support`` are
+        used. The tail beyond this contributes less than its mass, so the
+        default is generous for anything with a finite mean.
 
     Returns
     -------
     float
+        The attainable maximum of Kendall's tau-b, in ``[0, 1]``. Returns 0.0
+        if either margin puts all its mass on one value.
+
+    Raises
+    ------
+    ValueError
+        If ``margins`` does not have exactly two entries.
 
     Examples
     --------
@@ -691,7 +844,11 @@ def tau_upper_bound(margins: list[Any], *, support: int = 200) -> float:
 
 
 def checkerboard(copula: Copula, margins: list[Any], *, support: int = 60) -> NDArray[np.float64]:
-    r"""The checkerboard copula's mass on the lattice induced by the margins.
+    r"""Tabulate the probability of every pair of count values under a bivariate copula model.
+
+    The table is the checkerboard copula's mass on the lattice induced by the
+    margins, and is the natural thing to plot as a picture of a copula fitted
+    to discrete data.
 
     Since the copula is identified only on :math:`\mathrm{Ran}\,F_1 \times
     \mathrm{Ran}\,F_2`, an infinite family of copulas fits any discrete data
@@ -703,15 +860,24 @@ def checkerboard(copula: Copula, margins: list[Any], *, support: int = 60) -> ND
     Parameters
     ----------
     copula : Copula
-        Bivariate.
-    margins : list of two frozen discrete distributions
-    support : int
-        Lattice extent.
+        A bivariate copula (``dim == 2``).
+    margins : list of DiscreteMargin, length 2
+        Two frozen discrete distributions supported on the non-negative
+        integers.
+    support : int, default 60
+        Lattice extent: values ``0, ..., support`` are tabulated in each
+        coordinate.
 
     Returns
     -------
-    ndarray, shape (support + 1, support + 1)
-        Cell probabilities, summing to one up to the tail truncation.
+    numpy.ndarray of float, shape (support + 1, support + 1)
+        Cell probabilities; entry ``[i, j]`` is :math:`P(X_1 = i, X_2 = j)`.
+        They sum to one up to the tail truncation.
+
+    Raises
+    ------
+    ValueError
+        If the copula is not bivariate.
 
     Examples
     --------

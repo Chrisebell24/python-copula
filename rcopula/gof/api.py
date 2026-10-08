@@ -52,10 +52,36 @@ __all__ = ["GofResult", "gof_test", "gof_two_sample"]
 
 
 class GofResult(NamedTuple):
-    """Outcome of a goodness-of-fit test.
+    """The result of a goodness-of-fit test: the score, its p-value, and how it was computed.
 
-    Follows the ``scipy.stats`` convention of exposing ``statistic`` and
-    ``pvalue``, so it unpacks like any other test result.
+    Returned by :func:`gof_test` and :func:`gof_two_sample`; you do not
+    normally build one yourself. A small ``pvalue`` (say below 0.05) means the
+    data are unlikely under the tested copula (or, for the two-sample test,
+    that the two samples have different copulas).
+
+    It is a ``NamedTuple`` following the ``scipy.stats`` convention of exposing
+    ``statistic`` and ``pvalue``, so it unpacks like any other test result:
+    ``stat, p, *rest = result``. The constructor takes the attributes below,
+    in order, as its arguments; ``copula`` defaults to ``None``.
+
+    Attributes
+    ----------
+    statistic : float
+        The observed test statistic, zero or positive; larger means a worse fit.
+    pvalue : float
+        Bootstrap or permutation p-value, strictly between 0 and 1.
+    method : str
+        Name of the statistic used: ``"Sn"``, ``"Tn"``, ``"AnChisq"``,
+        ``"AnGamma"`` or, for the two-sample test, ``"two-sample Sn"``.
+    simulation : str
+        How the null distribution was generated: ``"pb"`` (parametric
+        bootstrap), ``"mult"`` (multiplier bootstrap) or ``"permutation"``.
+    n_rep : int
+        Number of bootstrap replicates or permutations used.
+    copula : Copula or None, default None
+        The fitted copula the data was tested against. ``None`` for a two-sample
+        test, which compares two samples to each other with no model between
+        them.
     """
 
     statistic: float
@@ -198,35 +224,63 @@ def gof_test(
     random_state: np.random.Generator | int | None = None,
     ties_method: str = "average",
 ) -> GofResult:
-    """Test whether a copula family fits the data (R's ``gofCopula``).
+    """Check whether a copula family is a plausible model for your data, and get a p-value.
+
+    The family's parameters are first fitted to the data; the test then asks
+    whether the gap between that fitted copula and the data's own empirical
+    copula is bigger than chance alone would produce (R's ``gofCopula``). Use
+    it after choosing a family, to see whether the data clearly contradict it.
+    A small p-value (say below 0.05) means "this family does not fit".
 
     Parameters
     ----------
     copula : Copula
-        The family to test. Parameters are estimated from the data.
-    data : array_like
-        ``(n, d)`` observations. Always rank-transformed, whatever the scale.
-    method : {"Sn", "Tn", "AnChisq", "AnGamma"}
-        Which statistic to use. ``Sn`` is the default and the recommended one.
-    simulation : {"pb", "mult"}
-        ``"pb"`` refits on every replicate; ``"mult"`` reweights instead and is
-        far faster. ``"mult"`` supports ``Sn`` only.
-    estim_method : str
-        Estimation method passed to :func:`~rcopula.fit`.
-    n_rep : int
-        Number of bootstrap replicates.
-    random_state : Generator, int or None
-        Seed or generator.
+        The family to test, e.g. ``ClaytonCopula()``. Its current parameter
+        values are only a template; parameters are re-estimated from the data.
+    data : array_like of float, shape (n, d)
+        Observations, one row per observation and one column per variable, on
+        any scale. They are always converted to ranks (pseudo-observations)
+        first, so even data already in ``[0, 1]`` is re-ranked.
+    method : {"Sn", "Tn", "AnChisq", "AnGamma"}, default "Sn"
+        Which statistic to use (see :mod:`rcopula.gof.statistics`). ``"Sn"`` is
+        the default and the recommended one.
+    simulation : {"pb", "mult"}, default "pb"
+        How the p-value is computed. ``"pb"`` (parametric bootstrap) simulates
+        and refits on every replicate; ``"mult"`` (multiplier bootstrap)
+        reweights instead and is far faster. ``"mult"`` supports ``"Sn"`` only.
+    estim_method : str, default "mpl"
+        Estimation method passed to :func:`~rcopula.fit`, e.g. ``"mpl"``,
+        ``"itau"`` or ``"irho"``.
+    n_rep : int, default 1000
+        Number of bootstrap replicates, a positive integer. More replicates give
+        a more precise p-value at proportionally more cost.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator, for reproducible p-values.
+    ties_method : str, default "average"
+        How tied values are ranked; passed to :func:`~rcopula.pseudo_obs`.
+        One of ``"average"``, ``"min"``, ``"max"``, ``"dense"``, ``"ordinal"``,
+        ``"random"``.
 
     Returns
     -------
     GofResult
-        With ``statistic`` and ``pvalue``, as in ``scipy.stats``.
+        With ``statistic`` and ``pvalue``, as in ``scipy.stats``, plus the
+        fitted copula in ``copula``.
+
+    Raises
+    ------
+    ValueError
+        If ``simulation`` is not ``"pb"`` or ``"mult"``, if
+        ``simulation="mult"`` is combined with a ``method`` other than ``"Sn"``,
+        or if ``method`` is not a recognised statistic.
 
     Notes
     -----
     A large p-value is *not* evidence that the family is correct -- only that
     this test could not reject it at this sample size.
+
+    The ``"pb"`` cost is ``n_rep`` full model fits, which can be slow for large
+    ``n`` or many parameters; ``"mult"`` needs one fit in total.
 
     Examples
     --------
@@ -298,7 +352,11 @@ def gof_two_sample(
     random_state: np.random.Generator | int | None = None,
     ties_method: str = "average",
 ) -> GofResult:
-    r"""Test whether two samples share a copula (R's ``gofT2stat``).
+    r"""Check whether two datasets have the same dependence structure, ignoring their scales.
+
+    This is a two-sample copula test (R's ``gofT2stat``). A small p-value (say
+    below 0.05) means the way the variables move together differs between the
+    two samples.
 
     Every other test here compares one sample against a *model*. This compares
     two samples against **each other**, with no model in between -- which is the
@@ -318,18 +376,31 @@ def gof_two_sample(
 
     Parameters
     ----------
-    x, y : array_like, shape (n, d) and (m, d)
-        The two samples. They need the same number of columns, not the same
-        number of rows.
-    n_rep : int
-        Permutations.
-    random_state : None, int or Generator
-    ties_method : str
-        Passed to :func:`~rcopula.pseudo_obs`.
+    x : array_like of float, shape (n, d)
+        The first sample, on any scale. At least 2 rows.
+    y : array_like of float, shape (m, d)
+        The second sample, on any scale. At least 2 rows. It needs the same
+        number of columns as ``x``, not the same number of rows.
+    n_rep : int, default 1000
+        Number of random relabellings (permutations) used to build the null
+        distribution, a positive integer.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed or generator, for reproducible p-values.
+    ties_method : str, default "average"
+        How tied values are ranked when computing the observed statistic;
+        passed to :func:`~rcopula.pseudo_obs`.
 
     Returns
     -------
     GofResult
+        With ``method="two-sample Sn"``, ``simulation="permutation"`` and
+        ``copula=None``.
+
+    Raises
+    ------
+    ValueError
+        If ``x`` and ``y`` have different numbers of columns, or either has
+        fewer than 2 rows.
 
     Notes
     -----

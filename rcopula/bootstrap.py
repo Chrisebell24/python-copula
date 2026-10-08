@@ -91,24 +91,36 @@ _MAX_FAILURE_FRACTION = 0.1
 
 @dataclass
 class BootstrapResult:
-    """The outcome of a bootstrap.
+    """The answer from a bootstrap: the estimate, its confidence interval and every replicate.
+
+    You normally get one of these from :func:`bootstrap`,
+    :func:`bootstrap_measure` or :func:`bootstrap_fit` rather than building it
+    yourself. Read ``confidence_interval`` for the interval, call
+    :meth:`summary` for a printable table, or plot ``replicates`` to see the
+    whole sampling distribution.
 
     Attributes
     ----------
-    estimate : float or ndarray
-        The statistic on the original data.
-    confidence_interval : tuple
-        ``(lower, upper)``. Scalars for a scalar statistic, arrays otherwise.
-    standard_error : float or ndarray
+    estimate : float or numpy.ndarray of float, shape (k,)
+        The statistic on the original data. A float for a scalar statistic,
+        an array of the statistic's ``k`` values otherwise.
+    confidence_interval : tuple of (float, float) or tuple of (numpy.ndarray, numpy.ndarray)
+        ``(lower, upper)``. Scalars for a scalar statistic, arrays of shape
+        ``(k,)`` otherwise.
+    standard_error : float or numpy.ndarray of float, shape (k,)
         Standard deviation of the replicates. Note this is a bootstrap estimate
         of the standard error, not the asymptotic one.
-    replicates : ndarray, shape (n_resamples, ...)
-        Every replicate, kept so the distribution can be plotted -- which is
-        usually more informative than the interval.
-    method : str
+    replicates : numpy.ndarray of float, shape (n_kept,) or (n_kept, k)
+        Every replicate that succeeded (``n_kept = n_resamples - n_failed``),
+        kept so the distribution can be plotted -- which is usually more
+        informative than the interval.
+    method : {"bca", "percentile", "basic"}
+        The interval type used.
     level : float
-    n_failed : int
-        Resamples the statistic refused.
+        Coverage of the interval, between 0 and 1 (e.g. 0.95).
+    n_failed : int, default 0
+        Resamples the statistic refused (raised an error or returned a
+        non-finite value).
     """
 
     estimate: Any
@@ -121,7 +133,10 @@ class BootstrapResult:
 
     @property
     def bias(self) -> Any:
-        """Bootstrap estimate of bias: mean of the replicates minus the estimate.
+        """How far the resampled values sit from the original estimate, on average.
+
+        Returns ``mean(replicates) - estimate``: the bootstrap estimate of
+        bias, a float for a scalar statistic or an array of shape ``(k,)``.
 
         A bias comparable to the standard error is a warning that the statistic
         is not well behaved at this sample size, whatever the interval says.
@@ -129,7 +144,15 @@ class BootstrapResult:
         return np.mean(self.replicates, axis=0) - self.estimate
 
     def summary(self) -> str:
-        """A printable report."""
+        """Return a printable table of the estimate, standard error, bias and interval.
+
+        Returns
+        -------
+        str
+            One row per component of the statistic, with columns estimate,
+            SE, bias and the lower and upper interval limits, followed by a
+            note of how many resamples were refused, if any.
+        """
         estimate = np.atleast_1d(np.asarray(self.estimate, dtype=float))
         lower = np.atleast_1d(np.asarray(self.confidence_interval[0], dtype=float))
         upper = np.atleast_1d(np.asarray(self.confidence_interval[1], dtype=float))
@@ -244,28 +267,37 @@ def bootstrap(
     random_state: Any = None,
     n_jobs: int = 1,
 ) -> BootstrapResult:
-    """Bootstrap any statistic of a data matrix, resampling whole rows.
+    """Get a confidence interval for any number computed from a data table, by resampling rows.
+
+    The bootstrap redraws the rows of ``x`` at random (with replacement) many
+    times, recomputes ``statistic`` on each redraw, and uses the spread of
+    those values to build an interval. It makes no assumption about the
+    statistic's distribution. Whole rows are resampled so the dependence
+    between columns is kept.
 
     Parameters
     ----------
-    x : array_like, shape (n, d)
-        The data. Rows are observations.
+    x : array_like of float, shape (n, d)
+        The data. Rows are observations; at least 2 rows.
     statistic : callable
-        Takes an ``(n, d)`` array and returns a float or an array of floats.
+        Function ``statistic(sample)`` taking a ``numpy.ndarray`` of shape
+        ``(n, d)`` and returning a float or a 1-D array of floats.
         Raising is allowed and is treated as refusing that resample.
-    n_resamples : int
-        Number of bootstrap replicates. 999 rather than 1000 by convention: the
-        percentile of ``B`` replicates is exact when ``(B+1)*alpha`` is an
-        integer.
-    level : float
-        Coverage, e.g. 0.95.
-    method : {"bca", "percentile", "basic"}
-        See the module docstring. BCa additionally runs an ``n``-point
-        jackknife, so it costs one extra pass over the data.
-    random_state : None, int or Generator
-    n_jobs : int
+    n_resamples : int, default 999
+        Number of bootstrap replicates, at least 2. 999 rather than 1000 by
+        convention: the percentile of ``B`` replicates is exact when
+        ``(B+1)*alpha`` is an integer.
+    level : float, default 0.95
+        Coverage, strictly between 0 and 1, e.g. 0.95 for a 95% interval.
+    method : {"bca", "percentile", "basic"}, default "bca"
+        Interval type; see the module docstring. BCa additionally runs an
+        ``n``-point jackknife, so it costs one extra pass over the data.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed for the resampling. Pass an int for reproducible output.
+    n_jobs : int, default 1
         Processes to spread the resamples over. ``1`` stays in this process;
-        anything else needs ``statistic`` to be picklable, which rules out
+        a negative value uses all cores. Anything other than ``1`` needs
+        ``statistic`` to be picklable, which rules out
         lambdas and closures -- use a module-level function or
         :func:`functools.partial`.
 
@@ -282,6 +314,16 @@ def bootstrap(
     Returns
     -------
     BootstrapResult
+        Estimate, interval, standard error and the replicates themselves.
+
+    Raises
+    ------
+    ValueError
+        If ``x`` has fewer than 2 rows, ``level`` is not strictly between 0
+        and 1, ``n_resamples`` is below 2, ``method`` is not one of the three
+        names, or ``statistic`` fails on the original data.
+    RuntimeError
+        If more than 10% of the resamples are refused by ``statistic``.
 
     Examples
     --------
@@ -440,18 +482,42 @@ def bootstrap_measure(
     random_state: Any = None,
     n_jobs: int = 1,
 ) -> BootstrapResult:
-    """A confidence interval for a bivariate dependence measure.
+    """Get a confidence interval for how strongly two variables move together.
+
+    A one-call wrapper around :func:`bootstrap` for the standard rank-based
+    dependence measures of a two-column dataset.
 
     Parameters
     ----------
-    x : array_like, shape (n, 2)
-    measure : {"tau", "rho", "beta", "lambda_upper", "lambda_lower"}
-    n_resamples, level, method, random_state, n_jobs
-        As for :func:`bootstrap`.
+    x : array_like of float, shape (n, 2)
+        The data: two columns, at least 2 rows. Raw data or
+        pseudo-observations both work, since every measure uses ranks.
+    measure : {"tau", "rho", "beta", "lambda_upper", "lambda_lower"}, default "tau"
+        Which measure: Kendall's tau, Spearman's rho, Blomqvist's beta, or a
+        nonparametric upper / lower tail-dependence estimate (the share of
+        points with both ranks above 0.95, resp. below 0.05, divided by 0.05).
+    n_resamples : int, default 999
+        Number of bootstrap replicates, at least 2.
+    level : float, default 0.95
+        Coverage, strictly between 0 and 1.
+    method : {"bca", "percentile", "basic"}, default "bca"
+        Interval type; see :func:`bootstrap`.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed for the resampling. Pass an int for reproducible output.
+    n_jobs : int, default 1
+        Number of worker processes. ``1`` stays in this process; a negative
+        value uses all cores. See :func:`bootstrap` for when parallelism pays.
 
     Returns
     -------
     BootstrapResult
+        With a float ``estimate`` and a ``(lower, upper)`` tuple of floats.
+
+    Raises
+    ------
+    ValueError
+        If ``measure`` is unknown, ``x`` does not have exactly 2 columns, or
+        for any reason listed in :func:`bootstrap`.
 
     Examples
     --------
@@ -512,7 +578,7 @@ def bootstrap_fit(
     random_state: Any = None,
     n_jobs: int = 1,
 ) -> BootstrapResult:
-    """Confidence intervals for a fitted copula's parameters.
+    """Get confidence intervals for a copula's fitted parameters by refitting it on resampled data.
 
     The nonparametric complement to the asymptotic standard errors from
     :func:`~rcopula.fit`: the whole estimation is redone on each resample, so
@@ -526,17 +592,36 @@ def bootstrap_fit(
         the right order -- ranks must be recomputed on the resample, not carried
         over from the original sample.
     copula : Copula
-        The family to fit.
-    fit_method : str
-        Passed to :func:`~rcopula.fit`.
-    n_resamples : int
-        Fewer than for a cheap statistic, because each one is a full fit.
-    level, method, random_state, n_jobs
-        As for :func:`bootstrap`.
+        The family to fit; its current parameters are only a starting point.
+    fit_method : {"mpl", "ml", "itau", "irho", "itau.mpl"}, default "mpl"
+        Estimation method passed to :func:`~rcopula.fit` (``"mpl"`` is
+        maximum pseudo-likelihood, ``"itau"`` inverts Kendall's tau).
+    n_resamples : int, default 499
+        Number of bootstrap replicates, at least 2. Fewer than for a cheap
+        statistic, because each one is a full fit.
+    level : float, default 0.95
+        Coverage, strictly between 0 and 1.
+    method : {"bca", "percentile", "basic"}, default "bca"
+        Interval type; see :func:`bootstrap`.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed for the resampling. Pass an int for reproducible output.
+    n_jobs : int, default 1
+        Number of worker processes. ``1`` stays in this process; a negative
+        value uses all cores. See :func:`bootstrap` for when parallelism pays.
 
     Returns
     -------
     BootstrapResult
+        One entry per free parameter of ``copula``: a float ``estimate`` for
+        a one-parameter family, arrays of shape ``(k,)`` otherwise.
+
+    Raises
+    ------
+    ValueError
+        For any reason listed in :func:`bootstrap`, including the fit failing
+        on the original data.
+    RuntimeError
+        If more than 10% of the refits fail.
 
     Notes
     -----

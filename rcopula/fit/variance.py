@@ -175,8 +175,32 @@ def var_ml(
     theta: NDArray[np.float64],
     n: int,
 ) -> NDArray[np.float64] | None:
-    r"""Observed-information covariance for maximum likelihood.
+    r"""Estimate how uncertain maximum-likelihood copula parameters are (their covariance matrix).
 
+    This is the observed-information covariance used by
+    ``fit(..., method="ml")``. Most users never call it directly: read
+    ``CopulaFitResult.cov_params`` or ``.bse`` instead. Call it yourself only
+    when you have written your own likelihood maximiser.
+
+    Parameters
+    ----------
+    logpdf : callable
+        Function ``logpdf(theta) -> ndarray of float, shape (n,)`` mapping a
+        parameter vector to the per-observation log densities.
+    theta : ndarray of float, shape (p,)
+        The estimate to evaluate at (ideally the maximiser).
+    n : int
+        Number of observations (positive).
+
+    Returns
+    -------
+    ndarray of float, shape (p, p), or None
+        Estimated covariance matrix of ``theta``, or ``None`` when the
+        negative Hessian is not positive definite or the result is not
+        finite.
+
+    Notes
+    -----
     Assumes the supplied data *are* copula observations -- margins known rather
     than estimated -- so the information equality holds and
     :math:`\mathrm{Cov}(\hat\theta) = H^{-1}/n` with :math:`H` the averaged
@@ -189,14 +213,17 @@ def var_ml(
     sampling SD put the truth near 0.090. Correct specification is exactly the
     assumption ``method="ml"`` already makes.
 
-    Parameters
-    ----------
-    logpdf : callable
-        Maps a parameter vector to the vector of per-observation log densities.
-    theta : ndarray
-        The estimate to evaluate at.
-    n : int
-        Number of observations.
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from rcopula import ClaytonCopula
+    >>> from rcopula.fit import var_ml
+    >>> u = ClaytonCopula(2.0).rvs(1000, random_state=0)
+    >>> cov = var_ml(lambda t: ClaytonCopula(t[0]).logpdf(u), np.array([2.0]), 1000)
+    >>> cov.shape
+    (1, 1)
+    >>> bool(cov[0, 0] > 0)
+    True
     """
     _, hessian = _score_and_hessian(logpdf, theta)
     if not _usable_hessian(hessian):
@@ -222,20 +249,41 @@ def mpl_influence(
     u: NDArray[np.float64],
     theta: NDArray[np.float64],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    r"""Per-observation influence :math:`W_i` and the averaged negative Hessian.
+    r"""Measure how much each observation pushes a pseudo-likelihood estimate around.
 
+    Returns the per-observation influence :math:`W_i` (score plus the
+    rank-estimation correction) and the averaged negative Hessian. These are
+    the building blocks of :func:`var_mpl`; you only need them directly to
+    build a bootstrap or your own variance estimate.
+
+    Parameters
+    ----------
+    logpdf_at : callable
+        Function ``logpdf_at(u, theta) -> ndarray of float, shape (n,)``
+        giving per-observation log densities at data ``u`` and parameters
+        ``theta``.
+    u : ndarray of float, shape (n, d)
+        Pseudo-observations strictly inside the unit cube.
+    theta : ndarray of float, shape (p,)
+        The estimate to evaluate at.
+
+    Returns
+    -------
+    w : ndarray of float, shape (n, p)
+        Influence contributions, one row per observation. All ``nan`` when
+        more than 2% of observations had to be discarded because their
+        derivatives were not finite (typically a family with a moving support
+        boundary).
+    hessian : ndarray of float, shape (p, p)
+        Averaged negative Hessian of the log-density.
+
+    Notes
+    -----
     Split out from :func:`var_mpl` because the multiplier goodness-of-fit
     bootstrap needs exactly the same quantity: it replicates
     :math:`\sqrt n(\hat\theta - \theta)` as
     :math:`H^{-1} n^{-1/2}\sum_i Z_i W_i` for random multipliers :math:`Z_i`,
     which is what lets it avoid refitting the copula on every bootstrap draw.
-
-    Returns
-    -------
-    w : ndarray
-        ``(n, p)`` influence contributions.
-    hessian : ndarray
-        ``(p, p)`` averaged negative Hessian of the log-density.
     """
     n, d = u.shape
     p = theta.size
@@ -297,8 +345,32 @@ def var_mpl(
     u: NDArray[np.float64],
     theta: NDArray[np.float64],
 ) -> NDArray[np.float64] | None:
-    r"""Genest-Ghoudi-Rivest covariance for maximum pseudo-likelihood.
+    r"""Estimate how uncertain pseudo-likelihood copula parameters are (their covariance matrix).
 
+    This is the Genest-Ghoudi-Rivest covariance used by
+    ``fit(..., method="mpl")``, the default. It accounts for the margins
+    having been replaced by ranks, which plain likelihood standard errors
+    ignore. Most users read ``CopulaFitResult.bse`` instead of calling this.
+
+    Parameters
+    ----------
+    logpdf_at : callable
+        Function ``logpdf_at(u, theta) -> ndarray of float, shape (n,)``
+        giving per-observation log densities.
+    u : ndarray of float, shape (n, d)
+        The pseudo-observations the fit used, strictly inside the unit cube.
+    theta : ndarray of float, shape (p,)
+        The estimate.
+
+    Returns
+    -------
+    ndarray of float, shape (p, p), or None
+        Estimated covariance matrix of ``theta``, or ``None`` when the
+        negative Hessian is not positive definite, too many observations sit
+        on a support boundary, or the result is not finite.
+
+    Notes
+    -----
     Adds the rank-estimation correction that plain maximum-likelihood standard
     errors omit. Concretely, alongside the score :math:`\dot\ell(U_i)` each
     observation contributes
@@ -316,14 +388,15 @@ def var_mpl(
     1.013 (paired range 0.91-1.12), the spread reflecting that R has analytic
     derivatives for Clayton while these are numerical.
 
-    Parameters
-    ----------
-    logpdf_at : callable
-        ``(u, theta) -> per-observation log densities``.
-    u : ndarray
-        The ``(n, d)`` pseudo-observations the fit used.
-    theta : ndarray
-        The estimate.
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from rcopula import ClaytonCopula, pseudo_obs
+    >>> from rcopula.fit import var_mpl
+    >>> u = pseudo_obs(ClaytonCopula(2.0).rvs(500, random_state=0))
+    >>> cov = var_mpl(lambda x, t: ClaytonCopula(t[0]).logpdf(x), u, np.array([2.0]))
+    >>> bool(cov[0, 0] > 0)
+    True
     """
     w, hessian = mpl_influence(logpdf_at, u, theta)
     p = theta.size
@@ -337,8 +410,26 @@ def var_mpl(
 
 
 def kendall_influence(u: NDArray[np.float64]) -> NDArray[np.float64]:
-    r"""Empirical influence function of Kendall's tau for a bivariate sample.
+    r"""For each observation, the share of other observations that move in the same direction.
 
+    This is the empirical influence function of Kendall's tau for a bivariate
+    sample: the fraction of other points that are concordant with point
+    ``i``. It is used to compute the standard error of tau-based estimates.
+
+    Parameters
+    ----------
+    u : ndarray of float, shape (n, 2)
+        Bivariate sample (pseudo-observations or raw values; only the
+        ordering matters). ``n`` must be at least 2.
+
+    Returns
+    -------
+    ndarray of float, shape (n,)
+        Values in ``[0, 1]``. ``2 * mean - 1`` approximately equals the
+        sample Kendall's tau.
+
+    Notes
+    -----
     Kendall's tau is a U-statistic of degree two, so by Hoeffding's projection
     its first-order behaviour is governed by
 
@@ -374,8 +465,24 @@ def kendall_influence(u: NDArray[np.float64]) -> NDArray[np.float64]:
 
 
 def spearman_influence(u: NDArray[np.float64]) -> NDArray[np.float64]:
-    r"""Empirical influence function of Spearman's rho for a bivariate sample.
+    r"""For each observation, how much it contributes to Spearman's rank correlation.
 
+    This is the empirical influence function of Spearman's rho for a
+    bivariate sample, used to compute the standard error of rho-based
+    estimates.
+
+    Parameters
+    ----------
+    u : ndarray of float, shape (n, 2)
+        Bivariate pseudo-observations in ``(0, 1)``.
+
+    Returns
+    -------
+    ndarray of float, shape (n,)
+        Influence contribution of each observation.
+
+    Notes
+    -----
     With :math:`\hat\rho \approx 12\,\overline{U_1 U_2} - 3`, the influence
     contribution of observation ``i`` is
 
@@ -385,6 +492,14 @@ def spearman_influence(u: NDArray[np.float64]) -> NDArray[np.float64]:
           + \overline{U_{j1}\mathbf{1}\{U_{j2} \ge U_{i2}\}}\Bigr) - 9,
 
     the two averages accounting for the ranks being estimated rather than known.
+
+    Examples
+    --------
+    >>> from rcopula import ClaytonCopula, pseudo_obs
+    >>> from rcopula.fit.variance import spearman_influence
+    >>> u = pseudo_obs(ClaytonCopula(2.0).rvs(200, random_state=0))
+    >>> spearman_influence(u).shape
+    (200,)
     """
     n = u.shape[0]
     a = (u[:, 1][None, :] * (u[:, 0][None, :] >= u[:, 0][:, None])).sum(axis=1) / n
@@ -412,24 +527,40 @@ def var_inversion_multi(
     jacobian: NDArray[np.float64],
     measure: str = "tau",
 ) -> NDArray[np.float64] | None:
-    r"""Delta-method covariance for a multi-parameter inversion estimator.
+    r"""Estimate the uncertainty of several correlations, each obtained from a pairwise tau or rho.
 
+    Delta-method covariance for a multi-parameter inversion estimator, as
+    used by ``fit(..., method="itau")`` and ``"irho"`` for elliptical copulas
+    with an unstructured correlation matrix.
+
+    Parameters
+    ----------
+    u : ndarray of float, shape (n, d)
+        The pseudo-observations, ``d >= 2``.
+    jacobian : ndarray of float, shape (p, p)
+        Derivative of the parameter vector with respect to the statistic
+        vector, where ``p = d * (d - 1) / 2`` is the number of column pairs
+        (ordered column by column down the lower triangle). Diagonal for
+        elliptical copulas, where each correlation depends only on its own
+        pair.
+    measure : {"tau", "rho"}, default "tau"
+        Which pairwise statistic was inverted: Kendall's tau or Spearman's
+        rho.
+
+    Returns
+    -------
+    ndarray of float, shape (p, p), or None
+        Estimated covariance matrix, or ``None`` if it is not finite or has a
+        negative diagonal entry.
+
+    Notes
+    -----
     Each correlation is inverted from its own pairwise statistic, so the
     covariance follows from the joint covariance of those statistics:
     :math:`\mathrm{Cov}(\hat\theta) = J\,\mathrm{Cov}(\hat{\boldsymbol\tau})\,J^{\top}`.
     The pairwise statistics are *not* independent -- they share observations --
     which is why the full covariance is estimated from the joint influence
     vectors rather than pair by pair.
-
-    Parameters
-    ----------
-    u : ndarray
-        The ``(n, d)`` pseudo-observations.
-    jacobian : ndarray
-        ``(p, p)`` derivative of the parameter vector with respect to the
-        statistic vector. Diagonal for elliptical copulas, where each
-        correlation depends only on its own pair.
-    measure : {"tau", "rho"}
     """
     n = u.shape[0]
     influences = _pair_influences(u, measure)
@@ -447,20 +578,54 @@ def var_itau(
     dtheta_dmeasure: float,
     measure: str = "tau",
 ) -> NDArray[np.float64] | None:
-    r"""Delta-method covariance for a one-parameter inversion estimator.
+    r"""Estimate the uncertainty of a one-parameter estimate obtained by inverting tau or rho.
 
+    Delta-method variance for a one-parameter inversion estimator, as used
+    by ``fit(..., method="itau")`` and ``"irho"``. Most users read
+    ``CopulaFitResult.bse`` instead of calling this.
+
+    Parameters
+    ----------
+    u : ndarray of float, shape (n, d)
+        The pseudo-observations. For ``d > 2`` the estimate is assumed to come
+        from the *average* of the pairwise statistics, as :func:`fit` does.
+    dtheta_dmeasure : float
+        :math:`g'`, the derivative of the inverse map (parameter as a function
+        of tau or rho) at the estimate.
+    measure : {"tau", "rho"}, default "tau"
+        Which dependence measure was inverted.
+
+    Returns
+    -------
+    ndarray of float, shape (1, 1), or None
+        The estimated variance, or ``None`` if ``d < 2`` or the value is not
+        finite.
+
+    Raises
+    ------
+    ValueError
+        If ``measure`` is neither ``"tau"`` nor ``"rho"``.
+
+    Notes
+    -----
     :math:`\hat\theta = g(\hat\tau)` gives
     :math:`\mathrm{Var}(\hat\theta) \approx g'(\tau)^2\,\mathrm{Var}(\hat\tau)`,
     with the variance of the rank statistic taken from its influence function.
 
-    Parameters
-    ----------
-    u : ndarray
-        The ``(n, 2)`` pseudo-observations.
-    dtheta_dmeasure : float
-        :math:`g'`, the derivative of the inverse map at the estimate.
-    measure : {"tau", "rho"}
-        Which dependence measure was inverted.
+    Examples
+    --------
+    For Clayton, :math:`\theta = 2\tau/(1-\tau)`, so
+    :math:`g'(\tau) = 2/(1-\tau)^2`:
+
+    >>> import numpy as np
+    >>> from scipy import stats
+    >>> from rcopula import ClaytonCopula
+    >>> from rcopula.fit import var_itau
+    >>> u = ClaytonCopula(2.0).rvs(1000, random_state=0)
+    >>> tau = stats.kendalltau(u[:, 0], u[:, 1]).statistic
+    >>> var = var_itau(u, 2.0 / (1.0 - tau) ** 2)
+    >>> var.shape
+    (1, 1)
     """
     n, d = u.shape
     if d < 2:

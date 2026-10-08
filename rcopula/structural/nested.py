@@ -87,23 +87,70 @@ _SAMPLEABLE = ("Gumbel", "Clayton")
 
 
 class NestedArchimedean(Copula):
-    """A hierarchical Archimedean copula.
+    """Model groups of variables that are more tightly linked within a group than across groups.
+
+    A plain Archimedean copula gives every pair of variables the same
+    dependence. A nested (hierarchical) Archimedean copula is a tree: each
+    node holds an Archimedean copula, variables hang off the nodes, and two
+    variables are linked by the copula at the node where their branches meet.
+    For example, three equities strongly linked to each other, two bonds
+    strongly linked to each other, and a weaker link between the two blocks.
+
+    You build the tree bottom-up: create a node for each group, then a parent
+    node whose ``children`` are those groups. Each node object is itself a
+    :class:`NestedArchimedean`; only the root, which covers variables
+    ``0 .. d-1``, can be evaluated as a copula.
 
     Parameters
     ----------
     generator : Copula
-        A one-parameter Archimedean copula supplying this node's generator. Its
-        ``dim`` is ignored -- the tree determines dimension.
-    components : sequence of int, optional
-        Zero-based indices of the variables attached **directly** to this node.
-    children : sequence of NestedArchimedean, optional
-        Sub-trees nested inside it.
+        A one-parameter Archimedean copula (e.g. ``GumbelCopula(2.0)``)
+        supplying this node's generator and parameter. Its ``dim`` is ignored
+        -- the tree determines dimension. Every node in a tree must use the
+        same family, and a child's parameter must be at least its parent's.
+    components : sequence of int or None, default None
+        Zero-based indices of the variables attached **directly** to this
+        node. ``None`` means none.
+    children : sequence of NestedArchimedean or None, default None
+        Sub-trees nested inside this node. ``None`` means none.
+    free : array_like of bool or None, default None
+        Keyword-only. Accepted for interface compatibility; the tree has no
+        flat parameter vector (estimate it with :func:`fit_nested`).
+
+    Attributes
+    ----------
+    generator_copula : Copula
+        The Archimedean copula at this node.
+    components : tuple of int
+        Variables attached directly to this node.
+    children : tuple of NestedArchimedean
+        Sub-trees directly below this node.
+    theta : float
+        This node's parameter (see :attr:`theta`).
+    dim : int
+        Number of variables below this node (at least 2).
+
+    Raises
+    ------
+    TypeError
+        If ``generator`` is not a one-parameter Archimedean copula.
+    ValueError
+        If the node has no variables below it, a variable appears twice, a
+        child uses a different family, or a child's parameter is smaller than
+        this node's (the nesting condition).
 
     Notes
     -----
     Every variable must appear exactly once across the whole tree, and the
     indices must be ``0 .. d-1``. Both are checked, because a mis-specified
     tree otherwise produces a plausible-looking object that is not a copula.
+    Contiguity is checked when the root is used (CDF, sampling, tau matrix),
+    since a sub-tree legitimately covers indices like ``[3, 4]``.
+
+    What is available: :meth:`cdf`, :meth:`rvs` (Gumbel and Clayton only),
+    :meth:`tau_matrix` and :meth:`lambda_matrix`. The density is not
+    implemented, so likelihood-based fitting is not possible; use
+    :func:`fit_nested`.
 
     Examples
     --------
@@ -185,7 +232,22 @@ class NestedArchimedean(Copula):
     # -- structure -----------------------------------------------------
 
     def leaves(self) -> tuple[int, ...]:
-        """Every variable index below this node, in tree order."""
+        """List every variable that sits somewhere below this node.
+
+        Returns
+        -------
+        tuple of int
+            The node's own components, then each child's leaves, recursively
+            (tree order, not sorted).
+
+        Examples
+        --------
+        >>> import rcopula as rc
+        >>> from rcopula.structural import NestedArchimedean
+        >>> inner = NestedArchimedean(rc.GumbelCopula(3.0), [2, 0])
+        >>> NestedArchimedean(rc.GumbelCopula(1.5), [1], [inner]).leaves()
+        (1, 2, 0)
+        """
         found = list(self.components)
         for child in self.children:
             found.extend(child.leaves())
@@ -193,16 +255,38 @@ class NestedArchimedean(Copula):
 
     @property
     def theta(self) -> float:
-        """This node's dependence parameter."""
+        """This node's dependence parameter (the generator copula's ``theta``).
+
+        Returns
+        -------
+        float
+            The parameter; ``nan`` if not yet specified.
+        """
         return float(self.generator_copula.params[0])
 
     @property
     def depth(self) -> int:
-        """Height of the tree below this node; a flat copula has depth 1."""
+        """How many levels the tree has below and including this node.
+
+        Returns
+        -------
+        int
+            ``1`` for a node with no children (a flat Archimedean copula),
+            ``2`` for one level of nesting, and so on.
+        """
         return 1 + max((child.depth for child in self.children), default=0)
 
     def nodes(self) -> list[NestedArchimedean]:
-        """This node and every node beneath it, root first."""
+        """List this node and every node beneath it.
+
+        This order (depth-first, root first) is the one :meth:`with_thetas`
+        expects.
+
+        Returns
+        -------
+        list of NestedArchimedean
+            This node first, then each child's nodes in turn.
+        """
         out = [self]
         for child in self.children:
             out.extend(child.nodes())
@@ -238,13 +322,50 @@ class NestedArchimedean(Copula):
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Bounds of the flat parameter vector: empty, as the tree keeps parameters per node.
+
+        Returns
+        -------
+        list
+            Always ``[]``.
+        """
         return []
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> NestedArchimedean:
         return NestedArchimedean(self.generator_copula, self.components, self.children)
 
     def with_thetas(self, thetas: Sequence[float]) -> NestedArchimedean:
-        """Rebuild the tree with new parameters, in :meth:`nodes` order."""
+        """Return a copy of the tree with new parameters, one per node.
+
+        The shape of the tree is kept; only the ``theta`` at each node changes.
+        The nesting condition is checked again on the result.
+
+        Parameters
+        ----------
+        thetas : sequence of float
+            One parameter per node, in :meth:`nodes` order (root first,
+            depth-first).
+
+        Returns
+        -------
+        NestedArchimedean
+            The re-parameterised tree.
+
+        Raises
+        ------
+        ValueError
+            If the number of values differs from the number of nodes, or if
+            the new values break the nesting condition.
+
+        Examples
+        --------
+        >>> import rcopula as rc
+        >>> from rcopula.structural import NestedArchimedean
+        >>> inner = NestedArchimedean(rc.GumbelCopula(4.0), [0, 1])
+        >>> tree = NestedArchimedean(rc.GumbelCopula(1.5), [2], [inner])
+        >>> [node.theta for node in tree.with_thetas([2.0, 5.0]).nodes()]
+        [2.0, 5.0]
+        """
         values = list(thetas)
         if len(values) != len(self.nodes()):
             raise ValueError(f"got {len(values)} parameters for {len(self.nodes())} nodes")
@@ -366,7 +487,27 @@ class NestedArchimedean(Copula):
     # -- dependence ----------------------------------------------------
 
     def lowest_common_ancestor(self, i: int, j: int) -> NestedArchimedean:
-        """The node whose generator governs the pair ``(i, j)``."""
+        """Find the node where the branches of variables ``i`` and ``j`` meet.
+
+        That node's generator is the bivariate copula of the pair, so its
+        parameter alone sets their dependence.
+
+        Parameters
+        ----------
+        i, j : int
+            Two different variable indices below this node.
+
+        Returns
+        -------
+        NestedArchimedean
+            The deepest node whose leaves include both ``i`` and ``j``. If
+            either index is not in the tree, this node is returned.
+
+        Raises
+        ------
+        ValueError
+            If ``i == j``.
+        """
         if i == j:
             raise ValueError("a variable has no common ancestor with itself")
         for child in self.children:
@@ -376,12 +517,24 @@ class NestedArchimedean(Copula):
         return self
 
     def tau_matrix(self) -> NDArray[np.float64]:
-        """Pairwise Kendall's tau, exactly.
+        """Return Kendall's tau (a rank correlation) for every pair of variables, exactly.
 
         Two variables meet at exactly one node, and that node's generator is the
         bivariate copula of the pair -- so the tau is the generator's own, with
         no integration. A flat Archimedean copula would give one number for
         every pair; this gives one per branch of the tree.
+
+        Returns
+        -------
+        numpy.ndarray of float64, shape (d, d)
+            Symmetric matrix with ones on the diagonal; entry ``[i, j]`` is
+            Kendall's tau between variables ``i`` and ``j``.
+
+        Raises
+        ------
+        ValueError
+            If this node is not a root covering ``0 .. d-1``, or if any node's
+            parameter is unspecified.
         """
         self._require_thetas()
         d = self.dim
@@ -392,7 +545,24 @@ class NestedArchimedean(Copula):
         return out
 
     def lambda_matrix(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-        """Pairwise lower and upper tail dependence, by the same argument."""
+        """Return the tail-dependence coefficients for every pair of variables.
+
+        By the same argument as :meth:`tau_matrix`: each pair takes the
+        coefficients of the generator at the node where it meets.
+
+        Returns
+        -------
+        lower : numpy.ndarray of float64, shape (d, d)
+            Lower tail-dependence coefficients; ones on the diagonal.
+        upper : numpy.ndarray of float64, shape (d, d)
+            Upper tail-dependence coefficients; ones on the diagonal.
+
+        Raises
+        ------
+        ValueError
+            If this node is not a root covering ``0 .. d-1``, or if any node's
+            parameter is unspecified.
+        """
         self._require_thetas()
         d = self.dim
         lower, upper = np.ones((d, d)), np.ones((d, d))
@@ -404,19 +574,39 @@ class NestedArchimedean(Copula):
         return lower, upper
 
     def tau(self) -> float:
-        """Refused: a nested copula has no single tau, which is the point of it."""
+        """Not available: a nested copula has no single tau, which is the point of it.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Use :meth:`tau_matrix` for the pairwise values.
+        """
         raise NotImplementedError(
             "a nested Archimedean copula has a different Kendall's tau for "
             "different pairs -- that is what it is for. Use tau_matrix()."
         )
 
     def rho(self) -> float:
+        """Not available: Spearman's rho differs from pair to pair in a nested copula.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Estimate it pairwise from a sample instead.
+        """
         raise NotImplementedError(
             "a nested Archimedean copula has a different Spearman's rho for "
             "different pairs. Estimate it pairwise from a sample."
         )
 
     def lambda_(self) -> TailDependence:
+        """Not available: tail dependence differs from pair to pair in a nested copula.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Use :meth:`lambda_matrix` for the pairwise values.
+        """
         raise NotImplementedError(
             "tail dependence differs by pair in a nested copula; use lambda_matrix()."
         )
@@ -433,6 +623,14 @@ class NestedArchimedean(Copula):
     # -- presentation --------------------------------------------------
 
     def describe(self) -> str:
+        """Return a multi-line, indented picture of the tree with each node's parameter.
+
+        Returns
+        -------
+        str
+            A header line, then one indented line per node such as
+            ``"  Gumbel(theta=4) on [0, 1, 2]"``.
+        """
         return f"Nested Archimedean copula, dim {self.dim}\n{self._render(0)}"
 
     def _render(self, level: int) -> str:
@@ -461,6 +659,13 @@ class NestedArchimedean(Copula):
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> Copula:
+        """Not available: one tau value cannot set a parameter at every node.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Use :func:`fit_nested`, or set each node's parameter.
+        """
         raise NotImplementedError(
             "a nested copula has one parameter per node; a single tau cannot "
             "identify them. Use fit_nested."
@@ -468,7 +673,11 @@ class NestedArchimedean(Copula):
 
 
 def fit_nested(structure: NestedArchimedean, data: ArrayLike) -> NestedArchimedean:
-    r"""Estimate every node by inverting Kendall's tau.
+    r"""Fit a nested Archimedean copula to data, given the tree shape you want.
+
+    You supply the structure (which variables are grouped under which node);
+    this estimates the parameter at every node from the sample's pairwise
+    Kendall's tau. No density is needed.
 
     Each node governs the pairs whose lowest common ancestor it is, so the
     natural estimator averages the sample tau over exactly those pairs and
@@ -483,9 +692,22 @@ def fit_nested(structure: NestedArchimedean, data: ArrayLike) -> NestedArchimede
     Parameters
     ----------
     structure : NestedArchimedean
-        The tree shape. Its parameters are ignored and replaced.
-    data : array_like
-        ``(n, d)`` observations, on any scale -- only ranks are used.
+        The tree shape and family (a root covering ``0 .. d-1``). Its
+        parameters are ignored and replaced.
+    data : array_like of float, shape (n, d)
+        Observations, on any scale -- only ranks are used.
+
+    Returns
+    -------
+    NestedArchimedean
+        A tree of the same shape with an estimated parameter at every node,
+        satisfying the nesting condition.
+
+    Raises
+    ------
+    ValueError
+        If ``data`` does not have ``d`` columns, or if a node's average tau is
+        outside its family's range (for example negative tau with Gumbel).
 
     Examples
     --------

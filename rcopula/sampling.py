@@ -104,34 +104,48 @@ def quasi_rvs(
     scramble: bool = True,
     random_state: Any = None,
 ) -> NDArray[np.float64]:
-    r"""Draw from a copula using a low-discrepancy point set.
+    r"""Draw a sample from a copula whose points are spread more evenly than random ones.
 
-    Generates a Sobol or Halton set in :math:`[0,1]^d` and pushes it through the
-    copula's inverse Rosenblatt transform (Cambou, Hofert and Lemieux 2017). The
-    result has the right distribution and covers the space more evenly than
+    This is quasi-random (quasi-Monte Carlo) sampling. Use it in place of
+    ``copula.rvs`` when you are averaging something over the sample -- a price,
+    a risk measure -- and want a smaller error for the same number of draws.
+
+    It generates a Sobol or Halton set in :math:`[0,1]^d` and pushes it through
+    the copula's inverse Rosenblatt transform (Cambou, Hofert and Lemieux 2017).
+    The result has the right distribution and covers the space more evenly than
     independent draws.
 
     Parameters
     ----------
     copula : Copula
+        Any fitted or constructed copula of dimension ``d``; it must support
+        the inverse Rosenblatt transform.
     size : int
-        Number of points. For Sobol, a power of two preserves the balance
-        properties the construction is built on; scipy warns otherwise, and so
-        does the note below.
-    sequence : {"sobol", "halton"}
-        Sobol is the usual choice and better in moderate dimensions; Halton is
-        simpler and degrades faster past about ten.
-    scramble : bool
+        Number of points, at least 1. For Sobol, a power of two (512, 1024,
+        ...) preserves the balance properties the construction is built on;
+        scipy warns otherwise, and so does the note below.
+    sequence : {"sobol", "halton"}, default "sobol"
+        Which point set to use. Sobol is the usual choice and better in
+        moderate dimensions; Halton is simpler and degrades faster past about
+        ten.
+    scramble : bool, default True
         Owen scrambling. Keep it on: an unscrambled set is deterministic, so it
         gives *one* answer with no way to estimate its error, and its first
         point is the corner of the cube. Scrambling preserves the low
         discrepancy and restores the ability to replicate.
-    random_state : None, int or Generator
-        Seeds the scrambling.
+    random_state : int, numpy.random.Generator or None, default None
+        Seeds the scrambling. Pass an int for reproducible output.
 
     Returns
     -------
-    ndarray, shape (size, d)
+    numpy.ndarray of float, shape (size, d)
+        Draws from the copula, every value strictly between 0 and 1.
+
+    Raises
+    ------
+    ValueError
+        If ``size`` is less than 1, or ``sequence`` is not ``"sobol"`` or
+        ``"halton"``.
 
     Notes
     -----
@@ -167,7 +181,11 @@ def quasi_rvs(
 
 
 def antithetic_rvs(copula: Copula, size: int, *, random_state: Any = None) -> NDArray[np.float64]:
-    r"""Draw from a copula in antithetic pairs.
+    r"""Draw a sample from a copula in mirror-image pairs, to reduce Monte Carlo error.
+
+    This is antithetic sampling. It is free and helps when the quantity you
+    average goes up (or down) steadily as the draws go up, such as a call
+    option payoff; it can hurt for symmetric payoffs (see the warning below).
 
     Each independent uniform vector :math:`z` is used twice, as :math:`z` and
     :math:`1-z`, before the inverse Rosenblatt transform. The two resulting
@@ -177,15 +195,26 @@ def antithetic_rvs(copula: Copula, size: int, *, random_state: Any = None) -> ND
     Parameters
     ----------
     copula : Copula
+        Any copula of dimension ``d`` that supports the inverse Rosenblatt
+        transform.
     size : int
-        Total number of draws. Rounded up to an even number, since they come in
-        pairs; the first half and second half are the partners of each other, so
-        ``u[i]`` pairs with ``u[size // 2 + i]``.
-    random_state : None, int or Generator
+        Total number of draws, at least 1. Rounded up to an even number, since
+        they come in pairs; the first half and second half are the partners of
+        each other, so with ``m = len(u) // 2`` row ``u[i]`` pairs with
+        ``u[m + i]``.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed for the underlying uniforms. Pass an int for reproducible output.
 
     Returns
     -------
-    ndarray, shape (size, d)
+    numpy.ndarray of float, shape (size, d)
+        Draws from the copula. When ``size`` is odd the array has ``size + 1``
+        rows, so that every draw keeps its partner.
+
+    Raises
+    ------
+    ValueError
+        If ``size`` is less than 1.
 
     Warnings
     --------
@@ -221,7 +250,11 @@ def antithetic_rvs(copula: Copula, size: int, *, random_state: Any = None) -> ND
 def latin_hypercube_rvs(
     copula: Copula, size: int, *, random_state: Any = None
 ) -> NDArray[np.float64]:
-    r"""Draw from a copula using a Latin hypercube design.
+    r"""Draw a sample from a copula whose margins are spread evenly by construction.
+
+    This is Latin hypercube sampling. Use it when the answer you are computing
+    depends mostly on the individual margins rather than on how they move
+    together.
 
     Each of the :math:`d` uniform coordinates is stratified into ``size`` equal
     bins with exactly one point per bin, then the columns are permuted
@@ -230,6 +263,26 @@ def latin_hypercube_rvs(
 
     It says nothing about the *joint* structure -- that comes from the inverse
     Rosenblatt transform, as usual.
+
+    Parameters
+    ----------
+    copula : Copula
+        Any copula of dimension ``d`` that supports the inverse Rosenblatt
+        transform.
+    size : int
+        Number of draws, at least 1. Also the number of bins per margin.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed for the design. Pass an int for reproducible output.
+
+    Returns
+    -------
+    numpy.ndarray of float, shape (size, d)
+        Draws from the copula, every value strictly between 0 and 1.
+
+    Raises
+    ------
+    ValueError
+        If ``size`` is less than 1.
 
     Examples
     --------
@@ -260,7 +313,11 @@ def variance_ratio(
     replicates: int = 20,
     random_state: Any = None,
 ) -> dict[str, float]:
-    r"""Measure what a variance-reduction method actually bought.
+    r"""Measure how much a variance-reduction sampler shrinks the Monte Carlo error for your payoff.
+
+    Use it before adopting :func:`quasi_rvs`, :func:`antithetic_rvs` or
+    :func:`latin_hypercube_rvs`: it tells you, for your copula and your
+    payoff, whether the method helps and by how much.
 
     Runs the estimator ``replicates`` times under plain Monte Carlo and again
     under ``method``, and compares the spread of the answers. This is the honest
@@ -270,25 +327,50 @@ def variance_ratio(
     Parameters
     ----------
     copula : Copula
+        The copula to sample from, of dimension ``d``.
     payoff : callable
-        Takes an ``(n, d)`` array of copula draws and returns a value per row.
-        The quantity estimated is its mean.
+        Function ``payoff(u)`` taking a ``numpy.ndarray`` of shape ``(n, d)``
+        of copula draws and returning an array_like of float, shape ``(n,)``:
+        one value per row. The quantity estimated is its mean.
     size : int
-        Draws per replicate.
-    method : {"sobol", "halton", "antithetic", "lhs"}
-    replicates : int
-        Independent repetitions. Each uses a different scramble or seed, which
-        is what makes a spread measurable at all -- an unscrambled quasi-random
-        set would give the same answer every time and no error estimate.
-    random_state : None, int or Generator
+        Draws per replicate, at least 1.
+    method : {"sobol", "halton", "antithetic", "lhs"}, default "sobol"
+        The sampler to compare against plain ``copula.rvs``: :func:`quasi_rvs`
+        with a Sobol or Halton set, :func:`antithetic_rvs`, or
+        :func:`latin_hypercube_rvs`.
+    replicates : int, default 20
+        Independent repetitions, at least 2. Each uses a different scramble or
+        seed, which is what makes a spread measurable at all -- an unscrambled
+        quasi-random set would give the same answer every time and no error
+        estimate.
+    random_state : int, numpy.random.Generator or None, default None
+        Seed from which every replicate's seed is drawn.
 
     Returns
     -------
-    dict
-        ``"plain_se"``, ``"reduced_se"``, ``"ratio"`` (plain over reduced;
-        above 1 means the method helped), ``"equivalent_sample_factor"`` (how
-        many times more plain draws would be needed to match), and the two mean
-        estimates, which should agree.
+    dict of str to float
+        ``"plain_mean"``
+            Average of the plain Monte Carlo estimates.
+        ``"reduced_mean"``
+            Average of the estimates under ``method``; should agree with
+            ``"plain_mean"`` up to noise.
+        ``"plain_se"``
+            Standard deviation of the plain estimates across replicates, i.e.
+            the standard error of one plain estimate of ``size`` draws.
+        ``"reduced_se"``
+            The same under ``method``.
+        ``"ratio"``
+            ``plain_se / reduced_se``. Above 1 means the method helped;
+            ``inf`` if ``reduced_se`` is zero.
+        ``"equivalent_sample_factor"``
+            ``ratio ** 2``: how many times more plain draws would be needed to
+            match the method's error.
+
+    Raises
+    ------
+    ValueError
+        If ``replicates`` is less than 2, or ``method`` is not one of the four
+        names above.
 
     Examples
     --------

@@ -1,4 +1,9 @@
-"""Specification tests: independence, exchangeability, radial symmetry, EV."""
+"""Tests of basic properties of the dependence, to run before choosing a copula family.
+
+Specification tests: independence (:func:`indep_test`, :func:`dependogram`,
+:func:`serial_indep_test`), exchangeability (:func:`exch_test`), radial
+symmetry (:func:`rad_sym_test`) and extreme-value dependence (:func:`ev_test`).
+"""
 
 from __future__ import annotations
 

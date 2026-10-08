@@ -66,17 +66,48 @@ __all__ = ["KhoudrajiCopula"]
 
 
 class KhoudrajiCopula(Copula):
-    """An asymmetric copula built from two symmetric ones.
+    """Combine two copulas into one whose dependence is lopsided (not symmetric in the variables).
+
+    Most families are *exchangeable*: swapping two variables changes nothing,
+    ``C(u, v) = C(v, u)``. Real data often disagree -- the link between an
+    index and its volatility, or a flood peak and its volume, looks different
+    from each side. Khoudraji's device takes two copulas and one "shape" number
+    per variable and returns
+    ``C(u) = C1(u_1**(1 - a_1), ...) * C2(u_1**a_1, ...)``, which is asymmetric
+    whenever the shapes differ. The usual recipe is ``copula1`` = independence
+    and ``copula2`` = a tail-dependent family such as Gumbel.
 
     Parameters
     ----------
     copula1, copula2 : Copula
-        The two components, of the same dimension. ``copula1`` is raised to the
-        ``1 - a`` powers and ``copula2`` to the ``a`` powers, so ``shapes`` near
-        zero recovers ``copula1`` and near one recovers ``copula2``.
-    shapes : array_like
-        One shape in ``[0, 1]`` per coordinate. **Equal shapes leave the result
-        exchangeable**, so asymmetry requires them to differ.
+        The two components, of the same dimension ``d``. ``copula1`` is raised
+        to the ``1 - a`` powers and ``copula2`` to the ``a`` powers, so
+        ``shapes`` near zero recovers ``copula1`` and near one recovers
+        ``copula2``. Their parameters may be ``nan`` (to be fitted).
+    shapes : float or array_like of float, shape (d,)
+        One shape in ``[0, 1]`` per coordinate; a single number is used for
+        every coordinate. **Equal shapes leave the result exchangeable**, so
+        asymmetry requires them to differ.
+    free : array_like of bool, shape (n_params,), or None, default None
+        Keyword-only. Which parameters are estimated when fitting; ``None``
+        means all of them.
+
+    Attributes
+    ----------
+    copula1, copula2 : Copula
+        The two components, as given.
+    shapes : numpy.ndarray of float64, shape (d,)
+        The per-coordinate shape parameters (see :attr:`shapes`).
+    name : str
+        ``"Khoudraji(<name 1>, <name 2>)"``.
+    param_names : tuple of str
+        ``"c1.*"`` names, then ``"c2.*"`` names, then ``"shape1", ...``.
+
+    Raises
+    ------
+    ValueError
+        If the components differ in dimension, if ``shapes`` has the wrong
+        length, or if a shape lies outside ``[0, 1]``.
 
     Notes
     -----
@@ -151,17 +182,40 @@ class KhoudrajiCopula(Copula):
 
     @property
     def shapes(self) -> NDArray[np.float64]:
-        """The per-coordinate shape parameters."""
+        """How far each coordinate leans towards ``copula2`` (1) rather than ``copula1`` (0).
+
+        Returns
+        -------
+        numpy.ndarray of float64, shape (d,)
+            One shape in ``[0, 1]`` per coordinate.
+        """
         return self._params[self._n1 + self._n2 :]
 
     @property
     def is_exchangeable(self) -> bool:
-        """Equal shapes leave the construction symmetric, defeating its purpose."""
+        """Whether all shapes are equal, which makes the result symmetric after all.
+
+        Equal shapes leave the construction symmetric, defeating its purpose
+        (assuming the components are themselves exchangeable).
+
+        Returns
+        -------
+        bool
+            ``True`` when every shape equals the first (to ``numpy.allclose``
+            tolerance).
+        """
         a = self.shapes
         return bool(np.allclose(a, a[0]))
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Allowed range of each parameter: both components' bounds, then ``[0, 1]`` per shape.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            One ``(lower, upper)`` pair per parameter.
+        """
         return [
             *self.copula1.param_bounds,
             *self.copula2.param_bounds,
@@ -268,11 +322,20 @@ class KhoudrajiCopula(Copula):
 
     @property
     def is_extreme_value(self) -> bool:
-        """Whether the construction lands back in the extreme-value class.
+        """Whether the result is an extreme-value copula (needed by :meth:`pickands`).
 
-        It does exactly when both components do -- and the Gumbel copula counts,
-        being the one family that is both Archimedean and extreme-value, as does
-        the independence copula.
+        Extreme-value status also makes :meth:`lambda_` available in closed
+        form. The construction lands back in the extreme-value class exactly
+        when both components do -- and the Gumbel copula counts, being the one
+        family that is both Archimedean and extreme-value, as does the
+        independence copula. Only bivariate constructions are considered.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``dim == 2`` and both components are extreme-value
+            (an :class:`~rcopula.core.extreme_value.ExtremeValueCopula`, a
+            Gumbel copula, or the independence copula).
         """
         from rcopula.core.archimedean import GumbelCopula
         from rcopula.core.other import IndependenceCopula
@@ -283,7 +346,11 @@ class KhoudrajiCopula(Copula):
         return self._dim == 2 and is_ev(self.copula1) and is_ev(self.copula2)
 
     def pickands(self, w: ArrayLike) -> NDArray[np.float64]:
-        r"""Pickands dependence function, when both components are extreme-value.
+        r"""Evaluate the Pickands function ``A(t)``, the curve that defines an extreme-value copula.
+
+        Available only when both components are extreme-value (see
+        :attr:`is_extreme_value`). ``A`` maps ``[0, 1]`` to ``[1/2, 1]``; the
+        copula is recovered as ``C(u, v) = (uv) ** A(log v / log(uv))``.
 
         Substituting :math:`C_i(u,v) = (uv)^{A_i(t_i)}` into the definition and
         collecting the exponent of :math:`\log(uv)` gives
@@ -296,6 +363,21 @@ class KhoudrajiCopula(Copula):
         reweighted arguments. So the extreme-value class is closed under the
         device -- which is the whole reason it is the standard route to an
         *asymmetric* extreme-value copula.
+
+        Parameters
+        ----------
+        w : float or array_like of float, any shape
+            Points ``t`` in ``[0, 1]`` at which to evaluate ``A``.
+
+        Returns
+        -------
+        numpy.ndarray of float64, same shape as ``w``
+            ``A(t)``, elementwise.
+
+        Raises
+        ------
+        NotImplementedError
+            If the copula is not extreme-value.
 
         Examples
         --------
@@ -332,27 +414,69 @@ class KhoudrajiCopula(Copula):
     # -- dependence ----------------------------------------------------
 
     def tau(self) -> float:
-        """Kendall's tau, by quadrature -- the device admits no closed form."""
+        """Return Kendall's tau, a rank correlation between -1 and 1, computed numerically.
+
+        By quadrature -- the device admits no closed form.
+
+        Returns
+        -------
+        float
+            Kendall's tau.
+
+        Raises
+        ------
+        ValueError
+            If any parameter is unspecified (``nan``).
+        NotImplementedError
+            If ``dim != 2``.
+        """
         self._require_specified()
         if self._dim != 2:
             raise NotImplementedError("Kendall's tau is implemented for dim=2")
         return tau_by_partials(self)
 
     def rho(self) -> float:
-        """Spearman's rho, by quadrature."""
+        """Return Spearman's rho, a rank correlation between -1 and 1, computed numerically.
+
+        By quadrature on the CDF.
+
+        Returns
+        -------
+        float
+            Spearman's rho.
+
+        Raises
+        ------
+        ValueError
+            If any parameter is unspecified (``nan``).
+        NotImplementedError
+            If ``dim != 2``.
+        """
         self._require_specified()
         if self._dim != 2:
             raise NotImplementedError("Spearman's rho is implemented for dim=2")
         return rho_by_quadrature(self)
 
     def lambda_(self) -> TailDependence:
-        r"""Tail dependence.
+        r"""Return the chance of joint extremes in each tail (tail-dependence coefficients).
 
         Exact when both components are extreme-value, where
         :math:`\lambda_U = 2(1 - A(1/2))` and :math:`\lambda_L = 0`. Otherwise
         the limit depends on how each component behaves along a direction the
         shapes choose, which no single coefficient of the components records --
         so it is refused rather than guessed.
+
+        Returns
+        -------
+        TailDependence
+            Named tuple ``(lower, upper)``; ``lower`` is always ``0.0``.
+
+        Raises
+        ------
+        ValueError
+            If any parameter is unspecified (``nan``).
+        NotImplementedError
+            If the copula is not extreme-value.
         """
         self._require_specified()
         if not self.is_extreme_value:
@@ -364,13 +488,27 @@ class KhoudrajiCopula(Copula):
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> Copula:
-        """Not available: the shapes and both components are not identified by tau."""
+        """Not available: one tau value cannot pin down both components and the shapes.
+
+        Raises
+        ------
+        NotImplementedError
+            Always. Fit the copula to data instead, or calibrate a component
+            and choose the shapes yourself.
+        """
         raise NotImplementedError(
             "a Khoudraji copula has more parameters than Kendall's tau can pin "
             "down; fit it, or calibrate a component and choose the shapes"
         )
 
     def describe(self) -> str:
+        """Return a multi-line, human-readable summary: the shapes and both components.
+
+        Returns
+        -------
+        str
+            A header line with the shapes, then one line per component.
+        """
         shapes = ", ".join(f"{v:.4g}" for v in self.shapes)
         return (
             f"Khoudraji copula, dim {self._dim}, shapes=({shapes})\n"

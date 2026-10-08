@@ -6,7 +6,7 @@ a goodness-of-fit p-value tell you *whether* a family fits; these tell you
 matters. A copula that misses the middle of the distribution is usually
 harmless; one that misses the corner is not.
 
-The five here are chosen because each answers a question the others cannot.
+Each one answers a question the others cannot.
 
 =============================  ===============================================
 :func:`contour`                What the density or CDF actually looks like.
@@ -18,6 +18,8 @@ The five here are chosen because each answers a question the others cannot.
 :func:`vine_trees`             A vine's trees, edge by edge.
 :func:`nested_tree`            A nested copula's hierarchy.
 :func:`dependence_heatmap`     A pairwise matrix, when one number will not do.
+:func:`dependogram_plot`       Which subsets of variables are dependent.
+:func:`pairs_rosenblatt`       Where a fitted model fails, pair by pair.
 =============================  ===============================================
 
 :func:`tail_concentration` is the one to reach for after fitting. Two families
@@ -26,9 +28,11 @@ exactly where the risk is, so a plot that puts the empirical corner behaviour
 next to the fitted one shows the disagreement that a single summary statistic
 averages away.
 
-Every function takes an optional ``ax`` and returns the axes it drew on, so the
-plots compose into whatever figure you are building. Nothing is shown or saved
-automatically.
+Every function takes an optional ``ax`` (or ``axes`` for the multi-panel ones)
+and returns the axes it drew on, so the plots compose into whatever figure you
+are building. Nothing is shown or saved automatically: call
+``matplotlib.pyplot.show()`` or ``ax.figure.savefig(...)`` yourself.
+matplotlib is imported only when a plot is drawn.
 
 References
 ----------
@@ -120,21 +124,41 @@ def contour(
     ax: Any = None,
     **kwargs: Any,
 ) -> Any:
-    """Contour plot of a bivariate copula's density or distribution function.
+    """Draw a contour map of a two-variable copula, like the height lines on a terrain map.
+
+    Shows where the copula puts its probability: tight contours in a corner
+    mean the two variables tend to be extreme together there. Use it to see
+    the shape of a family or of a fitted model at a glance.
 
     Parameters
     ----------
     copula : Copula
-        Bivariate, with parameters specified.
-    kind : {"pdf", "logpdf", "cdf"}
-        ``"logpdf"`` is usually the readable one for a tail-dependent family,
-        whose density spans many orders of magnitude and whose linear contours
-        therefore all crowd into one corner.
-    n : int
+        Bivariate (``dim == 2``), with parameters specified.
+    kind : {"pdf", "logpdf", "cdf"}, default "pdf"
+        What to draw: the density, its logarithm, or the distribution
+        function. ``"logpdf"`` is usually the readable one for a
+        tail-dependent family, whose density spans many orders of magnitude
+        and whose linear contours therefore all crowd into one corner.
+    n : int, default 60
         Grid points per axis.
-    margin : float
+    margin : float, default 0.01
         How far to stay off the boundary, where a tail-dependent density
-        diverges.
+        diverges. The grid spans ``[margin, 1 - margin]`` on each axis.
+    ax : matplotlib.axes.Axes or None, default None
+        Axes to draw on. ``None`` creates a new figure and axes.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.contour``. ``levels`` defaults to 14.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes drawn on, labelled ``u1`` and ``u2``.
+
+    Raises
+    ------
+    ValueError
+        If the copula is not bivariate or ``kind`` is not one of the three
+        options.
 
     Examples
     --------
@@ -170,7 +194,39 @@ def surface(
     ax: Any = None,
     **kwargs: Any,
 ) -> Any:
-    """Three-dimensional surface of the density or CDF (R's ``persp``).
+    """Draw a two-variable copula's density or CDF as a 3-D surface (R's ``persp``).
+
+    The same information as :func:`contour`, shown as a landscape whose height
+    is the density (or CDF) above each point of the unit square.
+
+    Parameters
+    ----------
+    copula : Copula
+        Bivariate (``dim == 2``), with parameters specified.
+    kind : {"pdf", "logpdf", "cdf"}, default "pdf"
+        What to draw: the density, its logarithm, or the distribution function.
+    n : int, default 60
+        Grid points per axis.
+    margin : float, default 0.02
+        How far to stay off the boundary, where a tail-dependent density
+        diverges.
+    ax : mpl_toolkits.mplot3d.axes3d.Axes3D or None, default None
+        A 3-D axes to draw on (created with ``projection="3d"``). ``None``
+        creates a new figure with one.
+    **kwargs
+        Passed to ``Axes3D.plot_surface``. ``cmap`` defaults to ``"viridis"``
+        and ``linewidth`` to 0.
+
+    Returns
+    -------
+    mpl_toolkits.mplot3d.axes3d.Axes3D
+        The 3-D axes drawn on; the z-axis is labelled with ``kind``.
+
+    Raises
+    ------
+    ValueError
+        If the copula is not bivariate or ``kind`` is not one of the three
+        options.
 
     Examples
     --------
@@ -208,12 +264,37 @@ def scatter_matrix(
     axes: Any = None,
     **kwargs: Any,
 ) -> Any:
-    """Pairwise scatter plots on the copula scale, annotated with Kendall's tau.
+    """Plot every pair of variables against each other after converting them to ranks.
 
-    Ranks are taken first, so the panels show *dependence* and nothing else --
-    the marginal shapes that dominate a raw scatter plot are removed. Two
-    variables whose raw plot is an uninformative smear can show a clean pattern
-    here.
+    A grid of panels: scatter plots below the diagonal, histograms on it, and
+    the pair's Kendall's tau above it. Ranks are taken first, so the panels
+    show *dependence* and nothing else -- the marginal shapes that dominate a
+    raw scatter plot are removed. Two variables whose raw plot is an
+    uninformative smear can show a clean pattern here.
+
+    Parameters
+    ----------
+    data : array_like of float, shape (n, d)
+        Observations on any scale; they are converted to pseudo-observations
+        (ranks scaled into ``(0, 1)``) first.
+    names : list of str or None, default None
+        One label per column. ``None`` uses ``"u1", "u2", ...``.
+    axes : array_like of matplotlib.axes.Axes, shape (d, d), or None, default None
+        Grid of axes to draw into, indexed ``axes[i][j]``. ``None`` creates a
+        new figure.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.scatter`` for the lower-triangle
+        panels. ``s`` defaults to 4 and ``alpha`` to 0.4.
+
+    Returns
+    -------
+    numpy.ndarray of matplotlib.axes.Axes, shape (d, d)
+        The grid of axes (or the ``axes`` you passed in).
+
+    Raises
+    ------
+    ValueError
+        If ``names`` does not have one entry per column.
 
     Examples
     --------
@@ -270,9 +351,12 @@ def tail_concentration(
     ax: Any = None,
     **kwargs: Any,
 ) -> Any:
-    r"""Tail concentration functions, empirical against fitted.
+    r"""Compare how often data and fitted copulas are jointly extreme, out to each corner.
 
-    The two branches are
+    Draws the tail concentration function for the data (solid black) and for
+    each copula (dashed). The left half of the plot describes the lower tail
+    (both variables small), the right half the upper tail (both large). This
+    is the plot to look at after fitting. The two branches are
 
     .. math::
         L(q) = \frac{C(q, q)}{q}\ \ (q \le \tfrac12), \qquad
@@ -285,10 +369,29 @@ def tail_concentration(
 
     Parameters
     ----------
-    data : array_like, optional
-        Observations, plotted as the empirical curve.
-    copula : Copula or list of Copula, optional
-        One or more fitted copulas, plotted as reference curves.
+    data : array_like of float, shape (n, 2), or None, default None
+        Observations on any scale (converted to ranks), plotted as the
+        empirical curve.
+    copula : Copula, list of Copula, or None, default None
+        One or more bivariate copulas, plotted as reference curves. At least
+        one of ``data`` and ``copula`` must be given.
+    n : int, default 99
+        Number of evaluation points ``q``, equally spaced in ``(0, 1)``.
+    ax : matplotlib.axes.Axes or None, default None
+        Axes to draw on. ``None`` creates a new figure and axes.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.plot`` for the empirical curve only.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes drawn on, with a legend.
+
+    Raises
+    ------
+    ValueError
+        If neither ``data`` nor ``copula`` is given, or if the data or any
+        copula is not bivariate.
 
     Examples
     --------
@@ -340,7 +443,10 @@ def kendall_plot(
     ax: Any = None,
     **kwargs: Any,
 ) -> Any:
-    r"""Kendall plot (K-plot), a dependence diagnostic with no fitted model.
+    r"""Draw a Kendall plot (K-plot): a quick visual test of whether two variables are dependent.
+
+    Points on the diagonal mean independence; points above it mean positive
+    dependence, below it negative. No model has to be fitted first.
 
     Genest & Boies (2003) plot the ordered statistics :math:`W_{i}` of the
     empirical Kendall function against their expected values *under
@@ -351,6 +457,21 @@ def kendall_plot(
     Its appeal is that it needs neither margins nor a fitted family: it is a
     function of the ranks alone, so it can be looked at before any modelling
     decision has been made.
+
+    Parameters
+    ----------
+    data : array_like of float, shape (n, d)
+        Observations on any scale; only ranks are used.
+    ax : matplotlib.axes.Axes or None, default None
+        Axes to draw on. ``None`` creates a new figure and axes.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.scatter``. ``s`` defaults to 8.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes drawn on: expected values under independence on the x-axis,
+        ordered empirical Kendall values ``W`` on the y-axis.
 
     Examples
     --------
@@ -423,13 +544,37 @@ def pickands_plot(
     ax: Any = None,
     **kwargs: Any,
 ) -> Any:
-    r"""The Pickands dependence function inside its admissible triangle.
+    r"""Plot the Pickands function of extreme-value copulas, showing their strength and symmetry.
 
-    Every extreme-value copula is determined by a convex :math:`A` with
+    The Pickands function :math:`A(t)` is the curve that fully describes an
+    extreme-value copula. Every extreme-value copula is determined by a convex :math:`A` with
     :math:`\max(t, 1-t) \le A(t) \le 1`. The upper edge is independence and the
     lower one comonotonicity, so the plot places a family between those two
     extremes and shows at a glance how much dependence it carries and whether it
     is symmetric -- which is the property Khoudraji's device exists to break.
+
+    Parameters
+    ----------
+    copula : Copula or list of Copula
+        One or more bivariate extreme-value copulas: an
+        :class:`~rcopula.core.extreme_value.ExtremeValueCopula`, a Gumbel
+        copula, or an extreme-value :class:`~rcopula.structural.KhoudrajiCopula`.
+    n : int, default 201
+        Number of points ``t`` in ``[0, 1]``.
+    ax : matplotlib.axes.Axes or None, default None
+        Axes to draw on. ``None`` creates a new figure and axes.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.plot`` for each copula's curve.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes drawn on, with the admissible bounds in grey and a legend.
+
+    Raises
+    ------
+    ValueError
+        If a copula is not extreme-value.
 
     Examples
     --------
@@ -478,7 +623,9 @@ def vine_trees(
     axes: Any = None,
     **kwargs: Any,
 ) -> Any:
-    """Draw a vine's trees, edge labels annotated with each pair-copula.
+    """Draw each tree of a vine copula, labelling every edge with its pair-copula.
+
+    Each edge label shows the pair-copula's family name and parameters.
 
     A vine is a sequence of trees, and the thing a reader needs to see is which
     pairs each tree joins, what it conditions on, and which family was selected
@@ -490,8 +637,24 @@ def vine_trees(
     ----------
     vine : VineCopula
         A fitted or specified vine.
-    max_trees : int, optional
-        Draw only the first few trees. Defaults to all of them.
+    max_trees : int or None, default None
+        Draw only the first ``max_trees`` trees. ``None`` draws all of them.
+    axes : sequence of matplotlib.axes.Axes or None, default None
+        One axes per tree to draw. ``None`` creates a new figure with one
+        panel per tree in a row.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.plot`` for the edges.
+
+    Returns
+    -------
+    numpy.ndarray of matplotlib.axes.Axes, shape (n_trees,)
+        One axes per drawn tree (or the ``axes`` you passed in).
+
+    Notes
+    -----
+    Nodes are placed on a circle. In trees after the first, node labels are
+    abbreviated to ``"<variable>|·"`` to signal conditioning; the edge labels
+    carry the family and parameters.
 
     Examples
     --------
@@ -561,12 +724,27 @@ def _short_params(copula: Copula) -> str:
 
 
 def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
-    """Draw a nested Archimedean copula's hierarchy.
+    """Draw a nested Archimedean copula as a tree diagram, with each node's parameter and tau.
 
     The whole point of nesting is that dependence varies by branch, so the
     picture worth drawing is the tree with each node's parameter and Kendall's
     tau on it -- from which the pairwise tau of any two leaves can be read off
     directly, since two variables meet at exactly one node.
+
+    Parameters
+    ----------
+    node : NestedArchimedean
+        The root of the tree, with every parameter specified.
+    ax : matplotlib.axes.Axes or None, default None
+        Axes to draw on. ``None`` creates a new figure and axes.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.scatter`` for the internal nodes.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes drawn on (axis lines hidden). Leaves are the variable
+        indices; each internal node shows ``theta`` and its Kendall's tau.
 
     Examples
     --------
@@ -630,11 +808,36 @@ def dependence_heatmap(
     ax: Any = None,
     **kwargs: Any,
 ) -> Any:
-    """Heat map of a pairwise dependence matrix, annotated with the numbers.
+    """Draw a colour-coded grid of a pairwise dependence matrix, with the numbers written in.
 
     Useful precisely for the constructions whose whole point is that dependence
     is *not* one number: a nested copula's :meth:`tau_matrix`, or the empirical
     matrix from a sample.
+
+    Parameters
+    ----------
+    values : array_like of float, shape (d, d)
+        Square matrix to show, e.g. ``cop.tau_matrix()`` or
+        ``rcopula.cor_kendall(data)``.
+    names : list of str or None, default None
+        Tick labels, one per row/column. ``None`` uses ``"0", "1", ...``.
+    label : str, default "Kendall's tau"
+        Title of the plot.
+    ax : matplotlib.axes.Axes or None, default None
+        Axes to draw on. ``None`` creates a new figure and axes.
+    **kwargs
+        Passed to ``matplotlib.axes.Axes.imshow``. ``cmap`` defaults to
+        ``"RdBu_r"`` with ``vmin=-1`` and ``vmax=1``.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes drawn on.
+
+    Raises
+    ------
+    ValueError
+        If ``values`` is not square.
 
     Examples
     --------
@@ -680,10 +883,11 @@ def dependogram_plot(
     level: float = 0.05,
     ax: Axes | None = None,
 ) -> Axes:
-    r"""Plot a :func:`~rcopula.htest.dependogram`.
+    r"""Draw a bar chart of which groups of variables show dependence, from a dependogram test.
 
-    One bar per subset, tallest first, with the subsets that reject independence
-    marked. The point of the picture over the table is that it shows *where* the
+    Plots the result of :func:`~rcopula.htest.dependogram`. One bar per
+    subset, tallest first, with the subsets that reject independence marked.
+    The point of the picture over the table is that it shows *where* the
     dependence lives at a glance: three variables can be pairwise independent
     and jointly dependent, and the bar for the triple stands alone.
 
@@ -691,13 +895,17 @@ def dependogram_plot(
     ----------
     result : DependogramResult
         From :func:`~rcopula.htest.dependogram`.
-    level : float
-        Significance level for the marking.
-    ax : Axes, optional
+    level : float, default 0.05
+        Keyword-only. Significance level: subsets with p-value below it are
+        drawn in red.
+    ax : matplotlib.axes.Axes or None, default None
+        Keyword-only. Axes to draw on. ``None`` creates a new figure and axes.
 
     Returns
     -------
-    Axes
+    matplotlib.axes.Axes
+        The axes drawn on: one bar per subset, height = Cramer-von Mises
+        statistic, annotated with its p-value.
 
     Examples
     --------
@@ -763,10 +971,10 @@ def pairs_rosenblatt(
     level: float = 0.05,
     axes: Any = None,
 ) -> Any:
-    r"""Pairwise scatter of Rosenblatt-transformed data (R's ``pairsRosenblatt``).
+    r"""Show, pair by pair, where a fitted copula fails to describe the data.
 
-    A goodness-of-fit test says *whether* a copula fits. This says **where** it
-    does not.
+    This is R's ``pairsRosenblatt``. A goodness-of-fit test says *whether* a
+    copula fits. This says **where** it does not.
 
     Under the fitted copula the Rosenblatt transform produces independent
     uniforms, so every panel below should look like structureless noise on the
@@ -784,17 +992,21 @@ def pairs_rosenblatt(
     Parameters
     ----------
     copula : Copula
-        The fitted model to be judged.
-    u : array_like, shape (n, d)
-        Pseudo-observations.
-    level : float
-        Panels below this p-value are shaded.
-    axes : ndarray of Axes, optional
-        A ``(d, d)`` grid to draw into.
+        The fitted model to be judged, of dimension ``d``.
+    u : array_like of float, shape (n, d)
+        Pseudo-observations (values in ``(0, 1)``, e.g. from
+        :func:`~rcopula.pseudo_obs`).
+    level : float, default 0.05
+        Keyword-only. Panels whose independence p-value is below this are
+        shaded red.
+    axes : array_like of matplotlib.axes.Axes, shape (d, d), or None, default None
+        Keyword-only. Grid to draw into. ``None`` creates a new figure.
 
     Returns
     -------
-    ndarray of Axes
+    numpy.ndarray of matplotlib.axes.Axes, shape (d, d)
+        Scatter plots below the diagonal, p-value and tau text above it. The
+        figure also gets a title and ``tight_layout``.
 
     Notes
     -----

@@ -39,10 +39,27 @@ __all__ = [
 
 
 class IndependenceCopula(Copula):
-    r"""The independence copula :math:`\Pi(u) = \prod_j u_j`.
+    r"""Copula for variables that have no dependence on each other at all.
+
+    Use it as a baseline: joint probabilities are simply the product of the
+    individual probabilities, :math:`\Pi(u) = \prod_j u_j`. It has no
+    parameters.
 
     The reference point for every dependence measure: all of ``tau``, ``rho``,
     ``beta`` and both tail-dependence coefficients are zero.
+
+    Parameters
+    ----------
+    dim : int, default 2
+        Number of variables ``d``; must be at least 2.
+    **kwargs : object
+        Accepted and ignored, so generic code can pass the same keywords to
+        every family.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2``.
 
     Examples
     --------
@@ -65,6 +82,13 @@ class IndependenceCopula(Copula):
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Admissible parameter ranges: always an empty list (no parameters).
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            ``[]``.
+        """
         return []
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> IndependenceCopula:
@@ -80,20 +104,66 @@ class IndependenceCopula(Copula):
         return rng.uniform(size=(size, self._dim))
 
     def tau(self) -> float:
+        """Return Kendall's tau, a rank correlation in ``[-1, 1]``; here 0.0.
+
+        Returns
+        -------
+        float
+            ``0.0``.
+        """
         return 0.0
 
     def rho(self) -> float:
+        """Return Spearman's rho, a rank correlation in ``[-1, 1]``; here 0.0.
+
+        Returns
+        -------
+        float
+            ``0.0``.
+        """
         return 0.0
 
     def lambda_(self) -> TailDependence:
+        """Return how strongly extreme values occur together (tail dependence).
+
+        Independent variables never crash or boom together beyond chance,
+        so both coefficients are zero.
+
+        Returns
+        -------
+        TailDependence
+            ``TailDependence(lower=0.0, upper=0.0)``.
+        """
         return TailDependence(lower=0.0, upper=0.0)
 
 
 class FrechetUpperCopula(Copula):
-    r"""The Frechet-Hoeffding upper bound :math:`M(\mathbf{u}) = \min_j u_j`.
+    r"""Copula for perfect positive dependence: all variables move in lock-step.
+
+    Every variable is an increasing function of every other, so knowing one
+    determines the rest. This is the strongest possible positive dependence --
+    the Frechet-Hoeffding upper bound :math:`M(\mathbf{u}) = \min_j u_j`. It
+    has no parameters. Use it as an extreme reference case or for perfectly
+    comonotone risks.
 
     Comonotonicity: every margin is an increasing function of every other. No
     density exists -- all the mass sits on the diagonal -- so :meth:`pdf` raises.
+
+    Parameters
+    ----------
+    dim : int, default 2
+        Number of variables ``d``; must be at least 2.
+    **kwargs : object
+        Accepted and ignored, so generic code can pass the same keywords to
+        every family.
+
+    Raises
+    ------
+    ValueError
+        If ``dim < 2``.
+    NotImplementedError
+        From :meth:`pdf` / :meth:`logpdf` at interior points, since no density
+        exists.
 
     Examples
     --------
@@ -122,6 +192,13 @@ class FrechetUpperCopula(Copula):
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Admissible parameter ranges: always an empty list (no parameters).
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            ``[]``.
+        """
         return []
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> FrechetUpperCopula:
@@ -140,21 +217,66 @@ class FrechetUpperCopula(Copula):
         return np.repeat(rng.uniform(size=(size, 1)), self._dim, axis=1)
 
     def tau(self) -> float:
+        """Return Kendall's tau, a rank correlation in ``[-1, 1]``; here 1.0.
+
+        Returns
+        -------
+        float
+            ``1.0``.
+        """
         return 1.0
 
     def rho(self) -> float:
+        """Return Spearman's rho, a rank correlation in ``[-1, 1]``; here 1.0.
+
+        Returns
+        -------
+        float
+            ``1.0``.
+        """
         return 1.0
 
     def lambda_(self) -> TailDependence:
+        """Return how strongly extreme values occur together (tail dependence).
+
+        The variables move in lock-step, so an extreme in one is always an
+        extreme in the others: both coefficients are one.
+
+        Returns
+        -------
+        TailDependence
+            ``TailDependence(lower=1.0, upper=1.0)``.
+        """
         return TailDependence(lower=1.0, upper=1.0)
 
 
 class FrechetLowerCopula(Copula):
-    r"""The Frechet-Hoeffding lower bound :math:`W(u, v) = \max(u + v - 1, 0)`.
+    r"""Copula for perfect negative dependence between two variables.
+
+    When one variable is large the other is exactly correspondingly small:
+    one is a decreasing function of the other. This is the strongest possible
+    negative dependence -- the Frechet-Hoeffding lower bound
+    :math:`W(u, v) = \max(u + v - 1, 0)`. It has no parameters.
 
     Countermonotonicity. **Bivariate only** -- in three or more dimensions
     :math:`W` is not a copula at all (its C-volume can be negative), which is
     why R restricts ``lowfhCopula`` the same way. Singular, so no density.
+
+    Parameters
+    ----------
+    dim : int, default 2
+        Number of variables; must be exactly 2.
+    **kwargs : object
+        Accepted and ignored, so generic code can pass the same keywords to
+        every family.
+
+    Raises
+    ------
+    ValueError
+        If ``dim != 2``.
+    NotImplementedError
+        From :meth:`pdf` / :meth:`logpdf` at interior points, since no density
+        exists.
 
     Examples
     --------
@@ -194,6 +316,13 @@ class FrechetLowerCopula(Copula):
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Admissible parameter ranges: always an empty list (no parameters).
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            ``[]``.
+        """
         return []
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> FrechetLowerCopula:
@@ -213,17 +342,46 @@ class FrechetLowerCopula(Copula):
         return np.column_stack([v, 1.0 - v])
 
     def tau(self) -> float:
+        """Return Kendall's tau, a rank correlation in ``[-1, 1]``; here -1.0.
+
+        Returns
+        -------
+        float
+            ``-1.0``.
+        """
         return -1.0
 
     def rho(self) -> float:
+        """Return Spearman's rho, a rank correlation in ``[-1, 1]``; here -1.0.
+
+        Returns
+        -------
+        float
+            ``-1.0``.
+        """
         return -1.0
 
     def lambda_(self) -> TailDependence:
+        """Return how strongly extreme values occur together (tail dependence).
+
+        One variable is small exactly when the other is large, so the two
+        are never jointly extreme in the same direction: both coefficients
+        are zero.
+
+        Returns
+        -------
+        TailDependence
+            ``TailDependence(lower=0.0, upper=0.0)``.
+        """
         return TailDependence(lower=0.0, upper=0.0)
 
 
 class PlackettCopula(Copula):
-    r"""Plackett copula (bivariate).
+    r"""Two-variable copula covering the whole range from negative to positive dependence.
+
+    A flexible one-parameter model for two variables with no tendency for
+    extremes to cluster (no tail dependence). Pick it when you want a simple,
+    symmetric dependence of any sign and strength.
 
     Defined by a constant cross-product ratio :math:`\theta > 0`:
 
@@ -236,6 +394,28 @@ class PlackettCopula(Copula):
     countermonotone bound, :math:`\theta = 1` independence,
     :math:`\theta \to \infty` the comonotone bound -- with no tail dependence
     anywhere. Spearman's rho has a closed form; Kendall's tau does not.
+
+    Parameters
+    ----------
+    theta : float, default nan
+        Cross-product ratio, any value in ``[0, inf)``. Below 1 gives negative
+        dependence, 1 is independence, above 1 positive dependence. ``nan``
+        leaves it unspecified, to be estimated by fitting.
+    dim : int, default 2
+        Number of variables; must be exactly 2.
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated (``True``) or held fixed (``False``)
+        during fitting. ``None`` means free.
+
+    Attributes
+    ----------
+    theta : float
+        The cross-product ratio.
+
+    Raises
+    ------
+    ValueError
+        If ``dim != 2`` or ``theta`` is negative.
 
     Examples
     --------
@@ -266,11 +446,24 @@ class PlackettCopula(Copula):
 
     @property
     def theta(self) -> float:
-        """The cross-product ratio."""
+        """The dependence parameter (cross-product ratio); 1 means independence.
+
+        Returns
+        -------
+        float
+            ``theta``, in ``[0, inf)``, or ``nan`` if unspecified.
+        """
         return float(self._params[0])
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Admissible range of ``theta``.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            ``[(0.0, inf)]``.
+        """
         return [(0.0, np.inf)]
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> PlackettCopula:
@@ -317,7 +510,10 @@ class PlackettCopula(Copula):
         return (c - (1.0 - 2.0 * w) * d) / (2.0 * b)
 
     def tau(self) -> float:
-        r"""Kendall's tau by quadrature -- Plackett admits no closed form.
+        r"""Return Kendall's tau, a rank correlation in ``[-1, 1]``.
+
+        Computed by numerical integration, because Plackett admits no closed
+        form.
 
         Uses :math:`\tau = 1 - 4\int\!\!\int \partial_1 C\,\partial_2 C\,du\,dv`
         rather than the equivalent :math:`4\int\!\!\int C\,c\,du\,dv - 1`. The
@@ -328,12 +524,36 @@ class PlackettCopula(Copula):
         inaccurate but outside the range Kendall's tau can occupy. The integrand
         used here is a product of conditional distribution functions, bounded in
         ``[0, 1]``, and lands within 0.002 of the empirical value there.
+
+        Returns
+        -------
+        float
+            Kendall's tau.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is unspecified (``nan``).
         """
         self._require_specified()
         return tau_by_partials(self)
 
     def rho(self) -> float:
-        r""":math:`\rho = \frac{\theta+1}{\theta-1} - \frac{2\theta\log\theta}{(\theta-1)^2}`."""
+        r"""Return Spearman's rho, a rank correlation in ``[-1, 1]``.
+
+        Closed form:
+        :math:`\rho = \frac{\theta+1}{\theta-1} - \frac{2\theta\log\theta}{(\theta-1)^2}`.
+
+        Returns
+        -------
+        float
+            Spearman's rho.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is unspecified (``nan``).
+        """
         self._require_specified()
         theta = self.theta
         if abs(theta - 1.0) < 1e-5:
@@ -345,16 +565,46 @@ class PlackettCopula(Copula):
         )
 
     def lambda_(self) -> TailDependence:
+        """Return how strongly extreme values occur together (tail dependence).
+
+        Plackett has no tail dependence at any ``theta``.
+
+        Returns
+        -------
+        TailDependence
+            ``TailDependence(lower=0.0, upper=0.0)``.
+        """
         return TailDependence(lower=0.0, upper=0.0)
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> PlackettCopula:
-        """Calibrate to a target Kendall's tau, by numerical inversion.
+        """Build a Plackett copula whose Kendall's tau equals a target value.
+
+        Use this to choose ``theta`` from a rank correlation you already know.
 
         Plackett's tau has no closed form in either direction, so this inverts
         :meth:`tau` on a logarithmic scale -- where the map is smooth and
         monotone over the family's whole range, from the countermonotone limit
         at ``theta -> 0`` to the comonotone one at ``theta -> inf``.
+
+        Parameters
+        ----------
+        tau : float
+            Target Kendall's tau, strictly between -1 and 1.
+        dim : int, default 2
+            Number of variables; must be 2.
+        **kwargs : Any
+            Passed to the constructor, e.g. ``free``.
+
+        Returns
+        -------
+        PlackettCopula
+            A new copula with ``tau()`` equal to ``tau`` (to about 1e-6).
+
+        Raises
+        ------
+        ValueError
+            If ``tau`` is not in ``(-1, 1)``.
 
         Examples
         --------
@@ -380,7 +630,35 @@ class PlackettCopula(Copula):
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> PlackettCopula:
-        """Calibrate to a target Spearman's rho by inverting the closed form."""
+        """Build a Plackett copula whose Spearman's rho equals a target value.
+
+        Inverts the closed form of :meth:`rho` numerically.
+
+        Parameters
+        ----------
+        rho : float
+            Target Spearman's rho, strictly between -1 and 1.
+        dim : int, default 2
+            Number of variables. Not used: the result is always bivariate.
+        **kwargs : Any
+            Accepted but not used.
+
+        Returns
+        -------
+        PlackettCopula
+            A new copula with ``rho()`` equal to ``rho``.
+
+        Raises
+        ------
+        ValueError
+            If ``rho`` is not in ``(-1, 1)``.
+
+        Examples
+        --------
+        >>> from rcopula import PlackettCopula
+        >>> bool(abs(PlackettCopula.from_rho(0.5).rho() - 0.5) < 1e-8)
+        True
+        """
         if not -1.0 < rho < 1.0:
             raise ValueError(f"rho must lie in (-1, 1), got {rho}")
         if rho == 0.0:
@@ -390,13 +668,39 @@ class PlackettCopula(Copula):
 
 
 class FGMCopula(Copula):
-    r"""Farlie-Gumbel-Morgenstern copula (bivariate).
+    r"""Simple two-variable copula for weak dependence (Farlie-Gumbel-Morgenstern).
+
+    A small, easy-to-compute departure from independence, positive or
+    negative. It cannot represent strong dependence, so use it for toy models
+    or for testing methods near independence.
 
     .. math::  C(u,v) = uv\bigl(1 + \theta(1-u)(1-v)\bigr), \qquad |\theta| \le 1.
 
     A perturbation of independence, and a *weak* one: dependence is capped at
     :math:`|\tau| \le 2/9` and :math:`|\rho| \le 1/3`. Useful as a tractable toy
     and for testing procedures near independence, rarely as a serious model.
+
+    Parameters
+    ----------
+    theta : float, default nan
+        Dependence parameter in ``[-1, 1]``; 0 is independence, positive
+        values give positive dependence. ``nan`` leaves it unspecified, to be
+        estimated by fitting.
+    dim : int, default 2
+        Number of variables; must be exactly 2.
+    free : array_like of bool, shape (1,), or None, default None
+        Whether ``theta`` is estimated (``True``) or held fixed (``False``)
+        during fitting. ``None`` means free.
+
+    Attributes
+    ----------
+    theta : float
+        The dependence parameter.
+
+    Raises
+    ------
+    ValueError
+        If ``dim != 2`` or ``theta`` is outside ``[-1, 1]``.
 
     Examples
     --------
@@ -429,10 +733,24 @@ class FGMCopula(Copula):
 
     @property
     def theta(self) -> float:
+        """The dependence parameter; 0 means independence.
+
+        Returns
+        -------
+        float
+            ``theta``, in ``[-1, 1]``, or ``nan`` if unspecified.
+        """
         return float(self._params[0])
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Admissible range of ``theta``.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            ``[(-1.0, 1.0)]``.
+        """
         return [(-1.0, 1.0)]
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> FGMCopula:
@@ -460,33 +778,121 @@ class FGMCopula(Copula):
         return np.column_stack([u, v])
 
     def tau(self) -> float:
-        r""":math:`\tau = 2\theta/9`."""
+        r"""Return Kendall's tau, a rank correlation; here :math:`\tau = 2\theta/9`.
+
+        Returns
+        -------
+        float
+            Kendall's tau, in ``[-2/9, 2/9]``.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is unspecified (``nan``).
+        """
         self._require_specified()
         return 2.0 * self.theta / 9.0
 
     def rho(self) -> float:
-        r""":math:`\rho = \theta/3`."""
+        r"""Return Spearman's rho, a rank correlation; here :math:`\rho = \theta/3`.
+
+        Returns
+        -------
+        float
+            Spearman's rho, in ``[-1/3, 1/3]``.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is unspecified (``nan``).
+        """
         self._require_specified()
         return self.theta / 3.0
 
     def lambda_(self) -> TailDependence:
+        """Return how strongly extreme values occur together (tail dependence).
+
+        FGM has no tail dependence at any ``theta``.
+
+        Returns
+        -------
+        TailDependence
+            ``TailDependence(lower=0.0, upper=0.0)``.
+        """
         return TailDependence(lower=0.0, upper=0.0)
 
     @classmethod
     def from_tau(cls, tau: float, dim: int = 2, **kwargs: Any) -> FGMCopula:
+        """Build an FGM copula whose Kendall's tau equals a target value.
+
+        Uses ``theta = 9 * tau / 2``.
+
+        Parameters
+        ----------
+        tau : float
+            Target Kendall's tau, in ``[-2/9, 2/9]`` (FGM cannot go further).
+        dim : int, default 2
+            Number of variables. Not used: the result is always bivariate.
+        **kwargs : Any
+            Accepted but not used.
+
+        Returns
+        -------
+        FGMCopula
+            A new copula with ``tau()`` equal to ``tau``.
+
+        Raises
+        ------
+        ValueError
+            If ``tau`` is outside ``[-2/9, 2/9]``.
+
+        Examples
+        --------
+        >>> from rcopula import FGMCopula
+        >>> FGMCopula.from_tau(0.1).theta
+        0.45
+        """
         if not -2.0 / 9.0 <= tau <= 2.0 / 9.0:
             raise ValueError(f"FGM attains only tau in [-2/9, 2/9], got {tau}")
         return cls(9.0 * tau / 2.0)
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> FGMCopula:
+        """Build an FGM copula whose Spearman's rho equals a target value.
+
+        Uses ``theta = 3 * rho``.
+
+        Parameters
+        ----------
+        rho : float
+            Target Spearman's rho, in ``[-1/3, 1/3]`` (FGM cannot go further).
+        dim : int, default 2
+            Number of variables. Not used: the result is always bivariate.
+        **kwargs : Any
+            Accepted but not used.
+
+        Returns
+        -------
+        FGMCopula
+            A new copula with ``rho()`` equal to ``rho``.
+
+        Raises
+        ------
+        ValueError
+            If ``rho`` is outside ``[-1/3, 1/3]``.
+        """
         if not -1.0 / 3.0 <= rho <= 1.0 / 3.0:
             raise ValueError(f"FGM attains only rho in [-1/3, 1/3], got {rho}")
         return cls(3.0 * rho)
 
 
 class MarshallOlkinCopula(Copula):
-    r"""Marshall-Olkin copula (bivariate).
+    r"""Two-variable copula for things that can fail from a common shock (Marshall-Olkin).
+
+    Models two components that each fail from their own causes or together
+    from a shared event, so there is a real chance they fail at exactly the
+    same moment. Use it for joint-default or joint-failure settings where
+    simultaneous events matter.
 
     .. math::
 
@@ -499,6 +905,31 @@ class MarshallOlkinCopula(Copula):
     only the continuous part and is undefined there. Asymmetric unless
     :math:`\alpha_1 = \alpha_2`, and upper-tail dependent with
     :math:`\lambda_U = \min(\alpha_1, \alpha_2)`.
+
+    Parameters
+    ----------
+    alpha1 : float or array_like of float, shape (2,), default nan
+        Share of the first component's failures caused by the common shock,
+        in ``[0, 1]``. May instead be both parameters at once,
+        ``[alpha1, alpha2]``, in which case ``alpha2`` is ignored. ``nan``
+        leaves it unspecified, to be estimated by fitting.
+    alpha2 : float, default nan
+        The same share for the second component, in ``[0, 1]``.
+    dim : int, default 2
+        Number of variables; must be exactly 2.
+    free : array_like of bool, shape (2,), or None, default None
+        Which of ``(alpha1, alpha2)`` are estimated (``True``) or held fixed
+        (``False``) during fitting. ``None`` means both free.
+
+    Attributes
+    ----------
+    alpha : numpy.ndarray of float, shape (2,)
+        The two shock parameters ``[alpha1, alpha2]``.
+
+    Raises
+    ------
+    ValueError
+        If ``dim != 2`` or either parameter is outside ``[0, 1]``.
 
     Examples
     --------
@@ -538,11 +969,24 @@ class MarshallOlkinCopula(Copula):
 
     @property
     def alpha(self) -> NDArray[np.float64]:
-        """The two shock parameters."""
+        """The two common-shock parameters ``[alpha1, alpha2]`` (read-only).
+
+        Returns
+        -------
+        numpy.ndarray of float, shape (2,)
+            Values in ``[0, 1]``, or ``nan`` where unspecified.
+        """
         return self._params
 
     @property
     def param_bounds(self) -> list[tuple[float, float]]:
+        """Admissible ranges of ``alpha1`` and ``alpha2``.
+
+        Returns
+        -------
+        list of tuple of (float, float)
+            ``[(0.0, 1.0), (0.0, 1.0)]``.
+        """
         return [(0.0, 1.0), (0.0, 1.0)]
 
     def _reconstruct(self, params: ArrayLike, free: ArrayLike) -> MarshallOlkinCopula:
@@ -582,19 +1026,64 @@ class MarshallOlkinCopula(Copula):
         return np.column_stack([u1, u2])
 
     def tau(self) -> float:
-        r""":math:`\tau = \alpha_1\alpha_2/(\alpha_1 + \alpha_2 - \alpha_1\alpha_2)`."""
+        r"""Return Kendall's tau, a rank correlation in ``[0, 1]`` for this family.
+
+        Closed form:
+        :math:`\tau = \alpha_1\alpha_2/(\alpha_1 + \alpha_2 - \alpha_1\alpha_2)`,
+        taken as 0 when both parameters are 0.
+
+        Returns
+        -------
+        float
+            Kendall's tau.
+
+        Raises
+        ------
+        ValueError
+            If a parameter is unspecified (``nan``).
+        """
         self._require_specified()
         a1, a2 = self.alpha
         denom = a1 + a2 - a1 * a2
         return 0.0 if denom == 0 else float(a1 * a2 / denom)
 
     def rho(self) -> float:
-        r""":math:`\rho = 3\alpha_1\alpha_2/(2\alpha_1 + 2\alpha_2 - \alpha_1\alpha_2)`."""
+        r"""Return Spearman's rho, a rank correlation in ``[0, 1]`` for this family.
+
+        Closed form:
+        :math:`\rho = 3\alpha_1\alpha_2/(2\alpha_1 + 2\alpha_2 - \alpha_1\alpha_2)`,
+        taken as 0 when both parameters are 0.
+
+        Returns
+        -------
+        float
+            Spearman's rho.
+
+        Raises
+        ------
+        ValueError
+            If a parameter is unspecified (``nan``).
+        """
         self._require_specified()
         a1, a2 = self.alpha
         denom = 2.0 * a1 + 2.0 * a2 - a1 * a2
         return 0.0 if denom == 0 else float(3.0 * a1 * a2 / denom)
 
     def lambda_(self) -> TailDependence:
+        """Return how strongly extreme values occur together (tail dependence).
+
+        Joint large values are likely (upper tail dependence
+        ``min(alpha1, alpha2)``); joint small values are not.
+
+        Returns
+        -------
+        TailDependence
+            ``TailDependence(lower=0.0, upper=min(alpha1, alpha2))``.
+
+        Raises
+        ------
+        ValueError
+            If a parameter is unspecified (``nan``).
+        """
         self._require_specified()
         return TailDependence(lower=0.0, upper=float(min(self.alpha)))
