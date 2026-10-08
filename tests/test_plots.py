@@ -409,3 +409,120 @@ class TestPairsRosenblatt:
 
         data = rc.FrankCopula(5.0).rvs(500, random_state=0)
         assert pairs_rosenblatt(rc.FrankCopula(5.0), data).shape == (2, 2)
+
+
+def _node_and_edge_labels(ax) -> tuple[list[str], list[str]]:
+    """Split an axes' texts into node labels and (two-line) edge labels."""
+    texts = [t.get_text() for t in ax.texts]
+    return sorted(t for t in texts if "\n" not in t), [t for t in texts if "\n" in t]
+
+
+class TestVineTreeLabels:
+    """Tree k's nodes are tree k-1's edges, labelled ``a,b|D`` in variable indices.
+
+    The old drawing reused the conditioning set of edge 0 for every node and
+    drew conditioned-variable indices (``"2|·"``) instead of edges.
+    """
+
+    def _vine(self, structure: str, order=None) -> rc.VineCopula:
+        trees = [
+            [rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0), rc.FrankCopula(3.0)],
+            [rc.GaussianCopula(0.3), rc.JoeCopula(1.5)],
+            [rc.StudentCopula(0.2, df=5.0)],
+        ]
+        return rc.VineCopula(trees, structure=structure, order=order)
+
+    def test_a_four_dimensional_d_vine(self) -> None:
+        grid = vine_trees(self._vine("D"))
+        nodes = [_node_and_edge_labels(ax)[0] for ax in grid]
+        assert nodes[0] == ["0", "1", "2", "3"]
+        assert nodes[1] == ["0,1", "1,2", "2,3"]
+        assert nodes[2] == ["0,2|1", "1,3|2"]
+        edges = [_node_and_edge_labels(ax)[1] for ax in grid]
+        assert [e.split("\n")[0] for e in edges[0]] == ["Clayton", "Gumbel", "Frank"]
+        assert [e.split("\n")[0] for e in edges[1]] == ["Gaussian", "Joe"]
+        assert [e.split("\n")[0] for e in edges[2]] == ["Student"]
+
+    def test_a_four_dimensional_c_vine(self) -> None:
+        grid = vine_trees(self._vine("C"))
+        nodes = [_node_and_edge_labels(ax)[0] for ax in grid]
+        assert nodes[0] == ["0", "1", "2", "3"]
+        assert nodes[1] == ["0,1", "0,2", "0,3"]
+        assert nodes[2] == ["1,2|0", "1,3|0"]
+
+    def test_labels_follow_the_variable_order(self) -> None:
+        grid = vine_trees(self._vine("D", order=[2, 0, 3, 1]))
+        nodes = [_node_and_edge_labels(ax)[0] for ax in grid]
+        assert nodes[1] == ["0,3", "2,0", "3,1"]
+        assert nodes[2] == ["0,1|3", "2,3|0"]
+
+    def test_each_edge_joins_the_two_nodes_it_connects(self) -> None:
+        # In tree 3 of the D-vine, the single edge 0,3|1,2 must join the nodes
+        # 0,2|1 and 1,3|2: its line's endpoints are those two nodes' positions.
+        ax = vine_trees(self._vine("D"))[2]
+        where = {t.get_text(): t.get_position() for t in ax.texts if "\n" not in t.get_text()}
+        (line,) = ax.lines
+        ends = set(zip(np.round(line.get_xdata(), 9), np.round(line.get_ydata(), 9), strict=True))
+        assert ends == {tuple(np.round(where[k], 9)) for k in ("0,2|1", "1,3|2")}
+
+    def test_edge_kwargs_override_the_defaults(self) -> None:
+        # Passing color used to raise "multiple values for keyword argument".
+        ax = vine_trees(self._vine("D"), color="red")[0]
+        assert all(line.get_color() == "red" for line in ax.lines)
+
+
+class TestPlotKwargsAndErrors:
+    def test_contour_with_nothing_finite_says_so(self, monkeypatch) -> None:
+        cop = rc.ClaytonCopula(2.0)
+        monkeypatch.setattr(cop, "pdf", lambda points: np.full(len(points), np.nan))
+        with pytest.raises(ValueError, match="not finite anywhere"):
+            contour(cop)
+
+    def test_contour_draws_a_partly_infinite_logpdf(self, monkeypatch) -> None:
+        cop = rc.ClaytonCopula(2.0)
+        real = cop.logpdf
+
+        def partly(points):
+            out = np.asarray(real(points), dtype=float).copy()
+            out[::7] = -np.inf
+            return out
+
+        monkeypatch.setattr(cop, "logpdf", partly)
+        assert contour(cop, kind="logpdf").get_xlabel() == "u1"
+
+    def test_tail_concentration_styles_the_empirical_curve_with_kwargs(self) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(300, random_state=0)
+        # color used to collide with the hard-coded color="black".
+        ax = tail_concentration(u, rc.GumbelCopula(2.0), color="red")
+        empirical, model = ax.lines[0], ax.lines[1]
+        assert empirical.get_color() == "red"
+        assert model.get_color() != "red"
+
+    def test_tail_concentration_styles_the_copula_curves_with_copula_kwargs(self) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(300, random_state=0)
+        ax = tail_concentration(
+            u,
+            [rc.ClaytonCopula(2.0), rc.GumbelCopula(2.0)],
+            copula_kwargs={"linewidth": 3.5, "linestyle": ":"},
+        )
+        empirical, *models = ax.lines[:3]
+        assert empirical.get_linewidth() != 3.5
+        assert [m.get_linewidth() for m in models] == [3.5, 3.5]
+        assert [m.get_linestyle() for m in models] == [":", ":"]
+
+    def test_nested_tree_styles_nodes_and_leaves_separately(self) -> None:
+        cop = NestedArchimedean(
+            rc.GumbelCopula(1.5), [2], [NestedArchimedean(rc.GumbelCopula(3.0), [0, 1])]
+        )
+        # color used to collide with the hard-coded color="0.92".
+        ax = nested_tree(cop, color="red", leaf_kwargs={"color": "blue"})
+        colours = [tuple(np.round(c.get_facecolor()[0], 3)) for c in ax.collections]
+        red, blue = (1.0, 0.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0)
+        assert colours.count(red) == 2  # two internal nodes
+        assert colours.count(blue) == 3  # three leaves
+
+
+def test_pickands_plot_accepts_a_custom_label() -> None:
+    """label= used to collide with the hard-coded label=cop.name."""
+    ax = rc.plots.pickands_plot([rc.GumbelCopula(2.0)], label="mine")
+    assert "mine" in [line.get_label() for line in ax.get_lines()]

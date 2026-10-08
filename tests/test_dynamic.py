@@ -557,3 +557,68 @@ class TestDcc:
         x = rng.multivariate_normal(np.zeros(3), np.eye(3), size=200)
         result = fit_dcc(x)
         assert np.isfinite(result.loglik)
+
+
+class TestReviewFixes:
+    """Forecast timing for the GAS driver, and up-front validation of ``forcing``."""
+
+    @pytest.mark.parametrize(
+        "family", [rc.GaussianCopula(0.3), rc.ClaytonCopula(1.5)], ids=["gaussian", "clayton"]
+    )
+    def test_gas_forecast_step_one_is_the_filters_next_value(self, family: rc.Copula) -> None:
+        model = DynamicCopula(family, coefficients=(0.05, 0.3, 0.9), driver="gas")
+        u = model.simulate(120, random_state=4)
+        ahead = model.forecast(u, horizon=3, draws=25, random_state=0)
+        # Whatever the next observation turns out to be, the filter has already
+        # decided the parameter it will be evaluated at.
+        extended = np.vstack([u, [[0.37, 0.81]]])
+        expected = model.filter(extended).path[-1]
+        for key in ("mean", "median", "lower", "upper"):
+            assert ahead[key][0] == pytest.approx(expected, rel=1e-12, abs=1e-12)
+
+    def test_gas_forecast_step_two_uses_the_score_at_the_drawn_state(self) -> None:
+        model = DynamicCopula(rc.GaussianCopula(0.3), coefficients=(0.05, 0.3, 0.9), driver="gas")
+        u = model.simulate(80, random_state=5)
+        ahead = model.forecast(u, horizon=2, draws=1, random_state=11)
+        # Rebuild the single path by hand: step 2 is the filter run one step
+        # beyond the simulated first observation.
+        rng = np.random.default_rng(11)
+        theta1 = model.filter(np.vstack([u, [[0.5, 0.5]]])).path[-1]
+        row = model.family.with_params(model._params_at(theta1)).rvs(1, random_state=rng)
+        theta2 = model.filter(np.vstack([u, row, [[0.5, 0.5]]])).path[-1]
+        assert ahead["mean"][0] == pytest.approx(theta1, abs=1e-12)
+        assert ahead["mean"][1] == pytest.approx(theta2, abs=1e-12)
+
+    def test_patton_forecast_step_one_is_the_filters_next_value(self) -> None:
+        model = DynamicCopula(rc.GaussianCopula(0.3), coefficients=(0.05, 0.3, 0.9), lags=5)
+        u = model.simulate(60, random_state=1)
+        ahead = model.forecast(u, horizon=2, draws=10, random_state=0)
+        expected = model.filter(np.vstack([u, [[0.2, 0.9]]])).path[-1]
+        assert ahead["lower"][0] == pytest.approx(expected, abs=1e-12)
+        assert ahead["upper"][0] == pytest.approx(expected, abs=1e-12)
+
+    def test_unknown_forcing_is_rejected_up_front(self) -> None:
+        with pytest.raises(ValueError, match="forcing must be one of"):
+            DynamicCopula(rc.GaussianCopula(0.5), coefficients=(0, 0, 0), forcing="nonsense")  # type: ignore[arg-type]
+
+    def test_forcing_with_gas_warns(self) -> None:
+        with pytest.warns(UserWarning, match="no effect with driver='gas'"):
+            DynamicCopula(
+                rc.GaussianCopula(0.5),
+                coefficients=(0, 0, 0),
+                driver="gas",
+                forcing="abs-difference",
+            )
+
+    def test_gas_with_coefficients_does_not_warn(self) -> None:
+        import warnings
+
+        model = DynamicCopula(rc.ClaytonCopula(1.0), coefficients=(0, 0, 0), driver="gas")
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            model.with_coefficients((0.1, 0.1, 0.5))
+
+    @pytest.mark.parametrize("lags", [0, -3, 2.5, "ten"])
+    def test_bad_lags_rejected_up_front(self, lags: object) -> None:
+        with pytest.raises(ValueError, match="lags"):
+            DynamicCopula(rc.GaussianCopula(0.5), coefficients=(0, 0, 0), lags=lags)  # type: ignore[arg-type]

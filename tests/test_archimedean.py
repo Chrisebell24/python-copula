@@ -518,3 +518,66 @@ def test_clayton_density_is_flat_near_independence(theta: float, dim: int) -> No
     u = np.random.default_rng(0).uniform(size=(2000, dim))
     lp = rc.ClaytonCopula(theta, dim=dim).logpdf(u)
     assert np.max(np.abs(lp)) < 1e3 * abs(theta) + 1e-12
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for input validation and inversion range
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("method", ["psi", "ipsi", "tau", "lambda_"])
+def test_unset_theta_raises_consistently(method: str) -> None:
+    cop = rc.ClaytonCopula()
+    args = ([0.5],) if method in ("psi", "ipsi") else ()
+    with pytest.raises(ValueError, match="unspecified parameters"):
+        getattr(cop, method)(*args)
+
+
+@pytest.mark.parametrize("tau", [0.996, 0.999, 0.99999, -0.999, -0.99999])
+def test_frank_from_tau_reaches_extreme_dependence(tau: float) -> None:
+    cop = rc.FrankCopula.from_tau(tau)
+    assert cop.tau() == pytest.approx(tau, abs=1e-12)
+
+
+def test_frank_from_rho_reaches_extreme_dependence() -> None:
+    assert rc.FrankCopula.from_rho(0.9999).rho() == pytest.approx(0.9999, abs=1e-12)
+
+
+def test_frank_unattainable_target_has_a_clear_message() -> None:
+    # Used to surface scipy's "f(a) and f(b) must have different signs".
+    with pytest.raises(ValueError, match="too close to \\+1"):
+        rc.FrankCopula.from_tau(1.0 - 1e-13)
+    with pytest.raises(ValueError, match="too close to -1"):
+        rc.FrankCopula.from_tau(-1.0 + 1e-13)
+    # rho approaches 1 faster (like 1 - 6/theta), so even 1 - 1e-15 is reached.
+    assert rc.FrankCopula.from_rho(1.0 - 1e-15).rho() == pytest.approx(1.0, abs=1e-14)
+
+
+@pytest.mark.parametrize("cls", [rc.ClaytonCopula, rc.FrankCopula])
+def test_negative_tau_in_higher_dimension_is_rejected_by_itau(cls: type) -> None:
+    with pytest.raises(ValueError, match="only attainable for dim=2"):
+        cls.generator_instance.itau(-0.2, 3)
+    with pytest.raises(ValueError, match="only attainable for dim=2"):
+        cls.from_tau(-0.2, dim=3)
+    assert cls.from_tau(-0.2, dim=2).tau() == pytest.approx(-0.2, abs=1e-12)
+
+
+def test_polylog_closed_form_holds_for_negative_arguments() -> None:
+    # The private helper's docstring promises validity for every real z < 1;
+    # check it against the convergent series inside (-1, 0).
+    from rcopula.core.archimedean import _polylog_neg_int
+
+    z = np.array([-0.9, -0.5, -0.1])
+    k = np.arange(1, 4000)[:, None]
+    for n in range(5):
+        series = np.sum(k.astype(float) ** n * z**k, axis=0)
+        assert np.allclose(_polylog_neg_int(z, n), series, rtol=1e-9, atol=1e-12)
+
+
+@pytest.mark.parametrize("cls", [rc.JoeCopula, rc.GumbelCopula])
+def test_from_tau_zero_is_independence_at_the_lower_bound(cls) -> None:
+    """Joe's independence point is theta = 1, the edge of its range; the
+    bracket search looked strictly inside it and called tau = 0 unattainable."""
+    cop = cls.from_tau(0.0)
+    assert cop.theta == 1.0
+    assert cop.tau() == pytest.approx(0.0, abs=1e-12)

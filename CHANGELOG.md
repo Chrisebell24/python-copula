@@ -3,6 +3,75 @@
 Dates are ISO. Pre-1.0 the API may change; breaking changes are listed first in
 each release.
 
+## 0.3.0 — 2026-10-08
+
+### Breaking
+
+- **`fit()` returns only the estimated parameters for every method.** `params`
+  and `param_names` (now plain `str`) hold the free parameters for `itau`,
+  `irho` and `itau.mpl` as they already did for `mpl`/`ml`, matching R;
+  `result.copula.params` is still the full vector. Inversion now respects
+  parameters pinned with `fix_params`, and a bivariate t keeps its `df` and
+  `dispstr` instead of coming back at `df=4`.
+- **`VineCopula.rosenblatt` returns columns in the original variable order**,
+  consistent with `rvs` and `logpdf`, not in the vine's internal order.
+- **`StudentCopula.lambda_` raises for non-exchangeable `dim > 2`** instead of
+  silently reporting the (1, 2) pair; use `marginal_copula(cop, [i, j]).lambda_()`.
+- **`gof_statistic(..., "Tn")` is `sqrt(n) * max|C_n - C|`** (Genest et al.
+  2009); it was `n * max`. P-values are unchanged.
+- **`backtest_pairs`** computes Sharpe over all live periods (flat periods earn
+  zero) and counts entries, not every position change. Earlier Sharpe ratios
+  were inflated — example 10's fell from +14–55 to +0.6–0.8.
+- **`credit.tranche_spread`** discounts both legs, so spreads change whenever
+  `discount_rate` is non-zero; `catastrophe_bond` annualises the expected loss
+  for `multiple` and `expected_return` (new key `annual_expected_loss`).
+- Parameterless copulas and `EmpiricalCopula` reject unknown keyword arguments.
+
+### Fixed
+
+- Copula families: `from_tau`/`from_rho` fill every correlation for `"toep"`
+  and `"un"`; `StudentCopula.from_rho` no longer returns the edge of a
+  too-narrow search; Frank reaches tau near ±1; Clayton/Frank reject negative
+  tau above two dimensions with a clear message; `from_tau(0)` works for Joe,
+  Gumbel and Tawn; `EmpiricalCopula` smoothings handle ties exactly;
+  `CopulaDistribution` and `fit_joint` read DataFrames by column name;
+  MarshallOlkin, Plackett and FGM argument handling.
+- Inference: `itau.mpl` honours `start`, `optim_method` and
+  `estimate_variance`; `fit_joint` keeps names and stops counting pinned margin
+  parameters; `select_copula` gives every family identical folds; GoF argument
+  checks happen before fitting; clearer errors in `ev_test`,
+  `return_period_level`, `conditional_ppf`, `kendall_return_period`,
+  `radial_simplex`.
+- Finance: `pairs_signal` honours `exit_band`; `mean_cvar_weights` uses sparse
+  matrices (20,000 scenarios in under 200 MB); `SmileMargin` extrapolates
+  lognormal tails; `spread_option` prices puts; `implied_correlation` uses
+  common random numbers over a wider range; input validation across `credit`,
+  `derivatives`, `garch` and `risk`.
+- Modelling: `bootstrap` supports matrix-valued statistics; random tie-breaking
+  in `pseudo_obs` is truly random; the GAS forecast's first step is the
+  filter's next value; `fit_discrete`'s likelihood-ratio statistic; `mixed_pdf`
+  works above two dimensions; `select_pairs(top=0)`; `select_partners` label
+  handling; cached datasets are checked against their digest; `to_json`
+  accepts fit results.
+- Structural and numerics: `fit_nested` clips to each family's range (no more
+  Gumbel crash on weak dependence); `marginal_copula` keeps every Archimedean
+  parameter; `plots.vine_trees` labels higher trees correctly; the t-copula CDF
+  is finite and correct at tiny `df`.
+
+### Performance
+
+- `VineCopula.rvs`, `logpdf` and `fit_vine` stop at a truncated vine's last
+  dependent tree: an 801-variable one-tree vine samples 50,000 draws in ~20 s
+  (previously impractical). New `VineCopula.truncation_level`.
+- `cor_kendall` is computed in blocks, bit-identical to scipy: 800 columns in
+  ~5 s instead of ~4 minutes.
+
+### Documentation
+
+- Every public function and class has a plain-English docstring with explicit
+  parameter types, shapes and defaults.
+- New tutorial and example 32: copulas for an 800-stock basket.
+
 ## 0.2.0 — 2026-10-08
 
 ### Breaking

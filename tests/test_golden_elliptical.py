@@ -111,7 +111,17 @@ def test_dependence_measures_match_r(golden: dict) -> None:
 
         lam = _numeric(blk["lambdaL"])
         if not np.isnan(lam).any():
-            assert cop.lambda_().lower == pytest.approx(float(lam[0]), rel=1e-12, abs=1e-15)
+            pairs = np.atleast_1d(rc.P2p(cop.sigma()))
+            if np.ptp(pairs) == 0.0 or not isinstance(cop, rc.StudentCopula):
+                assert cop.lambda_().lower == pytest.approx(float(lam[0]), rel=1e-12, abs=1e-15)
+            else:
+                # R reports one number built from the (1, 2) pair only; rcopula
+                # refuses to pretend that describes every pair, so compare R's
+                # value with that pair's bivariate margin instead.
+                with pytest.raises(ValueError, match="differs between pairs"):
+                    cop.lambda_()
+                pair = rc.marginal_copula(cop, [0, 1]).lambda_().lower
+                assert pair == pytest.approx(float(lam[0]), rel=1e-12, abs=1e-15)
 
 
 def test_low_dimensional_cdf_is_exact_not_merely_close(golden: dict) -> None:

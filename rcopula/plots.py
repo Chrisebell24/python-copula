@@ -157,8 +157,10 @@ def contour(
     Raises
     ------
     ValueError
-        If the copula is not bivariate or ``kind`` is not one of the three
-        options.
+        If the copula is not bivariate, ``kind`` is not one of the three
+        options, or no grid value is finite (for example an unspecified
+        parameter). Individual non-finite values -- a ``logpdf`` of ``-inf``
+        where the density underflows -- are drawn at the lowest finite level.
 
     Examples
     --------
@@ -176,9 +178,22 @@ def contour(
     with np.errstate(over="ignore", under="ignore", invalid="ignore"):
         z = _evaluate(copula, kind, uu, vv)
 
+    finite = np.isfinite(z)
+    if not finite.any():
+        raise ValueError(
+            f"the {copula.name} copula's {kind} is not finite anywhere on the grid "
+            f"[{margin:g}, {1.0 - margin:g}]^2, so there is nothing to contour. Check "
+            "that its parameters are specified and inside their bounds, or try "
+            "another kind (e.g. 'cdf')."
+        )
     ax = _axes(ax)
     kwargs.setdefault("levels", 14)
-    ax.contour(uu, vv, np.nan_to_num(z, neginf=np.nanmin(z[np.isfinite(z)])), **kwargs)
+    # Non-finite values (a density that underflows to zero has logpdf -inf) are
+    # drawn at the lowest finite level rather than breaking the contouring.
+    floor = float(np.min(z[finite]))
+    ax.contour(
+        uu, vv, np.nan_to_num(z, nan=floor, neginf=floor, posinf=float(np.max(z[finite]))), **kwargs
+    )
     ax.set_xlabel("u1")
     ax.set_ylabel("u2")
     ax.set_title(f"{copula.name} copula: {kind}")
@@ -349,6 +364,8 @@ def tail_concentration(
     copula: Copula | list[Copula] | None = None,
     n: int = 99,
     ax: Any = None,
+    *,
+    copula_kwargs: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> Any:
     r"""Compare how often data and fitted copulas are jointly extreme, out to each corner.
@@ -379,8 +396,15 @@ def tail_concentration(
         Number of evaluation points ``q``, equally spaced in ``(0, 1)``.
     ax : matplotlib.axes.Axes or None, default None
         Axes to draw on. ``None`` creates a new figure and axes.
+    copula_kwargs : dict or None, default None
+        Keyword-only. Passed to ``matplotlib.axes.Axes.plot`` for **every
+        copula curve**, overriding their defaults (``linestyle="--"`` and
+        ``label=<family name>``). For example ``{"linewidth": 2}``.
     **kwargs
-        Passed to ``matplotlib.axes.Axes.plot`` for the empirical curve only.
+        Passed to ``matplotlib.axes.Axes.plot`` for the **empirical curve
+        only**, overriding its defaults (``color="black"``,
+        ``label="empirical"``). Use ``copula_kwargs`` to style the copula
+        curves.
 
     Returns
     -------
@@ -417,13 +441,15 @@ def tail_concentration(
         if u.shape[1] != 2:
             raise ValueError(f"tail concentration is bivariate; got {u.shape[1]} columns")
         joint = np.array([np.mean((u[:, 0] <= t) & (u[:, 1] <= t)) for t in q])
-        ax.plot(q, _concentration(q, joint), label="empirical", color="black", **kwargs)
+        empirical_style = {"label": "empirical", "color": "black", **kwargs}
+        ax.plot(q, _concentration(q, joint), **empirical_style)
 
     for cop in _as_list(copula):
         if cop.dim != 2:
             raise ValueError(f"tail concentration is bivariate; got dim={cop.dim}")
         joint = cop.cdf(np.column_stack([q, q]))
-        ax.plot(q, _concentration(q, joint), label=cop.name, linestyle="--")
+        copula_style = {"label": cop.name, "linestyle": "--", **(copula_kwargs or {})}
+        ax.plot(q, _concentration(q, joint), **copula_style)
 
     ax.axvline(0.5, color="0.8", linewidth=0.8)
     ax.set_xlabel("q")
@@ -607,7 +633,7 @@ def pickands_plot(
                 f"{cop.name} is not an extreme-value copula, so it has no "
                 "Pickands dependence function"
             )
-        ax.plot(t, a, label=cop.name, **kwargs)
+        ax.plot(t, a, **{"label": cop.name, **kwargs})
 
     ax.set_xlabel("t")
     ax.set_ylabel("A(t)")
@@ -623,9 +649,7 @@ def vine_trees(
     axes: Any = None,
     **kwargs: Any,
 ) -> Any:
-    """Draw each tree of a vine copula, labelling every edge with its pair-copula.
-
-    Each edge label shows the pair-copula's family name and parameters.
+    """Draw each tree of a vine copula, labelling every node and edge.
 
     A vine is a sequence of trees, and the thing a reader needs to see is which
     pairs each tree joins, what it conditions on, and which family was selected
@@ -643,7 +667,9 @@ def vine_trees(
         One axes per tree to draw. ``None`` creates a new figure with one
         panel per tree in a row.
     **kwargs
-        Passed to ``matplotlib.axes.Axes.plot`` for the edges.
+        Passed to ``matplotlib.axes.Axes.plot`` for every edge line,
+        overriding the defaults (``color="0.6"``, ``linewidth=1.0``,
+        ``zorder=1``).
 
     Returns
     -------
@@ -652,9 +678,18 @@ def vine_trees(
 
     Notes
     -----
-    Nodes are placed on a circle. In trees after the first, node labels are
-    abbreviated to ``"<variable>|·"`` to signal conditioning; the edge labels
-    carry the family and parameters.
+    This is the standard vine picture: the nodes of tree ``k + 1`` are the
+    edges of tree ``k``. Labels use the variables' column indices (the vine's
+    ``order`` is applied):
+
+    * tree 1's nodes are the variables, ``"0"``, ``"1"``, ...;
+    * a node of a later tree is labelled by the edge it stands for, as
+      ``"a,b"`` (from tree 1) or ``"a,b|c,d"`` -- the conditioned pair, then
+      the conditioning set;
+    * every edge is labelled with its pair-copula's family name and
+      parameters.
+
+    Nodes are placed on a circle.
 
     Examples
     --------
@@ -669,6 +704,8 @@ def vine_trees(
     >>> grid = vine_trees(vine)
     >>> len(grid)
     2
+    >>> sorted(t.get_text() for t in grid[1].texts if t.get_text()[0].isdigit())
+    ['0,1', '1,2']
     """
     depth = len(vine.pair_copulas) if max_trees is None else min(max_trees, len(vine.pair_copulas))
     if axes is None:
@@ -677,19 +714,18 @@ def vine_trees(
         _, axes = plt.subplots(1, depth, figsize=(4.2 * depth, 3.8), squeeze=False)
         axes = axes[0]
 
+    line_style = {"color": "0.6", "linewidth": 1.0, "zorder": 1, **kwargs}
     for k in range(depth):
         ax = axes[k]
+        nodes, edges = _vine_tree_graph(vine, k)
         # Lay the tree's nodes on a circle: readable for a star and for a path.
-        nodes = sorted(
-            {idx for i in range(len(vine.pair_copulas[k])) for idx in vine._edge_indices(k, i)[:2]}
-        )
-        angle = {node: 2 * np.pi * j / len(nodes) for j, node in enumerate(nodes)}
-        position = {node: (np.cos(a), np.sin(a)) for node, a in angle.items()}
-
-        for i, copula in enumerate(vine.pair_copulas[k]):
-            a, b, conditioning = vine._edge_indices(k, i)
-            (x0, y0), (x1, y1) = position[a], position[b]
-            ax.plot([x0, x1], [y0, y1], color="0.6", linewidth=1.0, zorder=1, **kwargs)
+        position = {
+            key: (np.cos(2 * np.pi * j / len(nodes)), np.sin(2 * np.pi * j / len(nodes)))
+            for j, key in enumerate(nodes)
+        }
+        for (first, second), copula in zip(edges, vine.pair_copulas[k], strict=True):
+            (x0, y0), (x1, y1) = position[first], position[second]
+            ax.plot([x0, x1], [y0, y1], **line_style)
             ax.text(
                 0.5 * (x0 + x1),
                 0.5 * (y0 + y1),
@@ -700,13 +736,9 @@ def vine_trees(
                 bbox={"facecolor": "white", "edgecolor": "0.8", "boxstyle": "round,pad=0.2"},
                 zorder=3,
             )
-        for node, (x, y) in position.items():
-            label = str(vine.order[node])
-            conditioning = vine._edge_indices(k, 0)[2]
-            if k > 0 and conditioning:
-                label = f"{vine.order[node]}|·"
-            ax.scatter([x], [y], s=280, color="0.9", edgecolor="0.4", zorder=2)
-            ax.text(x, y, label, ha="center", va="center", fontsize=8, zorder=4)
+        for key, (x, y) in position.items():
+            ax.scatter([x], [y], s=280 if k == 0 else 520, color="0.9", edgecolor="0.4", zorder=2)
+            ax.text(x, y, nodes[key], ha="center", va="center", fontsize=8, zorder=4)
 
         ax.set_title(f"tree {k + 1}")
         ax.set_xlim(-1.4, 1.4)
@@ -716,6 +748,47 @@ def vine_trees(
     return axes
 
 
+def _vine_edge_label(vine: Any, tree: int, edge: int) -> str:
+    """``"a,b"`` or ``"a,b|c,d"`` for one edge, in the vine's variable indices."""
+    a, b, given = vine._edge_indices(tree, edge)
+    pair = f"{vine.order[a]},{vine.order[b]}"
+    if not given:
+        return pair
+    return pair + "|" + ",".join(str(vine.order[g]) for g in sorted(given))
+
+
+def _vine_tree_graph(
+    vine: Any, tree: int
+) -> tuple[dict[frozenset[int], str], list[tuple[frozenset[int], frozenset[int]]]]:
+    """Nodes (with labels) and edges of one vine tree.
+
+    A node is keyed by the set of *positions* it involves: a single variable in
+    tree 1, and an edge's conditioned pair plus conditioning set afterwards.
+    An edge of tree ``k`` with conditioned pair ``(a, b)`` and conditioning set
+    ``D`` joins the two tree-``k - 1`` edges whose position sets are
+    ``{a} | D`` and ``{b} | D`` -- the proximity condition, which holds for any
+    regular vine, so this does not depend on the C/D layout.
+    """
+    if tree == 0:
+        nodes = {frozenset([p]): str(vine.order[p]) for p in range(vine.dim)}
+    else:
+        nodes = {}
+        for i in range(len(vine.pair_copulas[tree - 1])):
+            a, b, given = vine._edge_indices(tree - 1, i)
+            nodes[frozenset([a, b, *given])] = _vine_edge_label(vine, tree - 1, i)
+    edges = []
+    for i in range(len(vine.pair_copulas[tree])):
+        a, b, given = vine._edge_indices(tree, i)
+        first, second = frozenset([a, *given]), frozenset([b, *given])
+        if first not in nodes or second not in nodes:  # pragma: no cover - not a regular vine
+            raise ValueError(
+                f"edge {_vine_edge_label(vine, tree, i)} of tree {tree + 1} does not join "
+                f"two edges of tree {tree}; the vine structure is not regular"
+            )
+        edges.append((first, second))
+    return nodes, edges
+
+
 def _short_params(copula: Copula) -> str:
     """A compact parameter string for an edge label."""
     if not len(copula.params):
@@ -723,7 +796,13 @@ def _short_params(copula: Copula) -> str:
     return ", ".join(f"{v:.2f}" for v in copula.params)
 
 
-def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
+def nested_tree(
+    node: Any,
+    ax: Any = None,
+    *,
+    leaf_kwargs: dict[str, Any] | None = None,
+    **kwargs: Any,
+) -> Any:
     """Draw a nested Archimedean copula as a tree diagram, with each node's parameter and tau.
 
     The whole point of nesting is that dependence varies by branch, so the
@@ -737,8 +816,15 @@ def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
         The root of the tree, with every parameter specified.
     ax : matplotlib.axes.Axes or None, default None
         Axes to draw on. ``None`` creates a new figure and axes.
+    leaf_kwargs : dict or None, default None
+        Keyword-only. Passed to ``matplotlib.axes.Axes.scatter`` for the
+        **leaf** markers (the variables), overriding their defaults
+        (``s=220``, ``color="white"``, ``edgecolor="0.4"``, ``zorder=3``).
     **kwargs
-        Passed to ``matplotlib.axes.Axes.scatter`` for the internal nodes.
+        Passed to ``matplotlib.axes.Axes.scatter`` for the **internal-node**
+        markers only (the Archimedean generators), overriding their defaults
+        (``s=520``, ``color="0.92"``, ``edgecolor="0.35"``, ``zorder=3``). Use
+        ``leaf_kwargs`` to style the leaves.
 
     Returns
     -------
@@ -766,6 +852,14 @@ def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
     """
     ax = _axes(ax)
     leaf_x = [0.0]
+    leaf_style = {
+        "s": 220,
+        "color": "white",
+        "edgecolor": "0.4",
+        "zorder": 3,
+        **(leaf_kwargs or {}),
+    }
+    node_style = {"s": 520, "color": "0.92", "edgecolor": "0.35", "zorder": 3, **kwargs}
 
     def draw(current: Any, depth: int) -> float:
         """Place children first, then centre the parent over them."""
@@ -773,7 +867,7 @@ def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
         for leaf in current.components:
             x = leaf_x[0]
             leaf_x[0] += 1.0
-            ax.scatter([x], [-depth - 1.0], s=220, color="white", edgecolor="0.4", zorder=3)
+            ax.scatter([x], [-depth - 1.0], **leaf_style)
             ax.text(x, -depth - 1.0, str(leaf), ha="center", va="center", fontsize=8, zorder=4)
             spots.append(x)
         for child in current.children:
@@ -782,7 +876,7 @@ def nested_tree(node: Any, ax: Any = None, **kwargs: Any) -> Any:
         centre = float(np.mean(spots)) if spots else 0.0
         for x in spots:
             ax.plot([centre, x], [-depth, -depth - 1.0], color="0.6", linewidth=1.0, zorder=1)
-        ax.scatter([centre], [-depth], s=520, color="0.92", edgecolor="0.35", zorder=3, **kwargs)
+        ax.scatter([centre], [-depth], **node_style)
         ax.text(
             centre,
             -depth,

@@ -39,7 +39,8 @@ class CopulaFitResult:
         Estimated free (non-fixed) parameters. A scalar is turned into a
         length-1 array.
     param_names : sequence of str, length k
-        Names matching ``params``, in the same order.
+        Names matching ``params``, in the same order; converted to plain
+        ``str``.
     loglik : float
         Maximised log-likelihood (the pseudo-log-likelihood for ``"mpl"``).
     n_obs : int
@@ -76,6 +77,11 @@ class CopulaFitResult:
     message : str
         Optimiser message, or a note for closed-form estimators.
 
+    Raises
+    ------
+    ValueError
+        If ``param_names`` and ``params`` differ in length.
+
     See Also
     --------
     rcopula.fit : The function that produces this object.
@@ -110,7 +116,13 @@ class CopulaFitResult:
     ) -> None:
         self.copula = copula
         self.params = np.atleast_1d(np.asarray(params, dtype=np.float64))
-        self.param_names = tuple(param_names)
+        # Plain ``str``: names sliced out of a numpy array arrive as
+        # ``numpy.str_``, which prints as ``np.str_('rho')`` in a repr.
+        self.param_names = tuple(str(name) for name in param_names)
+        if len(self.param_names) != self.params.size:
+            raise ValueError(
+                f"{len(self.param_names)} parameter name(s) for {self.params.size} parameter(s)"
+            )
         self.cov_params = cov_params
         self.loglik = float(loglik)
         self.n_obs = int(n_obs)

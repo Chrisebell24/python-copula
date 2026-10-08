@@ -53,6 +53,15 @@ _T_RADIAL_NODES = 128
 #: 2 -- and Gauss-Legendre needs a smooth integrand.
 _T_PROBABILITY_SCALE_BELOW = 2.0
 
+#: Limit beyond which the standard normal CDF is exactly 0 or 1 in double
+#: precision (Phi(-40) ~ 4e-350 underflows).
+_NORMAL_SATURATION = 40.0
+
+#: Cap on a rescaled Student-t limit ``x * s``. Far past saturation, yet small
+#: enough that nothing downstream overflows; it is not 40 because the Genz
+#: recursion subtracts conditional terms that grow like ``sqrt(d)``.
+_SCALED_LIMIT_CAP = 1e8
+
 #: Gauss-Legendre nodes for the trivariate conditioning integral. Tuned
 #: empirically: 60 beats 300 on *both* accuracy and speed, because the
 #: integrand is smooth enough that extra nodes only accumulate roundoff.
@@ -118,6 +127,11 @@ def bvn_cdf(h: ArrayLike, k: ArrayLike, rho: float) -> NDArray[np.float64]:
     h = np.asarray(h, dtype=np.float64)
     k = np.asarray(k, dtype=np.float64)
     h, k = np.broadcast_arrays(h, k)
+    # Phi(+-40) is exactly 1 / 0 in double precision, so clipping the limits
+    # there changes nothing -- and keeps h * k below from overflowing for the
+    # astronomically large limits a Student-t with tiny df produces.
+    h = np.asarray(np.clip(h, -_NORMAL_SATURATION, _NORMAL_SATURATION), dtype=np.float64)
+    k = np.asarray(np.clip(k, -_NORMAL_SATURATION, _NORMAL_SATURATION), dtype=np.float64)
 
     if not -1.0 <= rho <= 1.0:
         raise ValueError(f"rho must lie in [-1, 1], got {rho}")
@@ -249,6 +263,10 @@ def tvn_cdf(upper: ArrayLike, corr: ArrayLike) -> NDArray[np.float64]:
         # phi(t) is negligible below -8.5 (Phi(-8.5) ~ 1e-17); keep a window
         # below c as well, for the case where c is itself far into the tail.
         lo = min(-8.5, c - 8.0)
+        # phi(t) is equally negligible above 8.5, so the window stops there:
+        # spreading the nodes up to a huge c (a Student-t limit at tiny df can
+        # be 1e40) would step straight over the mass near zero.
+        c = min(c, 8.5)
         if c <= lo:
             out[i] = 0.0
             continue
@@ -469,7 +487,8 @@ def mvt_cdf(
     -----
     Accuracy is about 1e-14 for ``d <= 3`` and ``df >= 2``, about 1e-7 for
     ``df < 2`` with extreme limits, and limited by the QMC error (roughly
-    1e-7) for ``d >= 4``. Very small ``df`` (around 0.02) holds only ~4e-4.
+    1e-7) for ``d >= 4``. Very small ``df`` degrades gracefully rather than
+    failing: about 4e-4 at ``df = 0.02`` and 4e-3 at ``df = 0.01``.
 
     Examples
     --------
@@ -578,7 +597,7 @@ def mvt_cdf(
                 continue
             # mvn_cdf is exact for d <= 3 (Owen's T, then the trivariate
             # conditioning integral), so the whole t probability inherits that.
-            out += weight * mvn_cdf(x * scale, r)
+            out += weight * mvn_cdf(_scale_limits(x, scale), r)
         return out
 
     n = int(n_points) if n_points else 2**_QMC_LOG2_POINTS
@@ -611,15 +630,30 @@ def _genz_transform_scaled(
     d = upper.shape[0]
     n = w.shape[0]
 
-    e = ndtr(upper[0] * scale / chol[0, 0])
+    e = ndtr(_scale_limits(upper[0], scale) / chol[0, 0])
     prod = e.copy()
     y = np.zeros((n, d))
 
     for i in range(1, d):
         arg = np.clip(w[:, i - 1] * e, 1e-16, 1.0 - 1e-16)
         y[:, i - 1] = ndtri(arg)
-        num = upper[i] * scale - y[:, :i] @ chol[i, :i]
+        num = _scale_limits(upper[i], scale) - y[:, :i] @ chol[i, :i]
         e = ndtr(num / chol[i, i])
         prod *= e
 
     return prod
+
+
+def _scale_limits(x: ArrayLike, scale: ArrayLike) -> NDArray[np.float64]:
+    """``x * scale`` for the Student-t mixture, without overflow.
+
+    With tiny ``df`` the t quantiles are astronomically large and the radial
+    scale spans hundreds of orders of magnitude, so the product overflows (or
+    is ``inf * 0`` where the chi quantile underflows to zero). Either way the
+    normal CDF has long saturated, so the product is capped at
+    ``+-_SCALED_LIMIT_CAP`` -- exact -- and ``inf * 0`` is taken as 0.
+    """
+    with np.errstate(over="ignore", invalid="ignore"):
+        z = np.asarray(x, dtype=np.float64) * np.asarray(scale, dtype=np.float64)
+    z = np.where(np.isnan(z) & ~np.isnan(np.asarray(x, dtype=np.float64)), 0.0, z)
+    return np.clip(z, -_SCALED_LIMIT_CAP, _SCALED_LIMIT_CAP)

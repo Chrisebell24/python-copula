@@ -426,14 +426,16 @@ class ExtremeValueCopula(Copula):
         ----------
         tau : float
             Target Kendall's tau. Must be attainable by the family; for these
-            families that means strictly between 0 and 1 (and below about
-            0.418 for :class:`TawnCopula`).
+            families that means ``0 <= tau < 1`` (and below about 0.418 for
+            :class:`TawnCopula`). ``tau = 0`` is the independence limit and
+            returns the family's independence parameter (see Notes).
         dim : int, default 2
-            Accepted for interface compatibility with :class:`Copula`; not
-            used, since these copulas are always bivariate.
+            Number of variables; must be 2, since these copulas are always
+            bivariate.
         **kwargs
             Extra keyword arguments passed on to the constructor (for example
-            ``free``).
+            ``free``). They are applied once, to the result; the root search
+            itself uses plain copulas.
 
         Returns
         -------
@@ -443,7 +445,18 @@ class ExtremeValueCopula(Copula):
         Raises
         ------
         ValueError
-            If ``tau`` cannot be reached by the family.
+            If ``tau`` cannot be reached by the family, or ``dim != 2``.
+
+        Notes
+        -----
+        Tawn reaches independence exactly, at ``theta = 0``, and is searched
+        down to it, so any ``0 <= tau <= 0.418`` is matched. Galambos and
+        Husler-Reiss reach it only in the limit ``theta -> 0`` and cannot be
+        evaluated at ``theta = 0`` itself (both divide by it), so for them
+        ``tau = 0`` -- or any target below the tau at the bottom of the search
+        range, which is zero to double precision -- returns the smallest
+        parameter in that range, ``1e-8``, whose copula is the independence
+        copula to machine precision.
 
         Examples
         --------
@@ -451,15 +464,30 @@ class ExtremeValueCopula(Copula):
         >>> g = GalambosCopula.from_tau(0.5)
         >>> round(g.tau(), 6)
         0.5
+        >>> GalambosCopula.from_tau(0.0).tau()
+        0.0
         """
         lo, hi = cls._tau_bracket()
+        independent = cls._independence_param()
+        if independent is not None:
+            # Independence is reached exactly, so search right down to it.
+            if tau == 0.0:
+                return cls(independent, dim, **kwargs)
+            lo = independent
+        elif 0.0 <= tau <= cls(lo).tau():
+            return cls(lo, dim, **kwargs)
         try:
-            theta = float(brentq(lambda th: cls(th, **kwargs).tau() - tau, lo, hi, xtol=1e-12))
+            theta = float(brentq(lambda th: cls(th).tau() - tau, lo, hi, xtol=1e-12))
         except ValueError as exc:
             raise ValueError(
                 f"Kendall's tau = {tau} is not attainable by the {cls.__name__} family"
             ) from exc
-        return cls(theta, **kwargs)
+        return cls(theta, dim, **kwargs)
+
+    @classmethod
+    def _independence_param(cls) -> float | None:
+        """Parameter value giving exactly the independence copula, if one exists."""
+        return None
 
     @classmethod
     def _tau_bracket(cls) -> tuple[float, float]:
@@ -943,6 +971,10 @@ class TawnCopula(ExtremeValueCopula):
     def _tau_bracket(cls) -> tuple[float, float]:
         return (1e-10, 1.0)
 
+    @classmethod
+    def _independence_param(cls) -> float | None:
+        return 0.0
+
 
 class TEVCopula(ExtremeValueCopula):
     r"""t-EV copula: the joint-extremes model that arises from Student-t distributed data.
@@ -1140,7 +1172,7 @@ class TEVCopula(ExtremeValueCopula):
             Target Kendall's tau. Must be attainable at the given ``df``; the
             t-EV copula always has ``tau > 0``.
         dim : int, default 2
-            Accepted for interface compatibility; not used (always bivariate).
+            Number of variables; must be 2 (always bivariate).
         **kwargs
             ``df`` (float, default 4.0) sets the degrees of freedom; any other
             keyword (for example ``free``) goes to the constructor.
@@ -1153,7 +1185,9 @@ class TEVCopula(ExtremeValueCopula):
         Raises
         ------
         ValueError
-            If ``tau`` is not attainable at that ``df``.
+            If ``tau`` is not attainable at that ``df`` (in particular any
+            ``tau <= 0``: the t-EV copula is never independent), or
+            ``dim != 2``.
 
         Examples
         --------
@@ -1170,4 +1204,4 @@ class TEVCopula(ExtremeValueCopula):
             raise ValueError(
                 f"Kendall's tau = {tau} is not attainable by the t-EV family at df={df}"
             ) from exc
-        return cls(rho, df=df, **kwargs)
+        return cls(rho, dim, df=df, **kwargs)

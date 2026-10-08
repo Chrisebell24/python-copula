@@ -59,7 +59,7 @@ from typing import NamedTuple
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy import optimize, stats
-from scipy.special import ndtr
+from scipy.special import log_ndtr, ndtr, ndtri_exp
 
 from rcopula.core.base import Copula
 from rcopula.distribution import CopulaDistribution, Margin
@@ -197,8 +197,8 @@ class SmileMargin:
     ----------
     strikes : array_like of float, shape (k,)
         Strikes at which the smile is quoted, strictly increasing, in the same
-        currency units as ``forward``. At least four are needed. Cover the
-        range you care about: outside it the distribution is flat (see Notes).
+        currency units as ``forward``. At least four are needed. Outside the
+        quoted range the tails are extrapolated (see ``tails`` and Notes).
     vols : array_like of float, shape (k,)
         Black-76 implied volatilities at those strikes, as decimals (``0.25``
         for 25%).
@@ -208,6 +208,13 @@ class SmileMargin:
         Time to expiry in years.
     rate : float, default 0.0
         Continuously compounded discount rate, as a decimal.
+    tails : {"lognormal", "flat"}, default "lognormal"
+        How to extend the distribution beyond the quoted strikes.
+        ``"lognormal"`` attaches lognormal tails using the implied vol at the
+        nearest end strike, so quantiles can fall outside the quoted range.
+        ``"flat"`` holds the CDF constant outside the range (the behaviour
+        of earlier versions): all tail mass sits on the end strikes and
+        :meth:`ppf` never leaves ``[strikes[0], strikes[-1]]``.
 
     Attributes
     ----------
@@ -226,7 +233,8 @@ class SmileMargin:
     ------
     ValueError
         If ``strikes`` and ``vols`` differ in length, fewer than four strikes
-        are given, or the strikes are not strictly increasing.
+        are given, the strikes are not strictly increasing, ``forward`` or
+        ``maturity`` is not positive, or ``tails`` is unknown.
 
     Notes
     -----
@@ -243,9 +251,18 @@ class SmileMargin:
 
     The derivative is taken numerically on the quoted grid and the result is
     clipped to [0, 1] and forced to be non-decreasing. Between strikes the CDF
-    is linearly interpolated; below the lowest and above the highest strike it
-    is held constant, so any probability the smile assigns beyond the quoted
-    range is concentrated at the end strikes.
+    is linearly interpolated.
+
+    Beyond the quoted range (``tails="lognormal"``), the left tail is a
+    lognormal with the forward and the implied vol of the lowest strike,
+    rescaled so the CDF is continuous there:
+    :math:`F(x) = F(K_1)\,G_L(x)/G_L(K_1)` for :math:`x < K_1`. The right tail
+    is the mirror image using the highest strike's vol:
+    :math:`1 - F(x) = (1 - F(K_k))\,\bar G_R(x)/\bar G_R(K_k)`. Holding the
+    end-strike vol flat in the wings is the usual simple extrapolation; it
+    keeps the CDF continuous and monotone and puts no mass on the end strikes
+    themselves. With ``tails="flat"`` the CDF is held constant outside the
+    range instead.
 
     Examples
     --------
@@ -274,7 +291,12 @@ class SmileMargin:
         forward: float,
         maturity: float,
         rate: float = 0.0,
+        tails: str = "lognormal",
     ) -> None:
+        if tails not in ("lognormal", "flat"):
+            raise ValueError(f"tails must be 'lognormal' or 'flat', got {tails!r}")
+        if not (forward > 0 and maturity > 0):
+            raise ValueError(f"forward and maturity must be positive, got {forward} and {maturity}")
         k = np.asarray(strikes, dtype=np.float64).ravel()
         v = np.asarray(vols, dtype=np.float64).ravel()
         if k.size != v.size:
@@ -297,6 +319,23 @@ class SmileMargin:
         # not guaranteed to give a valid distribution function.
         self._cdf_grid = np.maximum.accumulate(cdf)
         self._k_grid = k
+        self.tails = tails
+        # Lognormal wing parameters: total vol at each end strike, and the
+        # log-CDF / log-survival of that wing at its anchor strike.
+        self._s_lo = float(v[0] * np.sqrt(maturity))
+        self._s_hi = float(v[-1] * np.sqrt(maturity))
+        self._lo_anchor = float(log_ndtr(self._d(k[0], self._s_lo)))
+        self._hi_anchor = float(log_ndtr(-self._d(k[-1], self._s_hi)))
+
+    def _d(self, x: ArrayLike, s: float) -> NDArray[np.float64]:
+        """Standardised log-moneyness of ``x`` under a lognormal with total vol ``s``."""
+        return np.asarray((np.log(np.asarray(x) / self.forward) + 0.5 * s * s) / s)
+
+    def _left_mass(self) -> float:
+        return float(self._cdf_grid[0])
+
+    def _right_mass(self) -> float:
+        return float(1.0 - self._cdf_grid[-1])
 
     def cdf(self, x: ArrayLike) -> NDArray[np.float64]:
         """Probability that the asset finishes at or below ``x`` (risk-neutral CDF).
@@ -311,7 +350,24 @@ class SmileMargin:
         numpy.ndarray of float, same shape as ``x``
             Probabilities in [0, 1].
         """
-        return np.interp(np.asarray(x, dtype=np.float64), self._k_grid, self._cdf_grid)
+        xx = np.asarray(x, dtype=np.float64)
+        out = np.asarray(np.interp(xx, self._k_grid, self._cdf_grid), dtype=np.float64)
+        if self.tails == "flat":
+            return out[()]
+        lo, hi = self._k_grid[0], self._k_grid[-1]
+        left = xx < lo
+        if np.any(left) and self._left_mass() > 0:
+            xl = xx[left]
+            with np.errstate(divide="ignore"):
+                ratio = np.exp(log_ndtr(self._d(np.maximum(xl, 0.0), self._s_lo)) - self._lo_anchor)
+            out[left] = self._left_mass() * np.where(xl > 0, ratio, 0.0)
+        elif np.any(left):
+            out[left] = 0.0
+        right = xx > hi
+        if np.any(right):
+            ratio = np.exp(log_ndtr(-self._d(xx[right], self._s_hi)) - self._hi_anchor)
+            out[right] = 1.0 - self._right_mass() * ratio
+        return out[()]
 
     def ppf(self, q: ArrayLike) -> NDArray[np.float64]:
         """The price level the asset finishes below with probability ``q`` (quantile).
@@ -328,11 +384,33 @@ class SmileMargin:
         Returns
         -------
         numpy.ndarray of float, same shape as ``q``
-            Price levels, always within ``[strikes[0], strikes[-1]]``.
+            Price levels. With ``tails="lognormal"`` these extend below
+            ``strikes[0]`` (towards 0 as ``q -> 0``) and above ``strikes[-1]``
+            (to ``inf`` at ``q = 1``); with ``tails="flat"`` they stay within
+            ``[strikes[0], strikes[-1]]``.
         """
         qq = np.asarray(q, dtype=np.float64)
         # np.interp needs an increasing x; ties from the monotone fix are fine.
-        return np.interp(qq, self._cdf_grid, self._k_grid)
+        out = np.asarray(np.interp(qq, self._cdf_grid, self._k_grid), dtype=np.float64)
+        if self.tails == "flat":
+            return out[()]
+        f_lo, f_hi = self._cdf_grid[0], self._cdf_grid[-1]
+        left = qq < f_lo
+        if np.any(left):
+            with np.errstate(divide="ignore"):
+                logp = np.log(np.maximum(qq[left], 0.0)) - np.log(f_lo) + self._lo_anchor
+            d = ndtri_exp(np.minimum(logp, 0.0))
+            out[left] = self.forward * np.exp(self._s_lo * d - 0.5 * self._s_lo**2)
+        right = qq > f_hi
+        if np.any(right):
+            with np.errstate(divide="ignore"):
+                logp = (
+                    np.log(np.maximum(1.0 - qq[right], 0.0)) - np.log(1.0 - f_hi) + self._hi_anchor
+                )
+            d = -ndtri_exp(np.minimum(logp, 0.0))
+            with np.errstate(over="ignore"):
+                out[right] = self.forward * np.exp(self._s_hi * d - 0.5 * self._s_hi**2)
+        return out[()]
 
     def pdf(self, x: ArrayLike) -> NDArray[np.float64]:
         """How likely each price level at expiry is (risk-neutral density).
@@ -351,8 +429,28 @@ class SmileMargin:
         numpy.ndarray of float, same shape as ``x``
             Non-negative density values (probability per unit of price).
         """
+        xx = np.asarray(x, dtype=np.float64)
         density = np.gradient(self._cdf_grid, self._k_grid)
-        return np.interp(np.asarray(x, dtype=np.float64), self._k_grid, np.maximum(density, 0.0))
+        out = np.asarray(np.interp(xx, self._k_grid, np.maximum(density, 0.0)), dtype=np.float64)
+        lo, hi = self._k_grid[0], self._k_grid[-1]
+        outside = (xx < lo) | (xx > hi)
+        if self.tails == "flat":
+            out[outside] = 0.0
+            return out[()]
+        left = (xx < lo) & (xx > 0)
+        if np.any(left):
+            xl = xx[left]
+            d = self._d(xl, self._s_lo)
+            log_g = -0.5 * d * d - 0.5 * np.log(2 * np.pi) - np.log(xl * self._s_lo)
+            out[left] = self._left_mass() * np.exp(log_g - self._lo_anchor)
+        out[xx <= 0] = 0.0
+        right = xx > hi
+        if np.any(right):
+            xr = xx[right]
+            d = self._d(xr, self._s_hi)
+            log_g = -0.5 * d * d - 0.5 * np.log(2 * np.pi) - np.log(xr * self._s_hi)
+            out[right] = self._right_mass() * np.exp(log_g - self._hi_anchor)
+        return out[()]
 
     def __repr__(self) -> str:
         return (
@@ -616,8 +714,9 @@ def implied_volatility(
     Raises
     ------
     ValueError
-        If no volatility in (1e-8, 10] reproduces ``price`` -- typically
-        because the price exceeds the no-arbitrage upper bound.
+        If ``kind`` is not ``"call"`` or ``"put"``, or no volatility in
+        (1e-8, 10] reproduces ``price`` -- typically because the price exceeds
+        the no-arbitrage upper bound.
 
     Notes
     -----
@@ -630,6 +729,8 @@ def implied_volatility(
     >>> float(round(implied_volatility(p, 100.0, 110.0, 1.5), 10))
     0.27
     """
+    if kind not in ("call", "put"):
+        raise ValueError(f"kind must be 'call' or 'put', got {kind!r}")
     df = _discount(rate, maturity)
     intrinsic = df * (max(forward - strike, 0.0) if kind == "call" else max(strike - forward, 0.0))
     if price <= intrinsic + 1e-14:
@@ -860,13 +961,14 @@ def spread_option(
     rate: float = 0.0,
     n: int = 200_000,
     random_state: np.random.Generator | int | None = None,
+    kind: str = "call",
 ) -> MonteCarloPrice:
-    r"""Monte-Carlo price of a call on the spread between two assets.
+    r"""Monte-Carlo price of a call or put on the spread between two assets.
 
-    Payoff :math:`\max(S_1 - S_2 - K, 0)`: pays when asset 1 beats asset 2 by
-    more than the strike (e.g. a crack or spark spread). Unlike
-    :func:`kirk_spread`, any margins and any copula can be used. Only calls
-    are supported.
+    Call payoff :math:`\max(S_1 - S_2 - K, 0)`: pays when asset 1 beats asset
+    2 by more than the strike (e.g. a crack or spark spread). Put payoff
+    :math:`\max(K - (S_1 - S_2), 0)`. Unlike :func:`kirk_spread`, any margins
+    and any copula can be used.
 
     Parameters
     ----------
@@ -884,6 +986,8 @@ def spread_option(
         Number of simulated scenarios.
     random_state : int, numpy.random.Generator or None, default None
         Seed or generator, for reproducible prices.
+    kind : {"call", "put"}, default "call"
+        Option type.
 
     Returns
     -------
@@ -893,10 +997,14 @@ def spread_option(
     Raises
     ------
     ValueError
-        If the copula is not bivariate.
+        If the copula is not bivariate, or ``kind`` is not ``"call"`` or
+        ``"put"``.
 
     Notes
     -----
+    Put-call parity holds scenario by scenario:
+    :math:`C - P = e^{-rT}(\mathbb{E}[S_1 - S_2] - K)`.
+
     At :math:`K = 0` with a Gaussian copula and lognormal margins this is the
     Margrabe exchange option, which has an exact price -- so
     :func:`margrabe` is the check that this simulation is right.
@@ -915,8 +1023,13 @@ def spread_option(
     """
     if copula.dim != 2:
         raise ValueError(f"a spread option is bivariate; got dim={copula.dim}")
+    if kind not in ("call", "put"):
+        raise ValueError(f"kind must be 'call' or 'put', got {kind!r}")
     prices = _terminal_prices(copula, margins, n, random_state)
-    payoff = np.maximum(prices[:, 0] - prices[:, 1] - strike, 0.0)
+    spread = prices[:, 0] - prices[:, 1]
+    payoff = (
+        np.maximum(spread - strike, 0.0) if kind == "call" else np.maximum(strike - spread, 0.0)
+    )
     return _mc(payoff, rate, maturity)
 
 
@@ -1084,10 +1197,10 @@ def cms_margin(
         Forward swap rate, as a decimal.
     vol : float
         Volatility of the rate: lognormal (decimal) for ``model="lognormal"``,
-        absolute (rate units) for ``model="normal"``. Must be positive for the
-        lognormal model.
+        absolute (rate units) for ``model="normal"``. Must be positive for
+        either model.
     maturity : float
-        Time to the fixing, in years.
+        Time to the fixing, in years. Must be positive.
     tenor : float
         Tenor of the underlying swap, in years.
     frequency : int, default 2
@@ -1105,8 +1218,10 @@ def cms_margin(
     Raises
     ------
     ValueError
-        As :func:`cms_convexity_adjustment`; and, for the lognormal model, if
-        ``vol`` or ``maturity`` is not positive.
+        As :func:`cms_convexity_adjustment`; and, for either model, if
+        ``vol`` or ``maturity`` is not positive. A zero vol or zero time to
+        fixing would make the rate a known constant (a point mass), which
+        is not a continuous margin a copula can use.
 
     Notes
     -----
@@ -1126,6 +1241,10 @@ def cms_margin(
     True
     """
     adjusted = forward + cms_convexity_adjustment(forward, vol, maturity, tenor, frequency, model)
+    if vol <= 0 or maturity <= 0:
+        raise ValueError(
+            f"vol and maturity must be positive for a CMS margin, got {vol} and {maturity}"
+        )
     if model == "normal":
         return stats.norm(loc=adjusted, scale=vol * np.sqrt(maturity))
     return lognormal_terminal(adjusted, vol, maturity)
@@ -1316,8 +1435,8 @@ def basket_implied_vol(
     Raises
     ------
     ValueError
-        If a simulated price cannot be inverted to a volatility (see
-        :func:`implied_volatility`).
+        If ``weights`` does not have length ``d``, or a simulated price cannot
+        be inverted to a volatility (see :func:`implied_volatility`).
 
     Notes
     -----
@@ -1354,6 +1473,8 @@ def basket_implied_vol(
     """
     d = copula.dim
     w = np.full(d, 1.0 / d) if weights is None else np.asarray(weights, dtype=np.float64).ravel()
+    if w.size != d:
+        raise ValueError(f"weights has length {w.size}, expected {d} (one per component)")
     k = np.atleast_1d(np.asarray(strikes, dtype=np.float64))
 
     basket = _terminal_prices(copula, margins, n, random_state) @ w

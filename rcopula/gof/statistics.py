@@ -11,9 +11,15 @@ departure they are sensitive to.
     by default.
 
 ``Tn``
-    The Kolmogorov-Smirnov analogue, :math:`\max_i |C_n - C_{\hat\theta}|`.
-    Less powerful than ``Sn`` in nearly every published comparison, but
-    occasionally more sensitive to a single localised discrepancy.
+    The Kolmogorov-Smirnov analogue,
+    :math:`T_n = \sqrt n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|`,
+    the sup-norm of the same empirical process :math:`\sqrt n (C_n - C_{\hat\theta})`
+    whose squared :math:`L^2` norm is ``Sn`` (Genest, Remillard and Beaudoin
+    2009). R's ``gofCopula`` has no ``Tn``, so there is no R value to match;
+    the scaling only multiplies the statistic by a constant at fixed ``n``,
+    so bootstrap p-values are unaffected by it. Less powerful than ``Sn`` in
+    nearly every published comparison, but occasionally more sensitive to a
+    single localised discrepancy.
 
 ``AnChisq`` / ``AnGamma``
     Anderson-Darling statistics applied after collapsing the Rosenblatt-
@@ -147,7 +153,11 @@ def gof_statistic(
     Notes
     -----
     ``Sn`` is :math:`\sum_i \{C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)\}^2`.
-    ``Tn`` is computed as :math:`n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|`.
+    ``Tn`` is :math:`\sqrt n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|`,
+    the Kolmogorov-Smirnov statistic of Genest, Remillard and Beaudoin (2009).
+    (Versions up to 0.2 returned ``n`` rather than ``sqrt(n)`` times the
+    maximum, contradicting the documentation; the p-value of
+    :func:`~rcopula.gof_test` is the same under either scaling.)
     ``AnChisq`` and ``AnGamma`` collapse each row to one number (a sum of
     squared normal quantiles, or a sum of :math:`-\log u`), map it to
     ``(0, 1)`` with the chi-squared or gamma distribution function, and apply
@@ -176,7 +186,9 @@ def gof_statistic(
         if copula is None:
             raise ValueError(f"method={method!r} needs a fitted copula")
         diff = empirical_copula_at(data) - copula.cdf(data)
-        return float(np.sum(diff**2)) if method == "Sn" else float(n * np.max(np.abs(diff)))
+        if method == "Sn":
+            return float(np.sum(diff**2))
+        return float(np.sqrt(n) * np.max(np.abs(diff)))
 
     clipped = np.clip(data, 1e-12, 1.0 - 1e-12)
     if method == "AnChisq":

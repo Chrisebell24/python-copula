@@ -540,7 +540,7 @@ import numpy as np
 sample_corr = np.corrcoef(z_train, rowvar=False)  # z_train: 1,000 days x 800 stocks
 np.linalg.eigvalsh(sample_corr)[0]
 # smallest eigenvalue: true matrix 0.342, estimated 0.004
-# Kendall's tau: same sector 0.31, different sectors 0.19; one Clayton forces 0.21 on all
+# Kendall's tau: same sector 0.30, different sectors 0.19; one Clayton forces 0.20 on all
 ```
 
 **1. Filter each stock with GARCH.** Strip out each stock's own volatility
@@ -581,12 +581,12 @@ graded on two more:
 
   sectors = [NestedArchimedean(rc.ClaytonCopula(theta[s]), members[s]) for s in range(10)]
   nested = NestedArchimedean(rc.ClaytonCopula(theta_root), children=sectors)
-  # root theta 0.48, sectors 0.88 on average
+  # root theta 0.49, sectors 0.89 on average
   ```
 
 - **Truncated vine.** An equal-weight index at the root of a C-vine, cut after the
   first tree: every stock links to the index with its own family, and the stocks
-  are independent given the index. 800 pair-copulas, fitted in about 2 minutes.
+  are independent given the index. 800 pair-copulas, fitted in one to two minutes.
 
   ```python
   vine = rc.fit_vine(
@@ -604,11 +604,11 @@ Grade them on days when 80 or more of the 800 stocks have their own worst-1% day
 
 ```
                    mass crash   mass rally
-truth                 2.97%        2.81%
-factor, Student-t     2.64%        2.78%    <- closest overall
-factor, Gaussian      1.24%        1.36%
-nested Clayton        2.84%        0.00%    <- right on crashes, blind to rallies
-vine (index root)     1.83%        1.96%    <- cannot see sectors after one tree
+truth                 3.02%        2.94%
+factor, Student-t     2.82%        2.87%    <- closest overall
+factor, Gaussian      1.41%        1.24%
+nested Clayton        2.82%        0.00%    <- right on crashes, blind to rallies
+vine (index root)     1.82%        1.70%    <- cannot see sectors after one tree
 ```
 
 The factor copula's loadings can also move over time: `rcopula.dynamic.fit_dynamic`
@@ -632,13 +632,13 @@ for _ in range(5):
 
 ```
                      VaR 99%   ES 99%   diversification
-truth                $2.51m    $3.33m       42.9%
-factor, Student-t    $2.44m    $3.19m       42.5%
-factor, Gaussian     $2.23m    $2.62m       52.2%   <- 21% too little ES
+truth                $2.52m    $3.50m       41.7%
+factor, Student-t    $2.46m    $3.13m       42.9%
+factor, Gaussian     $2.22m    $2.63m       51.8%   <- 25% too little ES
 ```
 
 Diversification is how far the book's ES sits below the sum of 800 standalone
-ESs. On the book's worst 1% of days, 487 of the 800 stocks are having their own
+ESs. On the book's worst 1% of days, 495 of the 800 stocks are having their own
 worst-5% day; independent failures would give 40. The Student-t factor copula
-says 487, the Gaussian 339. That gap is the diversification a correlation matrix
+says 483, the Gaussian 341. That gap is the diversification a correlation matrix
 promises and a panic takes away.

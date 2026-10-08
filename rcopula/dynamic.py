@@ -93,6 +93,7 @@ Manner, H. and Reznikova, O. (2012). A survey on time-varying copulas:
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -115,6 +116,7 @@ __all__ = [
 
 Driver = Literal["patton", "gas"]
 Forcing = Literal["auto", "normal-product", "abs-difference"]
+_FORCINGS = ("auto", "normal-product", "abs-difference")
 
 #: How far a one-sided parameter is allowed to run. Clayton at 25 is tau = 0.93
 #: and Gumbel at 25 is tau = 0.96; past that the copula is comonotone for any
@@ -477,7 +479,9 @@ class DynamicCopula:
     forcing : {"auto", "normal-product", "abs-difference"}, default "auto"
         Patton's forcing term. ``"auto"`` picks the normal product for
         elliptical families and the absolute difference otherwise, which is what
-        Patton did. Ignored by the GAS driver, which needs no such choice.
+        Patton did. The GAS driver needs no such choice: passing anything other
+        than ``"auto"`` with ``driver="gas"`` has no effect and issues a
+        ``UserWarning``.
     lags : int, default 10
         Length of the moving-average window, in observations; must be at least
         1. Patton used 10. Only used by the ``"patton"`` driver.
@@ -500,7 +504,7 @@ class DynamicCopula:
         ``"patton"`` or ``"gas"``.
     forcing : str
         The resolved forcing term, ``"normal-product"`` or
-        ``"abs-difference"`` (never ``"auto"``).
+        ``"abs-difference"`` (never ``"auto"``). Unused by the GAS driver.
     lags : int
         Moving-average window length.
     index : int
@@ -513,8 +517,15 @@ class DynamicCopula:
     ------
     ValueError
         If ``family`` is not bivariate, ``coefficients`` does not have exactly
-        three entries, ``driver`` is not ``"patton"`` or ``"gas"``, or
-        ``bounds`` is not increasing.
+        three entries, ``driver`` is not ``"patton"`` or ``"gas"``,
+        ``forcing`` is not one of the listed names, ``lags`` is not a whole
+        number of at least 1, or ``bounds`` is not increasing.
+
+    Warns
+    -----
+    UserWarning
+        If ``forcing`` is set explicitly with ``driver="gas"``, where it is
+        ignored.
 
     Notes
     -----
@@ -557,6 +568,21 @@ class DynamicCopula:
             )
         if driver not in ("patton", "gas"):
             raise ValueError(f"driver must be 'patton' or 'gas', got {driver!r}")
+        if forcing not in _FORCINGS:
+            raise ValueError(f"forcing must be one of {_FORCINGS}, got {forcing!r}")
+        if driver == "gas" and forcing != "auto":
+            warnings.warn(
+                f"forcing={forcing!r} has no effect with driver='gas', which is "
+                "driven by the likelihood score; it is only used by driver='patton'.",
+                UserWarning,
+                stacklevel=2,
+            )
+        try:
+            whole = float(lags) == int(lags)
+        except (TypeError, ValueError, OverflowError):
+            whole = False
+        if not whole or int(lags) < 1:
+            raise ValueError(f"lags must be a whole number of at least 1, got {lags!r}")
 
         self.family = family
         self.coefficients = coefficients
@@ -769,7 +795,7 @@ class DynamicCopula:
             self.family,
             coefficients=coefficients,
             driver=self.driver,
-            forcing=self.forcing,
+            forcing=self.forcing if self.driver == "patton" else "auto",
             lags=self.lags,
             index=self.index,
             bounds=(self.link.lower, self.link.upper),
@@ -862,6 +888,13 @@ class DynamicCopula:
         variable rather than a number; this returns a summary of its
         distribution at each step.
 
+        Step 1 is not random: it is the filter's own one-step-ahead parameter,
+        determined by the observations in ``u`` (for the GAS driver this
+        includes the score of the last row), so all four summaries coincide
+        there and equal what :meth:`filter` would assign to the next
+        observation. Each later step uses the observation simulated at the
+        step before, with its score taken at the state it was drawn from.
+
         Parameters
         ----------
         u : array_like of float, shape (n, 2)
@@ -914,9 +947,17 @@ class DynamicCopula:
         paths = np.empty((draws, horizon), dtype=float)
         history = _forcing_values(u, self.forcing, self._df) if self.driver == "patton" else None
 
+        # GAS: the one-step-ahead state f_{n+1} is already determined by the
+        # data -- it is the filter's update after the last observation, using
+        # that observation's score. Every simulated future starts from it.
+        next_linked = 0.0
+        if self.driver == "gas":
+            last = float(filtered.linked[-1])
+            next_linked = omega + beta * last + alpha * self._score(u[-1], last)
+
         for b in range(draws):
             previous = float(filtered.path[-1])
-            current = float(filtered.linked[-1])
+            current = next_linked
             window = list(history[-self.lags :]) if history is not None else []
             for h in range(horizon):
                 if self.driver == "patton":
@@ -926,7 +967,7 @@ class DynamicCopula:
                         + alpha * float(np.mean(window))
                     )
                 else:
-                    linked = omega + beta * current + alpha * 0.0  # score is mean zero
+                    linked = current
                 theta = float(self.link(linked))
                 paths[b, h] = theta
                 row = self.family.with_params(self._params_at(theta)).rvs(1, random_state=rng)
@@ -935,6 +976,8 @@ class DynamicCopula:
                     window = window[-self.lags :]
                     previous = theta
                 else:
+                    # Score of the simulated observation at the state it was
+                    # drawn from -- the same timing as the filter.
                     current = omega + beta * current + alpha * self._score(row[0], current)
 
         return {

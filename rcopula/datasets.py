@@ -67,9 +67,12 @@ class DatasetSpec:
     licence : str
         Why it is legitimate to redistribute a *link* to it and cache it.
     sha256 : str or None
-        Digest of the raw bytes, checked on every fetch. ``None`` means the
-        upstream file is not byte-stable (a live query endpoint), in which case
-        the shape is checked instead.
+        Digest of the raw bytes, checked on every download *and* every time
+        the cached copy is read (a cached file that no longer matches is
+        re-downloaded, or refused when ``download=False``). ``None`` means the
+        upstream file is not byte-stable (a live query endpoint), so no byte
+        check is possible; only the parsed table's structure is checked -- every
+        column in ``columns`` must be present, or :func:`load` raises.
     reader : {"usgs_rdb", "ghcn_csv", "csv"}
         Which parser to use.
     columns : tuple of str
@@ -336,8 +339,12 @@ def load(
     """Load one of the example datasets as a pandas DataFrame, downloading it the first time.
 
     The raw file is saved in :func:`cache_dir`, so later calls work offline.
-    Files with a recorded SHA-256 digest are checked when downloaded, so a
-    silently changed upstream file is caught rather than used.
+    Files with a recorded SHA-256 digest are checked when downloaded and again
+    whenever the cached copy is read, so a silently changed upstream file -- or
+    a cache file that was corrupted or edited -- is caught rather than used. A
+    cached copy that fails the check is downloaded afresh (and the fresh copy
+    checked); with ``download=False`` it raises instead. Datasets without a
+    digest are checked only for having the expected columns.
 
     Parameters
     ----------
@@ -366,7 +373,8 @@ def load(
     OSError
         If the download fails its digest check, the file cannot be parsed
         into the expected columns, or a download is needed and
-        ``download=False``. Network failures surface as
+        ``download=False`` (including a cached copy that fails its digest
+        check). Network failures surface as
         :class:`urllib.error.URLError`, itself a subclass of ``OSError``.
 
     Examples
@@ -383,16 +391,37 @@ def load(
     directory.mkdir(parents=True, exist_ok=True)
     cached = directory / f"{name}.raw"
 
-    if refresh or not cached.exists():
+    payload: bytes | None = None
+    if not refresh and cached.exists():
+        payload = cached.read_bytes()
+        if spec.sha256 is not None and _digest(payload) != spec.sha256:
+            # A cached copy that no longer matches its digest is as untrustworthy
+            # as a bad download: fetch it again rather than parse it.
+            if not download:
+                raise OSError(
+                    f"{name}: the cached copy at {cached} does not match its recorded "
+                    "SHA-256 and download=False. Delete it, or call "
+                    "load(..., download=True) to fetch a fresh copy."
+                )
+            payload = None
+
+    if payload is None:
         if not download:
             raise OSError(
                 f"{name} is not cached at {cached} and download=False. "
                 "Call load(..., download=True) once with network access; the "
                 "file is then reused."
             )
-        cached.write_bytes(_fetch(spec))
+        payload = _fetch(spec)
+        cached.write_bytes(payload)
 
-    frame = _READERS[spec.reader](cached.read_bytes(), spec, **kwargs)
+    try:
+        frame = _READERS[spec.reader](payload, spec, **kwargs)
+    except KeyError as error:
+        raise OSError(f"{name}: the file is missing an expected field {error}") from error
+    missing = [column for column in spec.columns if column not in frame.columns]
+    if missing:
+        raise OSError(f"{name}: the parsed file is missing the columns {missing}")
     frame = frame.dropna(subset=list(spec.columns)).reset_index(drop=True)
     frame.attrs["dataset"] = spec.name
     frame.attrs["licence"] = spec.licence

@@ -325,3 +325,66 @@ class TestItComposesWithTheRestOfThePackage:
         vine = rc.fit_vine(rc.pseudo_obs(block), structure="D")
         assert vine.dim == 4
         assert np.all(np.isfinite(vine.logpdf(rc.pseudo_obs(block))))
+
+
+class TestReviewFixes:
+    """Target resolution in select_partners and ``top=0`` in select_pairs."""
+
+    @staticmethod
+    def _frame(columns: list[object]) -> pd.DataFrame:
+        rng = np.random.default_rng(0)
+        factor = rng.standard_normal(400)
+        data = {
+            columns[0]: factor + 0.3 * rng.standard_normal(400),
+            columns[1]: rng.standard_normal(400),
+            columns[2]: factor + 0.3 * rng.standard_normal(400),
+            columns[3]: rng.standard_normal(400),
+        }
+        return pd.DataFrame(data)
+
+    def test_integer_labels_are_read_as_labels_first(self) -> None:
+        frame = self._frame([10, 20, 1, 0])
+        found = select_partners(frame, 1, n_partners=1)
+        # Label 1 is the third column (correlated with label 10), not position 1.
+        assert found["target"] == 1
+        assert found["partners"] == [10]
+
+    def test_integer_not_a_label_is_a_position(self) -> None:
+        frame = self._frame([10, 20, 30, 40])
+        assert select_partners(frame, 2, n_partners=1)["target"] == 30
+
+    def test_numpy_integer_target_on_an_array(self) -> None:
+        values = self._frame(["a", "b", "c", "d"]).to_numpy()
+        found = select_partners(values, np.int64(0), n_partners=1)
+        assert found["target"] == "x0"
+        assert found["partners"] == ["x2"]
+
+    def test_numpy_integer_label(self) -> None:
+        frame = self._frame([10, 20, 1, 0])
+        assert select_partners(frame, np.int64(10), n_partners=1)["partners"] == [1]
+
+    def test_out_of_range_position_is_a_clear_error(self) -> None:
+        with pytest.raises(ValueError, match="out of range"):
+            select_partners(self._frame(["a", "b", "c", "d"]), 7, n_partners=1)
+
+    def test_top_zero_returns_no_pairs(self) -> None:
+        frame = self._frame(["a", "b", "c", "d"])
+        out = select_pairs(frame, method="spearman", top=0)
+        assert len(out) == 0
+        assert list(out.columns) == ["first", "second", "score", "rank"]
+        assert len(select_pairs(frame, method="spearman", top=None)) == 6
+        assert len(select_pairs(frame, method="spearman", top=2)) == 2
+
+    @pytest.mark.parametrize("top", [-1, 1.5])
+    def test_bad_top_rejected(self, top: object) -> None:
+        with pytest.raises(ValueError, match="top"):
+            select_pairs(self._frame(["a", "b", "c", "d"]), top=top)  # type: ignore[arg-type]
+
+    def test_kendall_scores_match_pairwise_scipy(self) -> None:
+        from scipy import stats
+
+        frame = self._frame(["a", "b", "c", "d"])
+        out = select_pairs(frame, method="kendall")
+        for _, row in out.iterrows():
+            expected = stats.kendalltau(frame[row["first"]], frame[row["second"]]).statistic
+            assert row["score"] == pytest.approx(expected, abs=1e-15)

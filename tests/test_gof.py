@@ -342,3 +342,53 @@ class TestTwoSample:
 
         with pytest.raises(ValueError, match="at least 2 observations"):
             gof_two_sample(np.zeros((1, 2)), np.zeros((50, 2)))
+
+
+class TestReviewFixes:
+    def test_tn_is_root_n_times_the_largest_gap(self) -> None:
+        """Docs said max|C_n - C|, code returned n * max; now both say sqrt(n) * max."""
+        u = rc.pseudo_obs(rc.ClaytonCopula(2.0).rvs(200, random_state=0))
+        cop = rc.ClaytonCopula(2.0)
+        gap = np.max(np.abs(empirical_copula_at(u) - cop.cdf(u)))
+        assert gof_statistic(u, cop, method="Tn") == pytest.approx(np.sqrt(200) * gap)
+
+    def test_two_sample_ranks_the_replicates_like_the_statistic(self, monkeypatch) -> None:
+        import rcopula.gof.api as api
+
+        seen: list[str] = []
+        original = api.pseudo_obs
+
+        def spy(x, *args, **kwargs):
+            seen.append(kwargs.get("ties_method", "average"))
+            return original(x, *args, **kwargs)
+
+        monkeypatch.setattr(api, "pseudo_obs", spy)
+        x = np.round(rc.ClaytonCopula(2.0).rvs(60, random_state=0), 1)
+        y = np.round(rc.ClaytonCopula(2.0).rvs(60, random_state=1), 1)
+        rc.gof_two_sample(x, y, n_rep=5, random_state=0, ties_method="min")
+        assert len(seen) == 2 + 2 * 5
+        assert set(seen) == {"min"}
+
+    @pytest.mark.parametrize("simulation", ["pb", "mult"])
+    def test_a_bad_statistic_is_rejected_before_fitting(self, monkeypatch, simulation) -> None:
+        import rcopula.gof.api as api
+
+        def no_fit(*args, **kwargs):
+            raise AssertionError("fit was called before validation")
+
+        monkeypatch.setattr(api, "fit", no_fit)
+        x = rc.ClaytonCopula(2.0).rvs(50, random_state=0)
+        with pytest.raises(ValueError, match="method"):
+            rc.gof_test(rc.ClaytonCopula(), x, method="KS", simulation=simulation)
+        with pytest.raises(ValueError, match="estim_method"):
+            rc.gof_test(rc.ClaytonCopula(), x, estim_method="mle", simulation=simulation)
+
+    def test_multiplier_bootstrap_with_a_pinned_parameter(self) -> None:
+        """The free-parameter vector used to be fed to ``with_params`` as if full."""
+        x = rc.GaussianCopula([0.5, 0.3, 0.4], dim=3, dispstr="un").rvs(80, random_state=0)
+        template = rc.GaussianCopula([0.5, 0.0, 0.0], dim=3, dispstr="un").fix_params(
+            [False, True, True]
+        )
+        res = rc.gof_test(template, x, simulation="mult", n_rep=10, random_state=0)
+        assert 0.0 < res.pvalue < 1.0
+        assert res.copula.params[0] == 0.5

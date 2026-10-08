@@ -393,3 +393,81 @@ class TestLoglik:
         value = discrete_loglik(rc.ClaytonCopula(40.0), np.array([[0.0, 12.0]]), margins)
         assert np.isfinite(value)
         assert value < -20
+
+
+class TestReviewFixes:
+    """``step`` honoured, lattice validation, and the fixed-parameter LR."""
+
+    def test_step_is_used_for_a_family_without_an_analytic_h_function(self) -> None:
+        margins = [stats.norm(), stats.poisson(2.0)]
+        row = np.array([[0.3, 2.0]])
+        fine = mixed_pdf(rc.PlackettCopula(3.0), row, margins, [False, True], step=1e-5)
+        coarse = mixed_pdf(rc.PlackettCopula(3.0), row, margins, [False, True], step=0.2)
+        assert abs(fine[0] - coarse[0]) > 1e-4
+
+    def test_step_does_not_affect_analytic_families(self) -> None:
+        margins = [stats.norm(), stats.poisson(2.0)]
+        row = np.array([[0.3, 2.0]])
+        a = mixed_pdf(rc.ClaytonCopula(2.0), row, margins, [False, True], step=1e-5)
+        b = mixed_pdf(rc.ClaytonCopula(2.0), row, margins, [False, True], step=0.2)
+        np.testing.assert_array_equal(a, b)
+
+    def test_three_dimensional_mixed_density_sums_to_one(self) -> None:
+        margins = [stats.norm(), stats.poisson(2.0), stats.bernoulli(0.4)]
+        grid = np.linspace(-8, 8, 801)
+        total = 0.0
+        for k in range(12):
+            for b in (0, 1):
+                rows = np.column_stack([grid, np.full_like(grid, k), np.full_like(grid, b)])
+                values = mixed_pdf(rc.ClaytonCopula(2.0, dim=3), rows, margins, [False, True, True])
+                total += float(np.trapezoid(values, grid))
+        assert total == pytest.approx(1.0, abs=1e-4)
+
+    @pytest.mark.parametrize("step", [0.0, -1e-3, 0.5])
+    def test_bad_step_rejected(self, step: float) -> None:
+        with pytest.raises(ValueError, match="step"):
+            mixed_pdf(
+                rc.PlackettCopula(3.0),
+                [[0.0, 1.0]],
+                [stats.norm(), stats.poisson(2.0)],
+                [False, True],
+                step=step,
+            )
+
+    @pytest.mark.parametrize(
+        "margin",
+        [stats.randint(-3, 4), stats.poisson(2.0, loc=-1), stats.poisson(2.0, loc=0.5)],
+        ids=["negative", "shifted-negative", "non-integer"],
+    )
+    def test_lattice_functions_reject_margins_off_the_lattice(self, margin: object) -> None:
+        good = stats.poisson(2.0)
+        with pytest.raises(ValueError, match="non-negative integers"):
+            tau_upper_bound([margin, good])
+        with pytest.raises(ValueError, match="non-negative integers"):
+            checkerboard(rc.GaussianCopula(0.5), [good, margin], support=20)
+
+    @pytest.mark.parametrize("support", [-1, 2.5, True])
+    def test_lattice_functions_reject_a_bad_support(self, support: object) -> None:
+        margins = [stats.poisson(2.0)] * 2
+        with pytest.raises(ValueError, match="support"):
+            tau_upper_bound(margins, support=support)  # type: ignore[arg-type]
+
+    def test_shifted_non_negative_margin_is_accepted(self) -> None:
+        value = tau_upper_bound([stats.poisson(2.0, loc=1), stats.poisson(2.0, loc=1)])
+        assert value == pytest.approx(1.0)
+
+    def test_fixed_parameter_fit_compares_with_independence(self) -> None:
+        margins = [stats.poisson(3.0), stats.poisson(3.0)]
+        x = rc.CopulaDistribution(rc.GaussianCopula(0.6), margins).rvs(400, random_state=0)
+        fixed = rc.GaussianCopula(0.6).fix_params([False])
+        result = fit_discrete(x, fixed, margins)
+        independent = discrete_loglik(rc.IndependenceCopula(2), x, margins)
+        assert result.independent_loglik == pytest.approx(independent)
+        assert result.loglik > result.independent_loglik + 10
+
+    @pytest.mark.parametrize("start", [[0.1, 0.2], [np.nan], [[0.1]]])
+    def test_start_must_match_the_free_parameters(self, start: object) -> None:
+        margins = [stats.poisson(3.0), stats.poisson(3.0)]
+        x = np.array([[1, 2], [3, 3], [4, 2]])
+        with pytest.raises(ValueError, match="start"):
+            fit_discrete(x, rc.GaussianCopula(0.0), margins, start=start)  # type: ignore[arg-type]

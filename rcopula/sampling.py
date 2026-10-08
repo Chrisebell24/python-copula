@@ -207,9 +207,9 @@ def antithetic_rvs(copula: Copula, size: int, *, random_state: Any = None) -> ND
 
     Returns
     -------
-    numpy.ndarray of float, shape (size, d)
-        Draws from the copula. When ``size`` is odd the array has ``size + 1``
-        rows, so that every draw keeps its partner.
+    numpy.ndarray of float, shape (2 * ceil(size / 2), d)
+        Draws from the copula: ``size`` rows when ``size`` is even, and
+        ``size + 1`` rows when it is odd, so that every draw keeps its partner.
 
     Raises
     ------

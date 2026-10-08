@@ -181,3 +181,59 @@ class TestValidation:
         template = rc.CopulaDistribution(rc.ClaytonCopula(1.0), [stats.norm(), Custom()])
         with pytest.raises(TypeError, match="cannot be refitted"):
             fit_joint(template, x)
+
+
+class TestPinnedMarginsAndNames:
+    @staticmethod
+    def _gamma_data() -> np.ndarray:
+        truth = rc.CopulaDistribution(
+            rc.GumbelCopula(2.0), [stats.gamma(2.0, scale=1.5), stats.gamma(3.0, scale=0.5)]
+        )
+        return truth.rvs(600, random_state=0)
+
+    def test_n_params_excludes_margin_parameters_pinned_by_margin_kwargs(self) -> None:
+        template = rc.CopulaDistribution(rc.GumbelCopula(1.5), [stats.gamma(2.0)] * 2)
+        res = fit_joint(template, self._gamma_data(), margin_kwargs=[{"floc": 0}, {"floc": 0}])
+        # gamma has (a, loc, scale); loc is pinned, so 2 per margin + 1 copula.
+        assert res.n_params == 5
+        assert res.margin_fixed == [(False, True, False)] * 2
+        assert res.aic == pytest.approx(2 * 5 - 2 * res.loglik)
+
+    def test_ml_keeps_pinned_margin_parameters_pinned(self) -> None:
+        template = rc.CopulaDistribution(rc.GumbelCopula(1.5), [stats.gamma(2.0)] * 2)
+        res = fit_joint(
+            template,
+            self._gamma_data(),
+            method="ml",
+            margin_kwargs=[{"floc": 0}, {"floc": 0}],
+        )
+        assert [p[1] for p in res.margin_params] == [0.0, 0.0]
+        assert res.n_params == 5
+
+    def test_ml_keeps_the_variable_names(self) -> None:
+        truth = rc.CopulaDistribution(rc.ClaytonCopula(2.0), [stats.norm(1.0, 2.0)] * 2)
+        x = truth.rvs(800, random_state=0)
+        template = rc.CopulaDistribution(
+            rc.ClaytonCopula(1.0), [stats.norm()] * 2, names=["flow", "rain"]
+        )
+        ifm = fit_joint(template, x)
+        ml = fit_joint(template, x, method="ml")
+        assert ml.loglik > ifm.loglik  # the joint optimum replaced the IFM fit
+        assert ml.distribution.names == ["flow", "rain"]
+
+
+def test_fit_joint_reads_a_dataframe_by_name() -> None:
+    """A reordered DataFrame must give the same fit as the correctly ordered one,
+    matching how CopulaDistribution reads frames when it has names."""
+    from scipy import stats
+
+    truth = rc.CopulaDistribution(
+        rc.ClaytonCopula(2.0), [stats.norm(0, 1), stats.expon(scale=2.0)], names=["a", "b"]
+    )
+    frame = truth.rvs(800, random_state=0)
+    model = rc.CopulaDistribution(
+        rc.ClaytonCopula(1.0), [stats.norm(), stats.expon()], names=["a", "b"]
+    )
+    ordered = rc.fit_joint(model, frame)
+    swapped = rc.fit_joint(model, frame[["b", "a"]])
+    assert np.allclose(ordered.copula.params, swapped.copula.params)

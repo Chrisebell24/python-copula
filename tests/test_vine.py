@@ -301,3 +301,147 @@ class TestFitting:
     def test_it_needs_at_least_two_variables(self) -> None:
         with pytest.raises(ValueError, match="at least two"):
             fit_vine(np.random.default_rng(0).uniform(size=(50, 1)))
+
+
+def _truncated_c_vine(d: int, rhos: np.ndarray, student: bool = False) -> VineCopula:
+    pair = (
+        (lambda r: rc.StudentCopula(float(r), df=5.0))
+        if student
+        else (lambda r: rc.GaussianCopula(float(r)))
+    )
+    trees = [[pair(r) for r in rhos]] + [
+        [rc.IndependenceCopula(2)] * (d - 1 - k) for k in range(1, d - 1)
+    ]
+    return VineCopula(trees, structure="C")
+
+
+class TestRosenblattOrder:
+    """The transform comes back in the caller's column order, like rvs and logpdf."""
+
+    def test_columns_are_in_original_variable_order(self) -> None:
+        trees = [
+            [rc.ClaytonCopula(2.0), rc.GumbelCopula(2.5), rc.FrankCopula(3.0)],
+            [rc.FrankCopula(2.0), rc.GaussianCopula(0.3)],
+            [rc.ClaytonCopula(0.5)],
+        ]
+        order = [2, 0, 3, 1]
+        vine = VineCopula(trees, structure="D", order=order)
+        u = vine.rvs(500, random_state=3)
+        z = vine.rosenblatt(u)
+        # The first variable on the path is passed through unchanged, in its own column.
+        np.testing.assert_array_equal(z[:, order[0]], u[:, order[0]])
+        # rvs maps uniform column i to variable order[i]; rosenblatt undoes exactly that.
+        w = np.random.default_rng(3).uniform(size=(500, 4))
+        np.testing.assert_allclose(z[:, order], w, atol=1e-7)
+
+    def test_identity_order_is_unchanged(self) -> None:
+        vine = MIXED["D"]
+        u = vine.rvs(200, random_state=0)
+        w = np.random.default_rng(0).uniform(size=(200, vine.dim))
+        np.testing.assert_allclose(vine.rosenblatt(u), w, atol=1e-7)
+
+
+class TestTruncation:
+    """Independence trees past the truncation level are skipped, not walked."""
+
+    def test_truncation_level(self) -> None:
+        assert MIXED["D"].truncation_level == 2
+        assert _truncated_c_vine(5, np.full(4, 0.5)).truncation_level == 1
+        indep = VineCopula([[rc.IndependenceCopula(2)] * 2, [rc.IndependenceCopula(2)]])
+        assert indep.truncation_level == 0
+        u = indep.rvs(100, random_state=0)
+        np.testing.assert_array_equal(u, np.random.default_rng(0).uniform(size=(100, 3)))
+        np.testing.assert_array_equal(indep.logpdf(u), np.zeros(100))
+
+    def test_a_large_truncated_vine_samples_fast(self) -> None:
+        import time
+
+        d = 121
+        rhos = np.random.default_rng(0).uniform(0.3, 0.7, d - 1)
+        vine = _truncated_c_vine(d, rhos, student=True)
+        start = time.perf_counter()
+        u = vine.rvs(4000, random_state=1)
+        # Walking all 7,140 edges took minutes; one tree takes well under a second
+        # on an idle machine.
+        assert time.perf_counter() - start < 30.0
+        assert u.shape == (4000, d)
+
+    def test_truncated_c_vine_has_the_implied_one_factor_correlations(self) -> None:
+        d = 6
+        rhos = np.array([0.8, 0.6, 0.4, 0.7, 0.5])
+        vine = _truncated_c_vine(d, rhos)
+        z = stats.norm.ppf(vine.rvs(40_000, random_state=2))
+        corr = np.corrcoef(z, rowvar=False)
+        loadings = np.concatenate([[1.0], rhos])
+        implied = np.outer(loadings, loadings)
+        np.fill_diagonal(implied, 1.0)
+        assert np.max(np.abs(corr - implied)) < 0.02
+
+    @pytest.mark.parametrize("structure", ["C", "D"])
+    def test_truncated_matches_explicit_zero_gaussians(self, structure: str) -> None:
+        """Replace the independence trees by Gaussian(0) -- the same copula, but
+        not recognised as truncated -- and every recursion must agree."""
+        first = [rc.ClaytonCopula(2.0), rc.StudentCopula(0.5, df=4.0), rc.FrankCopula(3.0)]
+        truncated = VineCopula(
+            [first, [rc.IndependenceCopula(2)] * 2, [rc.IndependenceCopula(2)]],
+            structure=structure,
+        )
+        explicit = VineCopula(
+            [first, [rc.GaussianCopula(0.0)] * 2, [rc.GaussianCopula(0.0)]],
+            structure=structure,
+        )
+        u = explicit.rvs(400, random_state=4)
+        np.testing.assert_allclose(truncated.logpdf(u), explicit.logpdf(u), atol=1e-8)
+        np.testing.assert_allclose(
+            truncated.rvs(400, random_state=4), explicit.rvs(400, random_state=4), atol=1e-6
+        )
+        if structure == "D":
+            np.testing.assert_allclose(truncated.rosenblatt(u), explicit.rosenblatt(u), atol=1e-8)
+
+    @pytest.mark.parametrize(
+        ("structure", "expected"),
+        [
+            (
+                "C",
+                [
+                    [0.12857020276919962, 0.14579860771979763, 0.22594389876228577],
+                    [0.028689008371944547, 0.019483803416669374, 0.16676686816953334],
+                ],
+            ),
+            (
+                "D",
+                [
+                    [0.12857020276919962, 0.14579860771979763, 0.17433057348688547],
+                    [0.028689008371944547, 0.019483803416669374, 0.39407384294967784],
+                ],
+            ),
+        ],
+    )
+    def test_untruncated_seeded_draws_are_unchanged(
+        self, structure: str, expected: list[list[float]]
+    ) -> None:
+        """A full vine keeps its exact algorithm: same seed, same draws. Values
+        pinned from rcopula 0.2.0 (bit-identical on the machine that pinned them;
+        the tolerance only allows for another platform's libm)."""
+        u = MIXED[structure].rvs(2, random_state=11)
+        np.testing.assert_allclose(u, np.array(expected), rtol=1e-13, atol=0)
+
+    @pytest.mark.parametrize("structure", ["C", "D"])
+    def test_truncated_fit_has_the_right_shape(self, structure: str) -> None:
+        u = MIXED["D"].rvs(400, random_state=0)
+        u = np.column_stack([u, u[:, 0] * 0.5 + 0.25])
+        fitted = fit_vine(u, structure=structure, truncate=1, families=["gaussian", "clayton"])
+        assert [len(level) for level in fitted.pair_copulas] == [3, 2, 1]
+        assert fitted.truncation_level <= 1
+
+
+class TestDefaultOrder:
+    def test_d_vine_default_order_is_the_tau_ranking(self) -> None:
+        """The docstring promises the strength ordering for D-vines too."""
+        from rcopula.vine import _default_order
+
+        u = MIXED["C"].rvs(800, random_state=0)
+        fitted = fit_vine(u, structure="D", families=["gaussian"])
+        assert list(fitted.order) == _default_order(u, "D")
+        tau = np.abs(rc.cor_kendall(u)).sum(axis=1)
+        assert list(fitted.order) == [int(j) for j in np.argsort(-tau)]

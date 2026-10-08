@@ -273,3 +273,31 @@ class TestKendallReturnPeriod:
     def test_it_rejects_a_non_positive_period(self) -> None:
         with pytest.raises(ValueError, match="period must be positive"):
             return_period_level(rc.GumbelCopula(2.0), -5.0)
+
+
+class TestReturnPeriodEdges:
+    def test_period_shorter_than_interval_says_so(self) -> None:
+        with pytest.raises(ValueError, match="at least interval"):
+            return_period_level(rc.GumbelCopula(2.0), 0.5)
+        with pytest.raises(ValueError, match="at least interval"):
+            return_period_level(rc.GumbelCopula(2.0), 5.0, interval=10.0)
+
+    def test_return_period_level_rejects_a_bad_interval(self) -> None:
+        with pytest.raises(ValueError, match="interval must be positive"):
+            return_period_level(rc.GumbelCopula(2.0), 5.0, interval=0.0)
+
+    def test_period_equal_to_interval_is_level_zero(self) -> None:
+        assert return_period_level(rc.GumbelCopula(2.0), 1.0)[0] == 0.0
+
+    def test_t_equal_to_one_is_an_explicit_infinity(self) -> None:
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            out = kendall_return_period(rc.GumbelCopula(2.0), [0.5, 1.0])
+        assert np.isfinite(out[0]) and np.isposinf(out[1])
+
+    @pytest.mark.parametrize("t", [1.5, -0.1, np.nan])
+    def test_t_outside_the_unit_interval_is_rejected(self, t: float) -> None:
+        with pytest.raises(ValueError, match=r"t must lie in \[0, 1\]"):
+            kendall_return_period(rc.GumbelCopula(2.0), t)

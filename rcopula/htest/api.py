@@ -45,6 +45,7 @@ Kojadinovic, I. (2014). Some copula inference procedures adapted to the
 from __future__ import annotations
 
 import itertools
+import warnings
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -457,8 +458,8 @@ def ev_test(
     data : array_like of float, shape (n, 2)
         Bivariate observations on any scale; they are converted to ranks first.
         Exactly two columns. Extreme-value copulas cannot be negatively
-        dependent; a negative sample Kendall's tau is clipped to a tiny positive
-        value when building the null.
+        dependent; a sample Kendall's tau at or below zero triggers a warning
+        (see Warns) and the null is built at near independence.
     n_rep : int, default 1000
         Number of bootstrap replicates, a positive integer.
     random_state : int, numpy.random.Generator or None, default None
@@ -475,6 +476,15 @@ def ev_test(
     ------
     ValueError
         If ``data`` does not have exactly two columns.
+
+    Warns
+    -----
+    UserWarning
+        If the sample Kendall's tau is zero or negative. The Gumbel null is
+        then built at ``tau = 1e-6`` (near independence -- the only
+        extreme-value copula without positive dependence), so the test can
+        only tell whether the data look independent; clearly negative
+        dependence already rules out an extreme-value copula.
 
     Examples
     --------
@@ -496,7 +506,21 @@ def ev_test(
 
     from scipy import stats
 
-    tau = float(np.clip(stats.kendalltau(u[:, 0], u[:, 1]).statistic, 1e-6, 0.99))
+    sample_tau = float(stats.kendalltau(u[:, 0], u[:, 1]).statistic)
+    if not sample_tau > 0.0:
+        # Extreme-value copulas are positively quadrant dependent, so the
+        # Gumbel null cannot match this sample; clipping it to near
+        # independence used to happen silently.
+        warnings.warn(
+            f"ev_test: the sample Kendall's tau is {sample_tau:.4f} <= 0, but extreme-value "
+            "copulas cannot be negatively dependent. The null is built at (near) "
+            "independence, the only extreme-value copula with tau <= 0, so the p-value "
+            "only says whether the data are consistent with independence; clearly "
+            "negative dependence is itself evidence against an extreme-value copula.",
+            UserWarning,
+            stacklevel=2,
+        )
+    tau = float(np.clip(sample_tau, 1e-6, 0.99))
     null_copula = GumbelCopula.from_tau(tau)
 
     replicates = np.empty(n_rep)

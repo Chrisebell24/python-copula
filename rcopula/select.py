@@ -486,7 +486,12 @@ def select_copula(
         Bootstrap replicates (positive), used only when ``gof`` is requested.
     random_state : int, numpy.random.Generator or None, default None
         Seed for the cross-validation folds and the goodness-of-fit bootstrap.
-        Pass an int for reproducible results.
+        Every family gets the *same* folds and the same bootstrap stream, so
+        the comparison is not confounded by random draws: an int is used as
+        the seed for each family, and a Generator (or ``None``) is reduced to
+        a single int seed drawn once (one draw from the Generator, and only
+        when ``criterion="xv"`` or ``gof`` is requested). Pass an int for
+        reproducible results.
     ties_method : {"average", "min", "max", "dense", "ordinal", "random"}, default "average"
         How tied values are ranked when ``data`` is turned into
         pseudo-observations.
@@ -514,7 +519,9 @@ def select_copula(
     the error message, ``NaN`` scores and ``converged=False``, and it is
     ranked last. A fit that runs but whose optimiser reports non-convergence
     keeps its score and is ranked by it, with ``converged=False`` in its
-    row. Silently dropping either would misrepresent the comparison.
+    row. Silently dropping either would misrepresent the comparison. If both
+    the cross-validation and the goodness-of-fit run fail for a family, the
+    ``message`` column carries both errors, separated by ``"; "``.
 
     Examples
     --------
@@ -574,6 +581,20 @@ def select_copula(
     if gof_kind not in (None, "pb", "mult"):
         raise ValueError(f"gof must be False, True, 'pb' or 'mult', got {gof!r}")
 
+    # Every family must see the same folds and the same bootstrap stream, or the
+    # comparison is partly a comparison of random draws. An int seed already
+    # gives that (each call re-seeds from it); a Generator, or None, would be
+    # consumed family after family, so it is reduced to one int seed up front.
+    # The generator is touched only when something random is actually run.
+    family_seed: int | None = None
+    if criterion == "xv" or gof_kind is not None:
+        if isinstance(random_state, np.random.Generator):
+            family_seed = int(random_state.integers(0, 2**63 - 1))
+        elif random_state is None:
+            family_seed = int(np.random.default_rng().integers(0, 2**63 - 1))
+        else:
+            family_seed = int(random_state)
+
     rows: list[dict[str, object]] = []
     results: dict[str, CopulaFitResult] = {}
 
@@ -612,17 +633,18 @@ def select_copula(
         )
         lower, upper = _safe_lambda(res.copula)
         row["lambda_lower"], row["lambda_upper"] = lower, upper
+        failures: list[str] = []
 
         if criterion == "xv":
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     row["xv"] = cross_validate(
-                        candidate, u, k=k, method=method, random_state=random_state
+                        candidate, u, k=k, method=method, random_state=family_seed
                     )
             except Exception as exc:
                 row["xv"] = np.nan
-                row["message"] = f"cross-validation failed: {type(exc).__name__}: {exc}"
+                failures.append(f"cross-validation failed: {type(exc).__name__}: {exc}")
 
         if gof_kind is not None:
             try:
@@ -634,13 +656,16 @@ def select_copula(
                         simulation=gof_kind,
                         estim_method=method,
                         n_rep=n_rep,
-                        random_state=random_state,
+                        random_state=family_seed,
                     )
                 row["gof_statistic"], row["gof_pvalue"] = test.statistic, test.pvalue
             except Exception as exc:
                 row["gof_statistic"], row["gof_pvalue"] = np.nan, np.nan
-                row["message"] = f"gof failed: {type(exc).__name__}: {exc}"
+                failures.append(f"gof failed: {type(exc).__name__}: {exc}")
 
+        if failures:
+            # Keep every failure: a later one must not hide an earlier one.
+            row["message"] = "; ".join(failures)
         rows.append(row)
 
     table = pd.DataFrame(rows).set_index("family")

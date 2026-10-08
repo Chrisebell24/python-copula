@@ -369,3 +369,73 @@ class TestImpliedCorrelation:
     def test_unattainable_target_is_reported(self) -> None:
         with pytest.raises(ValueError, match="not attainable"):
             implied_correlation(0.999, 0.01, 0.15, 0.30, n_names=100, n=5_000)
+
+
+class TestCreditRegressions:
+    def test_tranche_spread_discounts_both_legs(self) -> None:
+        """A higher rate must not widen the spread.
+
+        It did when only the premium leg was discounted.
+        """
+        loss = portfolio_loss(rc.GaussianCopula(0.2, dim=100), 0.05, n=20_000, random_state=0)
+        flat = tranche_spread(loss, 0.03, 0.07, maturity=5.0)
+        disc = tranche_spread(loss, 0.03, 0.07, maturity=5.0, discount_rate=0.05)
+        assert disc <= flat
+        # Second-order effect only: well inside the old exp(r T / 2) ~ 13% widening.
+        assert disc == pytest.approx(flat, rel=0.05)
+
+    def test_tranche_spread_matches_closed_form(self) -> None:
+        el, r, t = 0.2, 0.04, 5.0
+        loss = np.full(10, 0.03 + el * 0.04)  # tranche [0.03, 0.07] loses exactly `el`
+        a0 = (1 - np.exp(-r * t)) / r
+        a1 = (1 - np.exp(-r * t) * (1 + r * t)) / r**2
+        expected = 1e4 * (el / t) * a0 / (a0 - (el / t) * a1)
+        assert tranche_spread(loss, 0.03, 0.07, t, r) == pytest.approx(expected, rel=1e-10)
+        assert tranche_spread(loss, 0.03, 0.07, t) == pytest.approx(1e4 * el / (t * (1 - el / 2)))
+
+    def test_implied_correlation_searches_beyond_095(self) -> None:
+        """The documented search range now reaches 0.999."""
+        loss = portfolio_loss(rc.GaussianCopula(0.98, dim=50), 0.05, 1.0, n=5_000, random_state=3)
+        el = tranche_expected_loss(loss, 0.30, 0.60)
+        rho = implied_correlation(el, 0.05, 0.30, 0.60, n_names=50, n=5_000, random_state=3)
+        assert rho == pytest.approx(0.98, abs=0.015)
+
+    def test_implied_correlation_uses_common_random_numbers(self, monkeypatch) -> None:
+        """A Generator must be turned into one seed reused by every trial correlation."""
+        import rcopula.credit as credit
+
+        seen: list[object] = []
+        real = credit.portfolio_loss
+
+        def spy(*args, **kwargs):
+            seen.append(args[5])
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(credit, "portfolio_loss", spy)
+        rho = credit.implied_correlation(
+            0.3, 0.05, 0.03, 0.07, n_names=30, n=2_000, random_state=np.random.default_rng(0)
+        )
+        assert 0.0 <= rho <= 0.999
+        assert len(seen) > 2
+        assert all(isinstance(s, int) for s in seen)
+        assert len(set(seen)) == 1
+
+    def test_portfolio_loss_validates_exposure_and_lgd(self) -> None:
+        cop = rc.GaussianCopula(0.2, dim=3)
+        with pytest.raises(ValueError, match="sum to zero"):
+            portfolio_loss(cop, 0.05, exposure=[0.0, 0.0, 0.0], n=10)
+        with pytest.raises(ValueError, match="exposure"):
+            portfolio_loss(cop, 0.05, exposure=[1.0, -1.0, 1.0], n=10)
+        with pytest.raises(ValueError, match="exposure"):
+            portfolio_loss(cop, 0.05, exposure=[1.0, np.nan, 1.0], n=10)
+        with pytest.raises(ValueError, match="lgd"):
+            portfolio_loss(cop, 0.05, lgd=1.5, n=10)
+        with pytest.raises(ValueError, match="lgd"):
+            portfolio_loss(cop, 0.05, lgd=[0.5, -0.1, 0.5], n=10)
+
+
+class TestRiskRegressions:
+    def test_risk_contributions_reports_weight_mismatch(self) -> None:
+        """Same clear error as simulate_losses, not a numpy matmul shape error."""
+        with pytest.raises(ValueError, match="weight"):
+            risk_contributions(rc.ClaytonCopula(2.0, dim=3), stats.norm(), [0.5, 0.5], n=10)

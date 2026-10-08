@@ -42,6 +42,19 @@ Nested constructions survive intact:
 >>> from_json(to_json(original)).describe() == original.describe()
 True
 
+A fit result (anything with a ``.copula`` attribute, such as the
+:class:`~rcopula.fit.results.CopulaFitResult` from :func:`rcopula.fit`) can be
+passed directly. The *fitted copula* is what gets saved and what comes back;
+the fit's summary numbers ride along under a ``"fit"`` key for the record:
+
+>>> u = rc.ClaytonCopula(2.0).rvs(200, random_state=0)
+>>> result = rc.fit(rc.ClaytonCopula(), u)
+>>> document = to_dict(result)
+>>> sorted(document["fit"])
+['converged', 'cov_params', 'loglik', 'method', 'n_obs', 'param_names', 'params', 'result']
+>>> from_dict(document) == result.copula
+True
+
 Notes
 -----
 A document records the version of ``rcopula`` that wrote it. Loading a document
@@ -169,7 +182,52 @@ def _encode(copula: Copula) -> dict[str, Any]:
     return node
 
 
-def to_dict(copula: Copula) -> dict[str, Any]:
+def _json_number(value: Any) -> float | None:
+    """A float JSON can hold: non-finite values become ``None`` (``null``)."""
+    number = float(value)
+    return number if np.isfinite(number) else None
+
+
+def _fit_metadata(result: Any) -> dict[str, Any]:
+    """The summary numbers of a fit result, for the record (never read back).
+
+    Only what is cheap, plain and meaningful across result types is kept: the
+    result's class name, the estimated parameters and their names, the
+    log-likelihood, the number of observations, the method, the convergence
+    flag and the parameter covariance. Anything a given result type lacks is
+    simply left out.
+    """
+    meta: dict[str, Any] = {"result": type(result).__name__}
+    params = getattr(result, "params", None)
+    if params is not None:
+        meta["params"] = [_json_number(v) for v in np.ravel(np.asarray(params, dtype=float))]
+    names = getattr(result, "param_names", None)
+    if names is not None:
+        meta["param_names"] = [str(name) for name in names]
+    for key in ("loglik",):
+        value = getattr(result, key, None)
+        if value is not None:
+            meta[key] = _json_number(value)
+    n_obs = getattr(result, "n_obs", None)
+    if n_obs is not None:
+        meta["n_obs"] = int(n_obs)
+    method = getattr(result, "method", None)
+    if isinstance(method, str):
+        meta["method"] = method
+    converged = getattr(result, "converged", None)
+    if converged is not None:
+        meta["converged"] = bool(converged)
+    if hasattr(result, "cov_params") and not callable(result.cov_params):
+        cov = result.cov_params
+        meta["cov_params"] = (
+            None
+            if cov is None
+            else [[_json_number(v) for v in row] for row in np.atleast_2d(np.asarray(cov, float))]
+        )
+    return meta
+
+
+def to_dict(copula: Any) -> dict[str, Any]:
     """Convert a copula into a plain Python dictionary you can store or send anywhere.
 
     The dictionary holds only strings, numbers, booleans, lists and nested
@@ -179,11 +237,19 @@ def to_dict(copula: Copula) -> dict[str, Any]:
 
     Parameters
     ----------
-    copula : Copula
+    copula : Copula or fit result
         The copula to save: any parametric family, or a structural
         construction (rotated, outer power, Khoudraji, mixture, nested
         Archimedean, vine) built from them. Not an
         :class:`~rcopula.core.empirical.EmpiricalCopula`.
+
+        A fit result -- any object whose ``.copula`` attribute is a
+        :class:`~rcopula.core.base.Copula`, such as the result of
+        :func:`rcopula.fit` or :func:`rcopula.discrete.fit_discrete` -- is
+        accepted too: its fitted copula is saved, and its summary numbers are
+        added under ``"fit"``. Only the copula is restored by
+        :func:`from_dict`; the ``"fit"`` entry is a record, not a way to
+        rebuild the result object.
 
     Returns
     -------
@@ -198,13 +264,19 @@ def to_dict(copula: Copula) -> dict[str, Any]:
             float) and ``"free"`` (list of bool), plus ``"dispstr"`` for the
             elliptical families and ``"df_fixed"`` for the Student t. A
             structural copula instead holds its components as nested nodes.
+        ``"fit"`` : dict, only when a fit result was passed
+            ``"result"`` (the result's class name) and whichever of
+            ``"params"``, ``"param_names"``, ``"loglik"``, ``"n_obs"``,
+            ``"method"``, ``"converged"`` and ``"cov_params"`` the result
+            has. Non-finite numbers are stored as ``None``.
 
     Raises
     ------
     TypeError
         If the copula is (or contains) an
         :class:`~rcopula.core.empirical.EmpiricalCopula`, which is
-        deliberately not serialisable.
+        deliberately not serialisable, or if ``copula`` is neither a copula
+        nor an object with a ``.copula`` attribute holding one.
 
     Examples
     --------
@@ -218,14 +290,27 @@ def to_dict(copula: Copula) -> dict[str, Any]:
     # module, so a top-level import would be circular.
     from rcopula import __version__
 
-    return {
+    fit_result: Any = None
+    if not isinstance(copula, Copula):
+        inner = getattr(copula, "copula", None)
+        if not isinstance(inner, Copula):
+            raise TypeError(
+                "to_dict/to_json takes a Copula or a fit result with a .copula "
+                f"attribute; got {type(copula).__name__}"
+            )
+        fit_result, copula = copula, inner
+
+    document: dict[str, Any] = {
         "rcopula": __version__,
         "schema": SCHEMA_VERSION,
         "copula": _encode(copula),
     }
+    if fit_result is not None:
+        document["fit"] = _fit_metadata(fit_result)
+    return document
 
 
-def to_json(copula: Copula, *, indent: int | None = 2) -> str:
+def to_json(copula: Any, *, indent: int | None = 2) -> str:
     """Save a copula as a JSON text string, so it can be written to a file and reloaded exactly.
 
     The string is the JSON form of :func:`to_dict`'s output. Read it back
@@ -233,8 +318,9 @@ def to_json(copula: Copula, *, indent: int | None = 2) -> str:
 
     Parameters
     ----------
-    copula : Copula
-        The copula to save; see :func:`to_dict` for what is accepted.
+    copula : Copula or fit result
+        The copula to save, or a fit result whose fitted copula is saved;
+        see :func:`to_dict` for what is accepted and what is kept.
     indent : int or None, default 2
         Spaces of indentation, passed to :func:`json.dumps`. ``None`` gives
         the compact single-line form.
@@ -248,7 +334,8 @@ def to_json(copula: Copula, *, indent: int | None = 2) -> str:
     ------
     TypeError
         If the copula is (or contains) an
-        :class:`~rcopula.core.empirical.EmpiricalCopula`.
+        :class:`~rcopula.core.empirical.EmpiricalCopula`, or ``copula`` is
+        neither a copula nor a fit result.
 
     Examples
     --------

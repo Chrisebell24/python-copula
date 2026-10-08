@@ -29,7 +29,7 @@ the most useful thing this module does.
 
    These are **reference implementations for analysis and teaching**, not a
    production pricing library. Spreads use a flat-hazard, single-period
-   approximation with no discounting curve, no accrual on default and no
+   approximation with a flat discount rate, no accrual on default and no
    counterparty adjustment.
 
 References
@@ -239,11 +239,12 @@ def portfolio_loss(
         single number applies to every name.
     lgd : float or array_like of float, shape (d,), default 0.6
         Loss given default, as a fraction of exposure (``0.6`` means 40%
-        recovery). A single number applies to every name.
+        recovery), each in ``[0, 1]``. A single number applies to every name.
     exposure : float or array_like of float, shape (d,), optional
-        Per-name exposure (notional), in any currency unit. Defaults to equal.
-        Only relative sizes matter: losses are returned as a fraction of total
-        exposure, so the result always lies in ``[0, 1]`` when ``lgd`` does.
+        Per-name exposure (notional), in any currency unit, each finite and
+        ``>= 0`` with a positive total. Defaults to equal. Only relative sizes
+        matter: losses are returned as a fraction of total exposure, so the
+        result always lies in ``[0, 1]``.
     n : int, default 100_000
         Number of simulated scenarios.
     random_state : int, numpy.random.Generator or None, default None
@@ -257,8 +258,9 @@ def portfolio_loss(
     Raises
     ------
     ValueError
-        If any default probability lies outside ``[0, 1]``, or a per-name
-        input has a length other than 1 or ``d``.
+        If any default probability or LGD lies outside ``[0, 1]``, any
+        exposure is negative or not finite, the exposures sum to zero, or a
+        per-name input has a length other than 1 or ``d``.
 
     Examples
     --------
@@ -275,8 +277,15 @@ def portfolio_loss(
     d = copula.dim
     p = _as_vector(default_prob, d, "default_prob")
     severity = _as_vector(lgd, d, "lgd")
+    if not np.all((severity >= 0) & (severity <= 1)):
+        raise ValueError("lgd must lie in [0, 1] for every name")
     weight = np.full(d, 1.0) if exposure is None else _as_vector(exposure, d, "exposure")
-    weight = weight / weight.sum()
+    if not np.all(np.isfinite(weight)) or np.any(weight < 0):
+        raise ValueError("exposure must be finite and >= 0 for every name")
+    total = weight.sum()
+    if total <= 0:
+        raise ValueError("exposures sum to zero; at least one name needs a positive exposure")
+    weight = weight / total
 
     defaulted = default_indicators(copula, p, n, random_state)
     return defaulted @ (weight * severity)
@@ -411,8 +420,11 @@ def tranche_spread(
     maturity : float, default 5.0
         Tranche maturity in years. Must be positive.
     discount_rate : float, default 0.0
-        Continuously compounded annual rate (``0.03`` for 3%). Zero means no
-        discounting.
+        Continuously compounded annual rate (``0.03`` for 3%), applied to
+        **both** legs. Zero means no discounting. Because both legs are
+        discounted on the same schedule the rate only has a second-order
+        effect: a higher rate slightly *tightens* the spread (it down-weights
+        the late, amortised premium payments).
 
     Returns
     -------
@@ -428,13 +440,20 @@ def tranche_spread(
 
     Notes
     -----
-    Equates the protection leg to the premium leg under a **single-period,
-    flat-curve** approximation:
+    Equates the protection leg to the premium leg assuming the tranche
+    loss accrues **linearly** over ``[0, T]`` on a flat discount curve
+    :math:`e^{-rt}`. The protection leg pays :math:`\mathrm{EL}/T` per year;
+    the premium leg pays :math:`s` on the outstanding notional
+    :math:`1 - \mathrm{EL}\,t/T`. Both are discounted with the same curve:
 
-    .. math::  s \approx \frac{\mathrm{EL}}{T \cdot (1 - \mathrm{EL}/2)}
+    .. math::
 
-    with the second factor a crude adjustment for notional amortising as losses
-    accrue. Real pricing integrates over a default-time distribution with a
+        s = \frac{(\mathrm{EL}/T)\,A_0}{A_0 - (\mathrm{EL}/T)\,A_1},\qquad
+        A_0 = \int_0^T e^{-rt}\,dt,\quad A_1 = \int_0^T t\,e^{-rt}\,dt,
+
+    which reduces to :math:`s = \mathrm{EL} / (T (1 - \mathrm{EL}/2))` at
+    :math:`r = 0` (the second factor is the adjustment for notional
+    amortising as losses accrue). Real pricing integrates over a default-time distribution with a
     discount curve and premium accruals; this is for comparing *models*, not
     for quoting.
 
@@ -452,9 +471,18 @@ def tranche_spread(
     el = tranche_expected_loss(loss, attachment, detachment)
     if maturity <= 0:
         raise ValueError(f"maturity must be positive, got {maturity}")
-    discount = np.exp(-discount_rate * maturity / 2.0) if discount_rate else 1.0
-    denominator = maturity * max(1.0 - el / 2.0, 1e-12) * discount
-    return float(1e4 * el / denominator)
+    # Both legs discounted on the same curve, loss accruing linearly in time.
+    # a1_over_a0 is the discount-weighted mean payment time; T/2 at r = 0.
+    rt = discount_rate * maturity
+    if abs(rt) < 1e-8:
+        a1_over_a0 = maturity / 2.0
+    else:
+        a0 = -np.expm1(-rt) / discount_rate
+        a1 = (-np.expm1(-rt) - rt * np.exp(-rt)) / discount_rate**2
+        a1_over_a0 = a1 / a0
+    rate = el / maturity
+    denominator = max(1.0 - rate * a1_over_a0, 1e-12)
+    return float(1e4 * rate / denominator)
 
 
 def nth_to_default_probability(
@@ -630,9 +658,11 @@ def implied_correlation(
     n : int, default 40_000
         Number of simulated scenarios per trial correlation.
     random_state : int, numpy.random.Generator or None, default None
-        Seed or generator. Pass an ``int`` so every trial correlation reuses
-        the same random numbers; with ``None`` or a ``Generator`` each trial
-        sees fresh noise and the root search can be erratic.
+        Seed or generator for reproducible results. Whatever is passed, every
+        trial correlation reuses the **same** random numbers (common random
+        numbers): a ``Generator`` or ``None`` is used once to draw a seed,
+        which is then reused for every trial, so the Monte Carlo mismatch is
+        a smooth function of the correlation and the root search is stable.
 
     Returns
     -------
@@ -642,14 +672,15 @@ def implied_correlation(
     Raises
     ------
     ValueError
-        If the target is unattainable over ``correlation`` in ``(0, 1)``
-        (in practice, the search range ``[1e-4, 0.95]``), or the tranche
-        bounds are invalid.
+        If the target is unattainable for any correlation in the search
+        range ``[0, 0.999]``, or the tranche bounds are invalid.
 
     Notes
     -----
-    The correlation is found by root search on a Monte Carlo estimate, so it
-    carries simulation error, and each call runs dozens of full simulations.
+    The correlation is found by Brent root search over ``[0, 0.999]`` on a
+    Monte Carlo estimate, so it carries simulation error, and each call runs
+    dozens of full simulations. (Exactly 1 is excluded because the
+    equicorrelation matrix is singular there.)
 
     Inverting the one-factor Gaussian model until it reproduces an observed
     tranche price, tranche by tranche on the same pool, produces the
@@ -673,18 +704,24 @@ def implied_correlation(
     """
     from rcopula.core.elliptical import GaussianCopula
 
+    # Common random numbers: every trial correlation must see the same draws,
+    # otherwise the mismatch is noisy in rho and brentq can wander. An int seed
+    # already guarantees that; a Generator / None is used once to fix a seed.
+    if isinstance(random_state, (int, np.integer)):
+        seed = int(random_state)
+    else:
+        seed = int(np.random.default_rng(random_state).integers(2**63 - 1))
+
     def mismatch(rho: float) -> float:
-        loss = portfolio_loss(
-            GaussianCopula(rho, dim=n_names), default_prob, lgd, None, n, random_state
-        )
+        loss = portfolio_loss(GaussianCopula(rho, dim=n_names), default_prob, lgd, None, n, seed)
         return tranche_expected_loss(loss, attachment, detachment) - target_expected_loss
 
-    lo, hi = 1e-4, 0.95
+    lo, hi = 0.0, 0.999
     f_lo, f_hi = mismatch(lo), mismatch(hi)
     if f_lo * f_hi > 0:
         raise ValueError(
             f"expected loss {target_expected_loss:.4g} is not attainable for the "
-            f"[{attachment}, {detachment}] tranche at any correlation in (0, 1); "
+            f"[{attachment}, {detachment}] tranche at any correlation in [0, 0.999]; "
             f"reachable range is roughly "
             f"[{target_expected_loss + min(f_lo, f_hi):.4g}, "
             f"{target_expected_loss + max(f_lo, f_hi):.4g}]"

@@ -146,3 +146,53 @@ def test_rejects_non_bivariate(cls, args, kw) -> None:
 def test_from_tau_round_trips(tau: float) -> None:
     for cls in (rc.GalambosCopula, rc.HuslerReissCopula):
         assert cls.from_tau(tau).tau() == pytest.approx(tau, abs=1e-8)
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for from_tau
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("cls", [rc.GalambosCopula, rc.HuslerReissCopula, rc.TawnCopula])
+def test_from_tau_zero_is_the_independence_limit(cls: type) -> None:
+    cop = cls.from_tau(0.0)
+    assert cop.tau() == pytest.approx(0.0, abs=1e-14)
+    assert cop.lambda_().upper == pytest.approx(0.0, abs=1e-14)
+    u = np.array([[0.3, 0.6], [0.9, 0.2]])
+    assert np.allclose(cop.cdf(u), u.prod(axis=1), atol=1e-14)
+    # Below the bottom of the search range tau is zero to double precision.
+    assert cls.from_tau(1e-300).tau() == pytest.approx(0.0, abs=1e-12)
+
+
+def test_tawn_from_tau_zero_is_exactly_theta_zero() -> None:
+    assert rc.TawnCopula.from_tau(0.0).theta == 0.0
+
+
+def test_negative_tau_is_still_unattainable() -> None:
+    with pytest.raises(ValueError, match="not attainable"):
+        rc.GalambosCopula.from_tau(-0.1)
+    with pytest.raises(ValueError, match="not attainable"):
+        rc.TEVCopula.from_tau(0.0)
+
+
+def test_from_tau_applies_constructor_keywords_once() -> None:
+    calls: list[object] = []
+
+    class Spy(rc.GalambosCopula):
+        def __init__(self, params: float = np.nan, dim: int = 2, *, free: object = None) -> None:
+            calls.append(free)
+            super().__init__(params, dim, free=free)  # type: ignore[arg-type]
+
+    cop = Spy.from_tau(0.4, free=[False])
+    assert cop.free.tolist() == [False]
+    assert cop.tau() == pytest.approx(0.4, abs=1e-8)
+    assert sum(c is not None for c in calls) == 1
+
+
+@pytest.mark.parametrize("cls", [rc.GalambosCopula, rc.TEVCopula])
+def test_from_tau_honours_dim(cls: type) -> None:
+    with pytest.raises(ValueError, match="bivariate"):
+        cls.from_tau(0.3, dim=3)
+    assert cls.from_tau(0.3, free=[False] * len(cls.param_names)).free.tolist() == [False] * len(
+        cls.param_names
+    )

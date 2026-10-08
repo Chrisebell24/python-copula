@@ -301,10 +301,13 @@ def mixed_pdf(
         Which coordinates are discrete (``True``) and which continuous
         (``False``). At most one may be ``False`` unless all are.
     step : float, default 1e-5
-        Finite-difference step for the continuous derivatives, on the copula
-        scale. Only used when the copula has no analytic conditional CDF.
-        Currently ignored: every family goes through an analytic conditional
-        CDF, and the argument is kept for API stability.
+        Finite-difference step, on the copula scale, for the derivative along
+        the continuous coordinate. Used whenever that derivative has no closed
+        form: for every copula with ``dim > 2``, and for bivariate families
+        other than the Archimedean, Gaussian and Student t ones (whose
+        conditional CDFs are analytic, so ``step`` does not affect them). The
+        step is shrunk near the edges of the unit interval so the difference
+        stays inside it. Must be in ``(0, 0.5)``.
 
     Returns
     -------
@@ -314,7 +317,8 @@ def mixed_pdf(
     Raises
     ------
     ValueError
-        If ``discrete``, ``x`` or ``margins`` does not match ``copula.dim``.
+        If ``discrete``, ``x`` or ``margins`` does not match ``copula.dim``,
+        or ``step`` is not in ``(0, 0.5)``.
     NotImplementedError
         If more than one coordinate is continuous while at least one is
         discrete.
@@ -323,8 +327,12 @@ def mixed_pdf(
     -----
     With no discrete coordinates this is the ordinary copula density times the
     marginal densities, and with all of them it is :func:`discrete_pmf`; both
-    limits are checked in the test suite. The continuous derivatives go through
-    :func:`~rcopula.conditional_cdf`, which is analytic for most families.
+    limits are checked in the test suite. For a bivariate Archimedean,
+    Gaussian or t copula the continuous derivative goes through the analytic
+    :func:`~rcopula.conditional_cdf`; otherwise it is a central difference of
+    the copula CDF with step ``step``, which is only as accurate as that CDF
+    (in ``d > 2`` the elliptical CDFs are themselves numerical integrals, so a
+    larger step than the default can be the more accurate choice there).
 
     Examples
     --------
@@ -345,8 +353,12 @@ def mixed_pdf(
     >>> bool(abs(total - 1.0) < 1e-6)
     True
     """
+    from rcopula.core.archimedean import ArchimedeanCopula
+    from rcopula.core.elliptical import GaussianCopula, StudentCopula
     from rcopula.transforms import conditional_cdf
 
+    if not 0.0 < float(step) < 0.5:
+        raise ValueError(f"step must be in (0, 0.5), got {step}")
     x = np.atleast_2d(np.asarray(x, dtype=float))
     dim = copula.dim
     discrete = np.asarray(discrete, dtype=bool)
@@ -379,6 +391,7 @@ def mixed_pdf(
         )
 
     axis = int(continuous[0])
+    analytic = dim == 2 and isinstance(copula, ArchimedeanCopula | GaussianCopula | StudentCopula)
     total = np.zeros(x.shape[0], dtype=float)
     for corner in itertools.product((0, 1), repeat=discrete_idx.size):
         point = upper.copy()
@@ -386,11 +399,32 @@ def mixed_pdf(
             if which:
                 point[:, position] = lower[:, position]
         sign = -1.0 if sum(corner) % 2 else 1.0
-        total += sign * np.asarray(
-            conditional_cdf(copula, np.clip(point, 1e-12, 1 - 1e-12), axis), dtype=float
-        )
-    del step  # analytic conditional CDFs throughout; kept for API stability
+        point = np.clip(point, 1e-12, 1 - 1e-12)
+        if analytic:
+            partial = np.asarray(conditional_cdf(copula, point, axis), dtype=float)
+        else:
+            partial = _partial_derivative(copula, point, axis, float(step))
+        total += sign * partial
     return np.maximum(total, 0.0) * np.asarray(margins[axis].pdf(x[:, axis]), dtype=float)
+
+
+def _partial_derivative(
+    copula: Copula, u: NDArray[np.float64], axis: int, step: float
+) -> NDArray[np.float64]:
+    """``dC/du_axis`` by central differences of the CDF, in any dimension.
+
+    The step is shrunk per row near 0 and 1 so the two evaluation points stay
+    inside the unit interval; the result is clipped to ``[0, 1]``, the range of
+    a conditional probability.
+    """
+    centre = u[:, axis]
+    h = np.minimum(step, 0.5 * np.minimum(centre, 1.0 - centre))
+    h = np.maximum(h, 1e-12)
+    hi, lo = u.copy(), u.copy()
+    hi[:, axis] = np.minimum(centre + h, 1.0)
+    lo[:, axis] = np.maximum(centre - h, 0.0)
+    difference = np.asarray(copula.cdf(hi), dtype=float) - np.asarray(copula.cdf(lo), dtype=float)
+    return np.clip(difference / (hi[:, axis] - lo[:, axis]), 0.0, 1.0)
 
 
 def discrete_loglik(copula: Copula, x: ArrayLike, margins: list[Any]) -> float:
@@ -584,18 +618,24 @@ def fit_discrete(
         One already-fitted frozen discrete distribution per column.
     start : array_like of float or None, default None
         Starting values for the *free* parameters only, overriding the
-        copula's current ones. ``None`` uses the copula's current values.
+        copula's current ones: exactly one finite value per free parameter.
+        ``None`` uses the copula's current values.
 
     Returns
     -------
     DiscreteFitResult
         The fitted copula, its parameters, log-likelihood, convergence flag
-        and the log-likelihood under independence.
+        and the log-likelihood of the same margins under independence. If the
+        copula has no free parameters nothing is optimised: the result holds
+        the copula as given and its log-likelihood, and ``independent_loglik``
+        is still the independence copula's, so the likelihood ratio compares
+        the given copula with independence.
 
     Raises
     ------
     ValueError
-        If ``x`` or ``margins`` does not match ``copula.dim``.
+        If ``x`` or ``margins`` does not match ``copula.dim``, or ``start``
+        does not have one finite value per free parameter.
 
     Notes
     -----
@@ -615,8 +655,20 @@ def fit_discrete(
     >>> bool(abs(result.params[0] - 0.6) < 0.06)
     True
     """
+    from rcopula.core.other import IndependenceCopula
+
     x = np.atleast_2d(np.asarray(x, dtype=float))
     free = np.asarray(copula.free, dtype=bool)
+    if start is not None:
+        start_values = np.atleast_1d(np.asarray(start, dtype=float))
+        if start_values.ndim != 1 or start_values.size != int(free.sum()):
+            raise ValueError(
+                f"start must hold one value per free parameter ({int(free.sum())}), "
+                f"got shape {np.shape(start)}"
+            )
+        if not np.all(np.isfinite(start_values)):
+            raise ValueError(f"start must be finite, got {start_values.tolist()}")
+    independent_loglik = discrete_loglik(IndependenceCopula(copula.dim), x, margins)
     if not free.any():
         loglik = discrete_loglik(copula, x, margins)
         return DiscreteFitResult(
@@ -625,14 +677,11 @@ def fit_discrete(
             loglik=loglik,
             n_obs=x.shape[0],
             converged=True,
-            independent_loglik=loglik,
+            independent_loglik=independent_loglik,
+            message="no free parameters; the copula was evaluated, not fitted",
         )
 
-    initial = (
-        np.array(copula.params, dtype=float)[free]
-        if start is None
-        else np.asarray(start, dtype=float)
-    )
+    initial = np.array(copula.params, dtype=float)[free] if start is None else start_values
     bounds = [b for b, is_free in zip(copula.param_bounds, free, strict=True) if is_free]
     # Pull infinite bounds in to something an optimiser can work with, and keep
     # off the endpoints, where several families are degenerate.
@@ -666,15 +715,13 @@ def fit_discrete(
     params[free] = result.x
     fitted = copula.with_params(params)
 
-    from rcopula.core.other import IndependenceCopula
-
     return DiscreteFitResult(
         copula=fitted,
         params=params,
         loglik=float(-result.fun),
         n_obs=x.shape[0],
         converged=bool(result.success),
-        independent_loglik=discrete_loglik(IndependenceCopula(copula.dim), x, margins),
+        independent_loglik=independent_loglik,
         message=str(result.message),
     )
 
@@ -763,6 +810,39 @@ def distributional_transform(
     return np.clip(total / replicates, 1e-12, 1 - 1e-12)
 
 
+def _lattice_masses(
+    margins: list[Any], support: Any, caller: str
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """The two margins' masses on ``0, ..., support``, after checking that is
+    where they live.
+
+    Both lattice functions index their output by the count itself, so a margin
+    with mass below zero or off the integers would be silently truncated or
+    missed entirely. Detect that from the margin's own CDF and refuse.
+    """
+    if isinstance(support, bool) or not isinstance(support, int | np.integer) or int(support) < 0:
+        raise ValueError(f"{caller}: support must be a non-negative integer, got {support!r}")
+    grid = np.arange(int(support) + 1)
+    masses = []
+    for k, margin in enumerate(margins):
+        below = float(np.asarray(margin.cdf(-0.5)))
+        if below > 1e-12:
+            raise ValueError(
+                f"{caller}: margin {k} puts probability {below:.3g} on negative values; "
+                "it must be supported on the non-negative integers 0, 1, 2, ... "
+                "(shift it, e.g. with scipy's loc, so its smallest value is 0)"
+            )
+        pmf = np.asarray(margin.pmf(grid), dtype=float)
+        within = float(np.asarray(margin.cdf(int(support))))
+        if abs(within - float(pmf.sum())) > 1e-9 * max(1.0, within):
+            raise ValueError(
+                f"{caller}: margin {k} puts probability on values that are not "
+                "integers; it must be supported on the non-negative integers"
+            )
+        masses.append(pmf)
+    return masses[0], masses[1]
+
+
 def tau_upper_bound(margins: list[Any], *, support: int = 200) -> float:
     r"""Compute the largest rank correlation (Kendall's tau-b) two discrete margins allow.
 
@@ -801,7 +881,9 @@ def tau_upper_bound(margins: list[Any], *, support: int = 200) -> float:
     Raises
     ------
     ValueError
-        If ``margins`` does not have exactly two entries.
+        If ``margins`` does not have exactly two entries, ``support`` is not a
+        non-negative integer, or a margin puts mass on negative or non-integer
+        values (which the lattice ``0, ..., support`` would silently miss).
 
     Examples
     --------
@@ -818,9 +900,7 @@ def tau_upper_bound(margins: list[Any], *, support: int = 200) -> float:
     """
     if len(margins) != 2:
         raise ValueError(f"tau_upper_bound is bivariate; got {len(margins)} margins")
-    grid = np.arange(support + 1)
-    p = np.asarray(margins[0].pmf(grid), dtype=float)
-    q = np.asarray(margins[1].pmf(grid), dtype=float)
+    p, q = _lattice_masses(margins, support, "tau_upper_bound")
 
     # The maximum is attained at the comonotone coupling, whose joint CDF is the
     # Frechet upper bound min(F, G). Its mass is the second difference.
@@ -877,7 +957,9 @@ def checkerboard(copula: Copula, margins: list[Any], *, support: int = 60) -> ND
     Raises
     ------
     ValueError
-        If the copula is not bivariate.
+        If the copula is not bivariate, ``margins`` does not have two entries,
+        ``support`` is not a non-negative integer, or a margin puts mass on
+        negative or non-integer values.
 
     Examples
     --------
@@ -892,6 +974,9 @@ def checkerboard(copula: Copula, margins: list[Any], *, support: int = 60) -> ND
     """
     if copula.dim != 2:
         raise ValueError(f"checkerboard is bivariate; got dim {copula.dim}")
+    if len(margins) != 2:
+        raise ValueError(f"checkerboard is bivariate; got {len(margins)} margins")
+    _lattice_masses(margins, support, "checkerboard")
     grid = np.arange(support + 1)
     pairs = np.array([[i, j] for i in grid for j in grid], dtype=float)
     return discrete_pmf(copula, pairs, margins).reshape(support + 1, support + 1)

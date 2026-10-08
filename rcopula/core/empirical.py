@@ -38,6 +38,9 @@ Remillard, B. and Scaillet, O. (2009). Testing for equality between two copulas.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy import stats
@@ -73,9 +76,11 @@ class EmpiricalCopula(Copula):
         estimator, as in R's ``empCopula``. Rarely needed.
     ties_method : str, default "average"
         Keyword-only. How tied values are ranked; passed to
-        :func:`~rcopula.dependence.pseudo_obs`.
-    **kwargs
-        Accepted and ignored.
+        :func:`~rcopula.dependence.pseudo_obs`. Methods that keep ties
+        (``"average"``, ``"min"``, ``"max"``) make the smoothed estimators
+        spread each tied group over the block of ranks it occupies (see
+        Notes); ``"first"`` and ``"random"`` break ties, so every observation
+        keeps a rank of its own.
 
     Attributes
     ----------
@@ -93,8 +98,23 @@ class EmpiricalCopula(Copula):
     Raises
     ------
     ValueError
-        If ``smoothing`` is not one of the three options, there are fewer than
-        two observations, or the data has fewer than two columns.
+        If ``smoothing`` is not one of the three options, ``data`` is not a
+        2-D array, there are fewer than two observations, or the data has
+        fewer than two columns.
+    TypeError
+        If given an unknown keyword argument (they used to be silently
+        ignored, so a misspelling such as ``smothing=`` went unnoticed).
+
+    Notes
+    -----
+    **Ties.** The beta and checkerboard estimators are indexed by ranks
+    ``1..n``. When ``k`` observations tie in a column they jointly occupy
+    the ranks ``r, ..., r + k - 1``; each of them is given the *average* of
+    the ``k`` beta distributions (beta smoothing) or the union of the ``k``
+    grid cells (checkerboard) for those ranks, rather than one rank rounded
+    from the mid-rank. This keeps the margins exactly uniform, so both
+    smoothings remain genuine copulas with ties. Without ties it is the usual
+    estimator.
 
     Examples
     --------
@@ -133,14 +153,16 @@ class EmpiricalCopula(Copula):
         *,
         offset: float = 0.0,
         ties_method: str = "average",
-        **kwargs: object,
     ) -> None:
         if smoothing not in SMOOTHINGS:
             raise ValueError(f"smoothing must be one of {SMOOTHINGS}, got {smoothing!r}")
 
         arr = np.asarray(data, dtype=np.float64)
-        if arr.ndim == 1:
-            arr = arr.reshape(-1, 1)
+        if arr.ndim != 2:
+            raise ValueError(
+                "data must be a 2-D array of shape (n_observations, n_variables) with at "
+                f"least two variables; got a {arr.ndim}-D array of shape {arr.shape}"
+            )
         if arr.shape[0] < 2:
             raise ValueError("an empirical copula needs at least two observations")
 
@@ -149,8 +171,18 @@ class EmpiricalCopula(Copula):
         self.ties_method = ties_method
         self._u = np.asarray(pseudo_obs(arr, ties_method=ties_method), dtype=np.float64)
         self._n = arr.shape[0]
-        # Ranks in 1..n, which the smoothed estimators are parameterised by.
-        self._ranks = np.round(self._u * (self._n + 1.0)).astype(int)
+        # The smoothed estimators are indexed by ranks 1..n. Observation i in
+        # column j occupies the block of ranks lo+1..hi: a single rank without
+        # ties, the k ranks a tied group shares otherwise. Ranking the pseudo-
+        # observations again ("min"/"max") recovers those blocks whatever
+        # ties_method produced them.
+        self._rank_lo = np.column_stack(
+            [stats.rankdata(col, method="min") - 1 for col in self._u.T]
+        ).astype(np.int64)
+        self._rank_hi = np.column_stack(
+            [stats.rankdata(col, method="max") for col in self._u.T]
+        ).astype(np.int64)
+        self._has_ties = bool(np.any(self._rank_hi - self._rank_lo > 1))
 
         super().__init__(np.empty(0), arr.shape[1])
 
@@ -205,19 +237,45 @@ class EmpiricalCopula(Copula):
             below = np.all(self._u[None, :, :] <= u[:, None, :], axis=2)
             return below.sum(axis=1) / (n + self.offset)
 
+        lo, hi = self._rank_lo, self._rank_hi
         if self.smoothing == "beta":
             # C_n^beta(u) = (1/n) sum_i prod_j pbeta(u_j; R_ij, n - R_ij + 1)
             out = np.empty(u.shape[0])
             for k, point in enumerate(u):
-                terms = stats.beta.cdf(point[None, :], self._ranks, n - self._ranks + 1)
+                if self._has_ties:
+                    terms = self._block_mean(point, stats.binom.sf, n)
+                else:
+                    terms = stats.beta.cdf(point[None, :], hi, n - hi + 1)
                 out[k] = np.prod(terms, axis=1).mean()
             return out
 
-        # Checkerboard: each observation is spread over one grid cell.
+        # Checkerboard: each observation is spread uniformly over its block of
+        # grid cells -- one cell, or the k cells a tied group shares.
         out = np.empty(u.shape[0])
         for k, point in enumerate(u):
-            terms = np.clip(n * point[None, :] - self._ranks + 1.0, 0.0, 1.0)
+            terms = np.clip((n * point[None, :] - lo) / (hi - lo), 0.0, 1.0)
             out[k] = np.prod(terms, axis=1).mean()
+        return out
+
+    def _block_mean(
+        self, point: NDArray[np.float64], kernel: Callable[..., Any], n_trials: int
+    ) -> NDArray[np.float64]:
+        r"""Average of a rank-indexed kernel over each observation's block of ranks.
+
+        For the beta smoothing the kernel for rank ``m`` is
+        ``pbeta(u; m, n + 1 - m) = P(Binomial(n, u) >= m)`` (``kernel =
+        binom.sf`` at ``m - 1``), or its density
+        ``dbeta(u; m, n + 1 - m) = n * dbinom(m - 1; n - 1, u)``. Cumulative
+        sums over ``m = 1..n`` give every block's average in one pass per
+        coordinate.
+        """
+        lo, hi = self._rank_lo, self._rank_hi
+        out = np.empty(lo.shape)
+        m_minus_1 = np.arange(self._n)
+        for j in range(self._dim):
+            values = kernel(m_minus_1, n_trials, point[j])
+            cum = np.concatenate([[0.0], np.cumsum(values)])
+            out[:, j] = (cum[hi[:, j]] - cum[lo[:, j]]) / (hi[:, j] - lo[:, j])
         return out
 
     def _logpdf(self, u, params):
@@ -228,9 +286,13 @@ class EmpiricalCopula(Copula):
                 "density; use smoothing='beta' if you need one"
             )
         n = self._n
+        hi = self._rank_hi
         out = np.empty(u.shape[0])
         for k, point in enumerate(u):
-            terms = stats.beta.pdf(point[None, :], self._ranks, n - self._ranks + 1)
+            if self._has_ties:
+                terms = n * self._block_mean(point, stats.binom.pmf, n - 1)
+            else:
+                terms = stats.beta.pdf(point[None, :], hi, n - hi + 1)
             out[k] = np.prod(terms, axis=1).mean()
         with np.errstate(divide="ignore"):
             return np.log(out)
@@ -240,11 +302,17 @@ class EmpiricalCopula(Copula):
         idx = rng.integers(0, self._n, size=size)
         if self.smoothing == "none":
             return self._u[idx]
+        lo, hi = self._rank_lo[idx], self._rank_hi[idx]
         if self.smoothing == "beta":
-            r = self._ranks[idx]
+            r = hi
+            if self._has_ties:
+                # A rank drawn uniformly from the observation's block. Only
+                # done with ties, so untied data keeps its random stream.
+                step = np.floor(rng.uniform(size=lo.shape) * (hi - lo)).astype(np.int64)
+                r = np.minimum(lo + 1 + step, hi)
             return rng.beta(r, self._n - r + 1)
-        # Checkerboard: uniform within the selected cell.
-        return (self._ranks[idx] - rng.uniform(size=(size, self._dim))) / self._n
+        # Checkerboard: uniform within the selected block of cells.
+        return (hi - rng.uniform(size=(size, self._dim)) * (hi - lo)) / self._n
 
     # -- estimators R exposes as free functions -------------------------
 

@@ -52,14 +52,14 @@ class IndependenceCopula(Copula):
     ----------
     dim : int, default 2
         Number of variables ``d``; must be at least 2.
-    **kwargs : object
-        Accepted and ignored, so generic code can pass the same keywords to
-        every family.
 
     Raises
     ------
     ValueError
         If ``dim < 2``.
+    TypeError
+        If given any keyword other than ``dim`` -- a misspelled keyword is an
+        error rather than being silently ignored.
 
     Examples
     --------
@@ -77,7 +77,7 @@ class IndependenceCopula(Copula):
     name = "Independence"
     param_names: tuple[str, ...] = ()
 
-    def __init__(self, dim: int = 2, **kwargs: object) -> None:
+    def __init__(self, dim: int = 2) -> None:
         super().__init__(np.empty(0), dim)
 
     @property
@@ -153,14 +153,14 @@ class FrechetUpperCopula(Copula):
     ----------
     dim : int, default 2
         Number of variables ``d``; must be at least 2.
-    **kwargs : object
-        Accepted and ignored, so generic code can pass the same keywords to
-        every family.
 
     Raises
     ------
     ValueError
         If ``dim < 2``.
+    TypeError
+        If given any keyword other than ``dim`` -- a misspelled keyword is an
+        error rather than being silently ignored.
     NotImplementedError
         From :meth:`pdf` / :meth:`logpdf` at interior points, since no density
         exists.
@@ -187,7 +187,7 @@ class FrechetUpperCopula(Copula):
     name = "FrechetUpper"
     param_names: tuple[str, ...] = ()
 
-    def __init__(self, dim: int = 2, **kwargs: object) -> None:
+    def __init__(self, dim: int = 2) -> None:
         super().__init__(np.empty(0), dim)
 
     @property
@@ -266,14 +266,14 @@ class FrechetLowerCopula(Copula):
     ----------
     dim : int, default 2
         Number of variables; must be exactly 2.
-    **kwargs : object
-        Accepted and ignored, so generic code can pass the same keywords to
-        every family.
 
     Raises
     ------
     ValueError
         If ``dim != 2``.
+    TypeError
+        If given any keyword other than ``dim`` -- a misspelled keyword is an
+        error rather than being silently ignored.
     NotImplementedError
         From :meth:`pdf` / :meth:`logpdf` at interior points, since no density
         exists.
@@ -307,7 +307,7 @@ class FrechetLowerCopula(Copula):
     name = "FrechetLower"
     param_names: tuple[str, ...] = ()
 
-    def __init__(self, dim: int = 2, **kwargs: object) -> None:
+    def __init__(self, dim: int = 2) -> None:
         if int(dim) != 2:
             raise ValueError(
                 f"the Frechet-Hoeffding lower bound is only a copula for dim=2, got dim={int(dim)}"
@@ -639,9 +639,9 @@ class PlackettCopula(Copula):
         rho : float
             Target Spearman's rho, strictly between -1 and 1.
         dim : int, default 2
-            Number of variables. Not used: the result is always bivariate.
+            Number of variables; must be 2.
         **kwargs : Any
-            Accepted but not used.
+            Passed to the constructor, e.g. ``free``.
 
         Returns
         -------
@@ -651,7 +651,9 @@ class PlackettCopula(Copula):
         Raises
         ------
         ValueError
-            If ``rho`` is not in ``(-1, 1)``.
+            If ``rho`` is not in ``(-1, 1)``, or ``dim != 2``.
+        TypeError
+            If ``kwargs`` holds a keyword the constructor does not take.
 
         Examples
         --------
@@ -662,9 +664,10 @@ class PlackettCopula(Copula):
         if not -1.0 < rho < 1.0:
             raise ValueError(f"rho must lie in (-1, 1), got {rho}")
         if rho == 0.0:
-            return cls(1.0)
+            return cls(1.0, dim, **kwargs)
         lo, hi = (1.0, 1e8) if rho > 0 else (1e-8, 1.0)
-        return cls(float(brentq(lambda th: cls(th).rho() - rho, lo, hi, xtol=1e-13)))
+        theta = float(brentq(lambda th: cls(th).rho() - rho, lo, hi, xtol=1e-13))
+        return cls(theta, dim, **kwargs)
 
 
 class FGMCopula(Copula):
@@ -832,9 +835,9 @@ class FGMCopula(Copula):
         tau : float
             Target Kendall's tau, in ``[-2/9, 2/9]`` (FGM cannot go further).
         dim : int, default 2
-            Number of variables. Not used: the result is always bivariate.
+            Number of variables; must be 2.
         **kwargs : Any
-            Accepted but not used.
+            Passed to the constructor, e.g. ``free``.
 
         Returns
         -------
@@ -844,7 +847,9 @@ class FGMCopula(Copula):
         Raises
         ------
         ValueError
-            If ``tau`` is outside ``[-2/9, 2/9]``.
+            If ``tau`` is outside ``[-2/9, 2/9]``, or ``dim != 2``.
+        TypeError
+            If ``kwargs`` holds a keyword the constructor does not take.
 
         Examples
         --------
@@ -854,7 +859,7 @@ class FGMCopula(Copula):
         """
         if not -2.0 / 9.0 <= tau <= 2.0 / 9.0:
             raise ValueError(f"FGM attains only tau in [-2/9, 2/9], got {tau}")
-        return cls(9.0 * tau / 2.0)
+        return cls(9.0 * tau / 2.0, dim, **kwargs)
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> FGMCopula:
@@ -867,9 +872,9 @@ class FGMCopula(Copula):
         rho : float
             Target Spearman's rho, in ``[-1/3, 1/3]`` (FGM cannot go further).
         dim : int, default 2
-            Number of variables. Not used: the result is always bivariate.
+            Number of variables; must be 2.
         **kwargs : Any
-            Accepted but not used.
+            Passed to the constructor, e.g. ``free``.
 
         Returns
         -------
@@ -879,11 +884,13 @@ class FGMCopula(Copula):
         Raises
         ------
         ValueError
-            If ``rho`` is outside ``[-1/3, 1/3]``.
+            If ``rho`` is outside ``[-1/3, 1/3]``, or ``dim != 2``.
+        TypeError
+            If ``kwargs`` holds a keyword the constructor does not take.
         """
         if not -1.0 / 3.0 <= rho <= 1.0 / 3.0:
             raise ValueError(f"FGM attains only rho in [-1/3, 1/3], got {rho}")
-        return cls(3.0 * rho)
+        return cls(3.0 * rho, dim, **kwargs)
 
 
 class MarshallOlkinCopula(Copula):
@@ -911,8 +918,8 @@ class MarshallOlkinCopula(Copula):
     alpha1 : float or array_like of float, shape (2,), default nan
         Share of the first component's failures caused by the common shock,
         in ``[0, 1]``. May instead be both parameters at once,
-        ``[alpha1, alpha2]``, in which case ``alpha2`` is ignored. ``nan``
-        leaves it unspecified, to be estimated by fitting.
+        ``[alpha1, alpha2]``, in which case ``alpha2`` must be left out.
+        ``nan`` leaves it unspecified, to be estimated by fitting.
     alpha2 : float, default nan
         The same share for the second component, in ``[0, 1]``.
     dim : int, default 2
@@ -929,7 +936,10 @@ class MarshallOlkinCopula(Copula):
     Raises
     ------
     ValueError
-        If ``dim != 2`` or either parameter is outside ``[0, 1]``.
+        If ``dim != 2``, either parameter is outside ``[0, 1]``, ``alpha1``
+        has a length other than 1 or 2, or ``alpha1`` holds both parameters
+        and ``alpha2`` is given as well (it would otherwise be silently
+        ignored).
 
     Examples
     --------
@@ -963,8 +973,20 @@ class MarshallOlkinCopula(Copula):
             raise ValueError(
                 f"this Marshall-Olkin implementation is bivariate only, got dim={int(dim)}"
             )
-        given = np.atleast_1d(np.asarray(alpha1, dtype=np.float64))
-        params = given if given.size == 2 else np.array([float(given[0]), float(alpha2)])
+        given = np.atleast_1d(np.asarray(alpha1, dtype=np.float64)).ravel()
+        if given.size == 2:
+            if not np.isnan(alpha2):
+                raise ValueError(
+                    "alpha1 already holds both parameters [alpha1, alpha2]; "
+                    f"do not pass alpha2={alpha2} as well"
+                )
+            params = given
+        elif given.size == 1:
+            params = np.array([float(given[0]), float(alpha2)])
+        else:
+            raise ValueError(
+                f"alpha1 must be a scalar or the pair [alpha1, alpha2], got {given.size} values"
+            )
         super().__init__(params, 2, free=free)
 
     @property

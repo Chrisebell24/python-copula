@@ -197,15 +197,17 @@ def conditional_ppf(
     Raises
     ------
     ValueError
-        If ``copula`` is not bivariate or ``given`` is not 0 or 1 (raised by
+        If any ``w`` or ``cond`` lies outside :math:`[0, 1]`, if ``given`` is
+        not 0 or 1, or if ``copula`` is not bivariate (raised by
         :func:`conditional_cdf`).
 
     Notes
     -----
     Solved by 60 steps of vectorised bisection on ``[1e-12, 1 - 1e-12]``, which
     handles every family uniformly and takes the bracket below double precision.
-    Targets outside :math:`[0, 1]` are not rejected; they simply converge to the
-    nearest end of the bracket.
+    Out-of-range targets are rejected rather than quietly converging to the
+    nearest end of the bracket, which used to return a plausible-looking but
+    meaningless value. NaN in ``w`` or ``cond`` gives NaN in that position.
 
     Examples
     --------
@@ -222,9 +224,15 @@ def conditional_ppf(
     >>> bool(np.allclose(recovered, w, atol=1e-8))
     True
     """
+    if given not in (0, 1):
+        raise ValueError(f"given must be 0 or 1, got {given}")
     target = np.atleast_1d(np.asarray(w, dtype=np.float64))
     c = np.atleast_1d(np.asarray(cond, dtype=np.float64))
+    for label, values in (("w", target), ("cond", c)):
+        if np.any((values < 0.0) | (values > 1.0)):
+            raise ValueError(f"{label} must lie in [0, 1]; got values outside it")
     target, c = np.broadcast_arrays(target, c)
+    missing = np.isnan(target) | np.isnan(c)
 
     lo = np.full(target.shape, 1e-12)
     hi = np.full(target.shape, 1.0 - 1e-12)
@@ -234,7 +242,7 @@ def conditional_ppf(
         below = conditional_cdf(copula, pair, given) < target
         lo = np.where(below, mid, lo)
         hi = np.where(below, hi, mid)
-    return 0.5 * (lo + hi)
+    return np.where(missing, np.nan, 0.5 * (lo + hi))
 
 
 def rosenblatt(copula: Copula, u: ArrayLike) -> NDArray[np.float64]:
@@ -518,7 +526,13 @@ def radial_simplex(copula: ArchimedeanCopula, u: ArrayLike) -> tuple[NDArray, ND
     radial : numpy.ndarray of float, shape (n,)
         :math:`R = \sum_k \psi^{-1}(u_k)`, non-negative.
     angular : numpy.ndarray of float, shape (n, d)
-        :math:`S`, whose rows sum to one. NaN in rows where :math:`R = 0`.
+        :math:`S`, whose rows sum to one. Where :math:`R = 0` (every
+        coordinate at 1, or so close that :math:`\psi^{-1}` underflows to 0)
+        the direction is undefined -- ``0/0`` -- and is set to the simplex's
+        barycentre, :math:`1/d` in every coordinate: the mean of the uniform
+        angular law and the limit along the diagonal. Where :math:`R = \infty`
+        (a coordinate at 0) the weight is shared equally among the infinite
+        coordinates.
 
     Raises
     ------
@@ -570,9 +584,18 @@ def radial_simplex(copula: ArchimedeanCopula, u: ArrayLike) -> tuple[NDArray, ND
     theta = float(copula.params[0])
     inverse = np.column_stack([copula.generator.ipsi(u[:, j], theta) for j in range(copula.dim)])
     radial = np.asarray(inverse.sum(axis=1), dtype=float)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        angular = inverse / radial[:, None]
-    return radial, np.asarray(angular, dtype=float)
+    d = copula.dim
+    angular = np.full(inverse.shape, 1.0 / d)
+    finite = np.isfinite(radial) & (radial > 0.0)
+    angular[finite] = inverse[finite] / radial[finite, None]
+    # R = inf: only the infinite coordinates carry weight, in equal shares.
+    infinite = np.isposinf(radial)
+    if np.any(infinite):
+        at_inf = np.isposinf(inverse[infinite])
+        angular[infinite] = at_inf / at_inf.sum(axis=1, keepdims=True)
+    # NaN input propagates instead of being disguised as the barycentre.
+    angular[np.isnan(radial)] = np.nan
+    return radial, angular
 
 
 def htrafo(copula: ArchimedeanCopula, u: ArrayLike) -> NDArray[np.float64]:

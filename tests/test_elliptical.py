@@ -370,3 +370,88 @@ class TestStudentSpearmanRho:
         values = cop.rho()
         assert np.asarray(values).shape == (3,)
         assert np.all(np.diff(values) < 0)  # decreasing, as the correlations are
+
+
+# ---------------------------------------------------------------------------
+# Regression tests: tail dependence and calibration in higher dimensions
+# ---------------------------------------------------------------------------
+
+
+class TestStudentTailDependenceInHigherDimensions:
+    def test_pairs_with_different_correlations_raise(self) -> None:
+        cop = rc.StudentCopula([0.2, 0.5, 0.7], dim=3, dispstr="un", df=4.0)
+        with pytest.raises(ValueError, match="marginal_copula"):
+            cop.lambda_()
+        with pytest.raises(ValueError, match="differs between pairs"):
+            rc.StudentCopula(0.5, dim=3, dispstr="ar1", df=4.0).lambda_()
+
+    def test_a_shared_correlation_gives_the_bivariate_value(self) -> None:
+        pair = rc.StudentCopula(0.5, df=4.0).lambda_()
+        assert rc.StudentCopula(0.5, dim=4, df=4.0).lambda_() == pair
+        same = rc.StudentCopula([0.5] * 3, dim=3, dispstr="un", df=4.0).lambda_()
+        assert same.upper == pytest.approx(pair.upper, rel=1e-14)
+
+    def test_marginal_copula_gives_each_pair(self) -> None:
+        cop = rc.StudentCopula([0.2, 0.5, 0.7], dim=3, dispstr="un", df=4.0)
+        sigma = cop.sigma()
+        pair = rc.marginal_copula(cop, [1, 2]).lambda_()
+        assert pair == rc.StudentCopula(sigma[1, 2], df=4.0).lambda_()
+
+
+class TestCalibrationFillsEveryCorrelation:
+    @pytest.mark.parametrize("dispstr, dim, n", [("un", 3, 3), ("un", 4, 6), ("toep", 4, 3)])
+    @pytest.mark.parametrize("cls", [rc.GaussianCopula, rc.StudentCopula])
+    def test_from_tau(self, cls: type, dispstr: str, dim: int, n: int) -> None:
+        cop = cls.from_tau(0.4, dim=dim, dispstr=dispstr)
+        assert cop.rho_params.shape == (n,)
+        assert np.allclose(cop.tau(), 0.4, atol=1e-13)
+
+    @pytest.mark.parametrize("dispstr, dim, n", [("un", 3, 3), ("toep", 4, 3)])
+    def test_gaussian_from_rho(self, dispstr: str, dim: int, n: int) -> None:
+        cop = rc.GaussianCopula.from_rho(0.4, dim=dim, dispstr=dispstr)
+        assert cop.rho_params.shape == (n,)
+        assert np.allclose(cop.rho(), 0.4, atol=1e-13)
+
+    def test_student_from_rho(self) -> None:
+        cop = rc.StudentCopula.from_rho(0.4, dim=3, dispstr="un", df=5.0)
+        assert cop.rho_params.shape == (3,)
+        assert np.allclose(cop.rho(), 0.4, atol=1e-9)
+        assert cop.df == 5.0
+
+    def test_one_parameter_structures_unchanged(self) -> None:
+        assert rc.GaussianCopula.from_tau(0.4, dim=3).rho_params.shape == (1,)
+        ar1 = rc.GaussianCopula.from_tau(0.4, dim=3, dispstr="ar1")
+        assert ar1.rho_params[0] == pytest.approx(np.sin(np.pi * 0.2), rel=1e-15)
+
+
+class TestStudentFromRhoSearch:
+    def test_root_far_from_the_gaussian_start_is_found(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The old search only looked within 0.2 of the Gaussian starting value
+        # and silently returned the window's edge when the root lay outside.
+        # Real t copulas keep the root inside that window for any practical df,
+        # so exercise the search on a synthetic monotone curve, rho_S = r**3,
+        # whose root for 0.5 (0.7937) is 0.28 from the Gaussian start (0.5176).
+        import rcopula.core.elliptical as ell
+
+        monkeypatch.setattr(ell, "_student_rho", lambda r, df: r**3)
+        cop = rc.StudentCopula.from_rho(0.5, df=4.0)
+        assert cop.rho_params[0] == pytest.approx(0.5 ** (1 / 3), abs=1e-12)
+        assert rc.StudentCopula.from_rho(-0.5, df=4.0).rho_params[0] == pytest.approx(
+            -(0.5 ** (1 / 3)), abs=1e-12
+        )
+
+    def test_unattainable_target_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import rcopula.core.elliptical as ell
+
+        monkeypatch.setattr(ell, "_student_rho", lambda r, df: 0.9 * r)
+        with pytest.raises(ValueError, match="too close to \\+1"):
+            rc.StudentCopula.from_rho(0.95, df=4.0)
+
+    def test_near_comonotone_target(self) -> None:
+        assert rc.StudentCopula.from_rho(0.999, df=4.0).rho() == pytest.approx(0.999, abs=1e-9)
+
+    def test_negative_target(self) -> None:
+        cop = rc.StudentCopula.from_rho(-0.45, df=3.0)
+        assert cop.rho() == pytest.approx(-0.45, abs=1e-9)
