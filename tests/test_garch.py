@@ -463,3 +463,37 @@ def test_the_reparameterised_refit_cannot_break_stationarity() -> None:
     theta = _fit_reparameterised(y, "normal", np.array([0.0, 0.05, 0.3, 0.8]), bounds)
     assert theta[2] >= 0.0 and theta[3] >= 0.0
     assert theta[2] + theta[3] <= _MAX_PERSISTENCE + 1e-12
+
+
+class TestGarchRegressions:
+    def test_half_life_without_persistence_is_zero_and_silent(self) -> None:
+        """alpha + beta == 0 used to emit a divide-by-zero RuntimeWarning."""
+        import dataclasses
+
+        res = _two_margins()[0]
+        none = dataclasses.replace(res, alpha=0.0, beta=0.0)
+        assert none.half_life == 0.0
+        unit = dataclasses.replace(res, alpha=0.1, beta=0.9)
+        assert unit.half_life == float("inf")
+        half = dataclasses.replace(res, alpha=0.2, beta=0.3)
+        assert half.half_life == pytest.approx(1.0)
+
+    def test_simulate_rejects_non_positive_n(self) -> None:
+        model = CopulaGarch(_two_margins(), rc.GaussianCopula(0.3))
+        with pytest.raises(ValueError, match="n must be"):
+            model.simulate(horizon=1, n=0)
+
+    def test_forecast_risk_validates_inputs(self) -> None:
+        model = CopulaGarch(_two_margins(), rc.GaussianCopula(0.3))
+        with pytest.raises(ValueError, match="horizon must be"):
+            model.forecast_risk(horizon=0)
+        with pytest.raises(ValueError, match="n must be"):
+            model.forecast_risk(n=1)
+
+    def test_forecast_risk_volatility_uses_ddof_1_and_raw_weights(self) -> None:
+        model = CopulaGarch(_two_margins(seed=9), rc.GaussianCopula(0.5))
+        w = np.array([1.5, -0.5])  # a leveraged long-short book: not rescaled
+        r = model.forecast_risk(w, horizon=2, n=50, random_state=3)
+        port = model.forecast(horizon=2, n=50, random_state=3) @ w
+        assert r["volatility"] == pytest.approx(port.std(ddof=1), rel=1e-12)
+        assert r["mean"] == pytest.approx(port.mean(), rel=1e-12)

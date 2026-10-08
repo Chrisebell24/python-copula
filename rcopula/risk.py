@@ -512,7 +512,8 @@ def risk_contributions(
     Raises
     ------
     ValueError
-        If ``alpha`` is outside ``(0, 1)``.
+        If ``alpha`` is outside ``(0, 1)``, or ``weights`` does not have
+        exactly ``d`` entries.
 
     Notes
     -----
@@ -544,6 +545,8 @@ def risk_contributions(
     """
     d = copula.dim
     w = np.full(d, 1.0 / d) if weights is None else np.asarray(weights, dtype=np.float64).ravel()
+    if w.size != d:
+        raise ValueError(f"got {w.size} weight(s) for a copula of dimension {d}")
     joint = CopulaDistribution(copula, margins)
     draws = np.asarray(joint.rvs(n, random_state=random_state), dtype=np.float64)
     portfolio = draws @ w
@@ -619,8 +622,10 @@ def covar(
     >>> from rcopula.risk import covar, value_at_risk
     >>> tied = ClaytonCopula(6.0).rvs(60_000, random_state=0)
     >>> free = IndependenceCopula(2).rvs(60_000, random_state=0)
-    >>> base = value_at_risk(free[:, 0], 0.95)
-    >>> bool(covar(tied[:, 0], tied[:, 1], 0.95) > covar(free[:, 0], free[:, 1], 0.95))
+    >>> var = value_at_risk(tied[:, 0], 0.95)          # unconditional system VaR
+    >>> bool(covar(tied[:, 0], tied[:, 1], 0.95) > var + 0.02)
+    True
+    >>> bool(abs(covar(free[:, 0], free[:, 1], 0.95) - var) < 0.02)
     True
     """
     s = np.asarray(system, dtype=np.float64).ravel()

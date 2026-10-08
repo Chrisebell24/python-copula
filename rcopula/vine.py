@@ -76,6 +76,12 @@ STRUCTURES = ("C", "D")
 DEFAULT_FAMILIES = ("independence", "gaussian", "student", "clayton", "gumbel", "frank")
 
 
+def _is_independence(copula: Copula) -> bool:
+    from rcopula.core.other import IndependenceCopula
+
+    return isinstance(copula, IndependenceCopula)
+
+
 def _h(copula: Copula, first: NDArray, second: NDArray, given: int) -> NDArray[np.float64]:
     r"""An h-function: :math:`\partial C/\partial u_{\text{given}}`.
 
@@ -86,9 +92,64 @@ def _h(copula: Copula, first: NDArray, second: NDArray, given: int) -> NDArray[n
     return np.clip(conditional_cdf(copula, points, given=given), 1e-12, 1.0 - 1e-12)
 
 
-def _h_inverse(copula: Copula, target: NDArray, given: NDArray, side: int) -> NDArray[np.float64]:
-    """Invert :func:`_h` in its first (``side=1``) or second (``side=0``) slot."""
+def _h_inverse(
+    copula: Copula,
+    target: NDArray,
+    given: NDArray,
+    side: int,
+    closed_form: bool = False,
+    cache: dict[Any, NDArray[np.float64]] | None = None,
+) -> NDArray[np.float64]:
+    """Invert :func:`_h` in its first (``side=1``) or second (``side=0``) slot.
+
+    The generic inverse is a 60-step bisection on :func:`_h`. With
+    ``closed_form=True`` a bivariate Gaussian or Student t pair-copula is
+    inverted analytically instead -- the same function to within rounding,
+    tens of times faster for the t (whose quantile function the bisection would
+    otherwise evaluate 120 times). ``cache`` (closed form only) remembers the
+    conditioning variable's quantiles between calls that share it, as every
+    tree-1 edge of a C-vine does.
+    """
+    if closed_form:
+        from rcopula.core.elliptical import StudentCopula
+
+        if isinstance(copula, GaussianCopula | StudentCopula) and copula.dim == 2:
+            return _elliptical_h_inverse(copula, target, given, cache)
     return np.clip(conditional_ppf(copula, target, given, given=side), 1e-12, 1.0 - 1e-12)
+
+
+def _elliptical_h_inverse(
+    copula: Copula,
+    target: NDArray,
+    given: NDArray,
+    cache: dict[Any, NDArray[np.float64]] | None = None,
+) -> NDArray[np.float64]:
+    """Closed-form inverse h-function of a bivariate Gaussian or t copula.
+
+    Both h-functions are symmetric in the two slots, so ``side`` does not enter:
+    ``x = F(rho * b + s * G^{-1}(w))`` with ``b = F^{-1}(given)``, ``F`` the
+    margin's CDF and ``G``/``s`` the conditional's distribution and scale.
+    """
+    from scipy.special import ndtr, ndtri, stdtr, stdtrit
+
+    from rcopula.core.elliptical import StudentCopula
+
+    w = np.clip(np.asarray(target, dtype=np.float64), 1e-12, 1.0 - 1e-12)
+    rho = float(copula.sigma()[0, 1])  # type: ignore[attr-defined]
+    nu = float(copula.df) if isinstance(copula, StudentCopula) else np.inf
+    key = (id(given), nu)
+    b = None if cache is None else cache.get(key)
+    if b is None:
+        c = np.clip(np.asarray(given, dtype=np.float64), 1e-12, 1.0 - 1e-12)
+        b = stdtrit(nu, c) if np.isfinite(nu) else ndtri(c)
+        if cache is not None:
+            cache[key] = b
+    if np.isfinite(nu):
+        scale = np.sqrt((nu + b**2) * (1.0 - rho**2) / (nu + 1.0))
+        x = stdtr(nu, rho * b + scale * stdtrit(nu + 1.0, w))
+    else:
+        x = ndtr(rho * b + np.sqrt(1.0 - rho**2) * ndtri(w))
+    return np.clip(np.asarray(x, dtype=np.float64), 1e-12, 1.0 - 1e-12)
 
 
 class VineCopula(Copula):
@@ -140,6 +201,9 @@ class VineCopula(Copula):
         Number of bivariate copulas, ``d(d-1)/2``.
     is_gaussian : bool
         Whether every pair-copula is Gaussian.
+    truncation_level : int
+        Number of leading trees that carry dependence; every tree after it is
+        all independence copulas.
 
     Raises
     ------
@@ -151,8 +215,13 @@ class VineCopula(Copula):
     Notes
     -----
     The density, the sampler (:meth:`rvs`) and the Rosenblatt transform are
-    exact. There is no closed-form distribution function, so :meth:`cdf`
-    raises :class:`NotImplementedError`; neither are there single-number
+    exact. All three stop at :attr:`truncation_level`: trees made entirely of
+    independence copulas after it are skipped, so a vine truncated after one
+    tree samples in time linear in ``d`` (an 801-variable C-vine with one
+    Student-t tree draws 50,000 rows in well under a minute).
+
+    There is no closed-form distribution function, so :meth:`cdf` raises
+    :class:`NotImplementedError`; neither are there single-number
     ``tau``/``rho``/``lambda_`` summaries, since every pair has its own.
 
     Examples
@@ -264,8 +333,31 @@ class VineCopula(Copula):
         arranged = self._reorder(u)
         total = np.zeros(arranged.shape[0])
         for copula, first, second in self._edges(arranged):
+            if _is_independence(copula):
+                continue  # log-density identically zero
             total = total + copula.logpdf(np.column_stack([first, second]))
         return total
+
+    @property
+    def truncation_level(self) -> int:
+        """How many trees carry dependence: the last tree with a non-independence pair-copula.
+
+        A vine is *truncated* at level ``t`` when every pair-copula in trees
+        ``t + 1, ..., d - 1`` is the independence copula, as :func:`fit_vine`
+        produces with ``truncate=t``. Those trees contribute nothing to the
+        density and their conditional transforms are the identity, so the
+        density, :meth:`rvs` and :meth:`rosenblatt` stop after tree ``t``.
+
+        Returns
+        -------
+        int
+            Between 0 (every pair-copula is independence) and ``d - 1`` (the
+            last tree carries dependence, i.e. the vine is not truncated).
+        """
+        for k in range(len(self.pair_copulas) - 1, -1, -1):
+            if not all(_is_independence(cop) for cop in self.pair_copulas[k]):
+                return k + 1
+        return 0
 
     def _edges(self, u: NDArray[np.float64]):
         """Yield ``(copula, first argument, second argument)`` for every edge.
@@ -274,13 +366,16 @@ class VineCopula(Copula):
         the log-likelihood and the Rosenblatt transform on a single traversal,
         so there is one place for the recursion to be right or wrong.
         """
+        # Trees past the truncation level hold only independence copulas: they
+        # add nothing to the density, so they are not walked at all.
+        depth = self.truncation_level
         if self.structure == "C":
             level = [u[:, j] for j in range(self.dim)]
-            for k, copulas in enumerate(self.pair_copulas):
+            for k, copulas in enumerate(self.pair_copulas[:depth]):
                 root = level[0]
                 for i, copula in enumerate(copulas):
                     yield copula, root, level[i + 1]
-                if k < self.dim - 2:
+                if k < depth - 1:
                     level = [
                         _h(copula, level[i + 1], root, given=1) for i, copula in enumerate(copulas)
                     ]
@@ -290,10 +385,10 @@ class VineCopula(Copula):
         # its two arguments are the corresponding conditionals.
         left = [u[:, j] for j in range(self.dim - 1)]
         right = [u[:, j + 1] for j in range(self.dim - 1)]
-        for k, copulas in enumerate(self.pair_copulas):
+        for k, copulas in enumerate(self.pair_copulas[:depth]):
             for i, copula in enumerate(copulas):
                 yield copula, left[i], right[i]
-            if k < self.dim - 2:
+            if k < depth - 1:
                 new_left = [
                     _h(copulas[i], left[i], right[i], given=1) for i in range(len(copulas) - 1)
                 ]
@@ -340,39 +435,75 @@ class VineCopula(Copula):
     def _rvs(
         self, size: int, params: NDArray[np.float64], rng: np.random.Generator
     ) -> NDArray[np.float64]:
-        """Inverse Rosenblatt: draw independent uniforms and unwind the trees."""
+        """Inverse Rosenblatt: draw independent uniforms and unwind the trees.
+
+        Only the first :attr:`truncation_level` trees are unwound: past it every
+        pair-copula is the independence copula, whose inverse h-function is the
+        identity, so a vine truncated after ``t`` trees costs ``O(t d)``
+        h-function evaluations rather than ``O(d^2)``. A truncated vine also
+        inverts its Gaussian and Student t pair-copulas in closed form; a full
+        vine keeps the bisection inverse, so its seeded draws are unchanged.
+        """
         w = rng.uniform(size=(size, self.dim))
-        arranged = self._simulate_c_vine(w) if self.structure == "C" else self._simulate_d_vine(w)
+        depth = self.truncation_level
+        closed_form = depth < self.dim - 1
+        arranged = (
+            self._simulate_c_vine(w, depth, closed_form)
+            if self.structure == "C"
+            else self._simulate_d_vine(w, depth, closed_form)
+        )
         out = np.empty_like(arranged)
         out[:, list(self.order)] = arranged
         return np.clip(out, np.nextafter(0.0, 1.0), np.nextafter(1.0, 0.0))
 
-    def _simulate_c_vine(self, w: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Aas et al. (2009), Algorithm 3."""
+    def _simulate_c_vine(
+        self, w: NDArray[np.float64], depth: int | None = None, closed_form: bool = False
+    ) -> NDArray[np.float64]:
+        """Aas et al. (2009), Algorithm 3, stopping at tree ``depth``.
+
+        ``v[i][j]`` is variable ``i`` conditioned on the first ``j`` roots. Only
+        ``j < depth`` is ever needed: deeper trees are independence and their
+        transforms the identity. With ``depth = d - 1`` this is the textbook
+        algorithm, operation for operation.
+        """
         d = self.dim
-        v: list[list[NDArray[np.float64]]] = [[np.empty(0)] * d for _ in range(d)]
+        depth = d - 1 if depth is None else depth
+        v: list[list[NDArray[np.float64]]] = [[np.empty(0)] * (depth + 1) for _ in range(d)]
+        cache: dict[Any, NDArray[np.float64]] = {}
         x = np.empty_like(w)
         x[:, 0] = v[0][0] = w[:, 0]
 
         for i in range(1, d):
             value = w[:, i]
-            for k in range(i - 1, -1, -1):
-                value = _h_inverse(self.pair_copulas[k][i - k - 1], value, v[k][k], side=1)
+            for k in range(min(i - 1, depth - 1), -1, -1):
+                value = _h_inverse(
+                    self.pair_copulas[k][i - k - 1],
+                    value,
+                    v[k][k],
+                    side=1,
+                    closed_form=closed_form,
+                    cache=cache,
+                )
             x[:, i] = v[i][0] = value
             if i == d - 1:
                 break
-            for j in range(i):
+            for j in range(min(i, depth - 1)):
                 v[i][j + 1] = _h(self.pair_copulas[j][i - j - 1], v[i][j], v[j][j], given=1)
         return x
 
-    def _simulate_d_vine(self, w: NDArray[np.float64]) -> NDArray[np.float64]:
-        r"""Inverse Rosenblatt for a D-vine.
+    def _simulate_d_vine(
+        self, w: NDArray[np.float64], depth: int | None = None, closed_form: bool = False
+    ) -> NDArray[np.float64]:
+        r"""Inverse Rosenblatt for a D-vine, stopping at tree ``depth``.
 
         Variable :math:`i` is drawn from its conditional given the ones before
         it, which unwinds through the trees: apply the tree-:math:`k` inverse
         h-function, then rebuild the conditionals the next variable will need.
+        Trees from ``depth`` on are independence, so they are skipped; with
+        ``depth = d - 1`` nothing is.
         """
         d = w.shape[1]
+        depth = d - 1 if depth is None else depth
         x = np.empty_like(w)
         x[:, 0] = w[:, 0]
         # left[k] holds the tree-k conditional the next variable needs. The
@@ -382,16 +513,29 @@ class VineCopula(Copula):
 
         for i in range(1, d):
             value = w[:, i]
+            if depth == 0:
+                x[:, i] = value
+                continue
             # Unwind from the deepest tree that reaches this variable.
-            for k in range(i - 1, 0, -1):
-                value = _h_inverse(self.pair_copulas[k][i - k - 1], value, left[k - 1], side=0)
-            value = _h_inverse(self.pair_copulas[0][i - 1], value, x[:, i - 1], side=0)
+            for k in range(min(i - 1, depth - 1), 0, -1):
+                value = _h_inverse(
+                    self.pair_copulas[k][i - k - 1],
+                    value,
+                    left[k - 1],
+                    side=0,
+                    closed_form=closed_form,
+                )
+            value = _h_inverse(
+                self.pair_copulas[0][i - 1], value, x[:, i - 1], side=0, closed_form=closed_form
+            )
             x[:, i] = value
+            if depth == 1 or i == d - 1:
+                continue  # no deeper tree will ask for a conditional
 
             # Rebuild the conditionals for the next variable.
             new_left = [_h(self.pair_copulas[0][i - 1], x[:, i - 1], x[:, i], given=1)]
             new_right = [_h(self.pair_copulas[0][i - 1], x[:, i - 1], x[:, i], given=0)]
-            for k in range(1, i):
+            for k in range(1, min(i, depth - 1)):
                 new_left.append(
                     _h(self.pair_copulas[k][i - k - 1], left[k - 1], new_right[k - 1], given=1)
                 )
@@ -405,11 +549,11 @@ class VineCopula(Copula):
         r"""Turn dependent copula data into independent uniform columns.
 
         This is the Rosenblatt transform: each column is replaced by its
-        conditional probability given the columns before it in the D-vine
-        path. If the vine is the right model for the data, the output columns
-        are independent and uniform on ``(0, 1)``, so it is the standard way to
-        check a fitted vine (test the output for independence) and the inverse
-        of how :meth:`rvs` samples.
+        conditional probability given the variables before it on the D-vine
+        path (``order``). If the vine is the right model for the data, the
+        output columns are independent and uniform on ``(0, 1)``, so it is the
+        standard way to check a fitted vine (test the output for independence)
+        and the inverse of how :meth:`rvs` samples.
 
         Parameters
         ----------
@@ -421,9 +565,14 @@ class VineCopula(Copula):
         Returns
         -------
         numpy.ndarray of float, shape (n, d)
-            The transformed values, in the *structure* order (position ``i``
-            is the ``i``-th variable along the D-vine path, i.e. column
-            ``order[i]`` of the input).
+            The transformed values, in the *original* column order -- the same
+            order as the input, :meth:`rvs` and :meth:`logpdf`. Column
+            ``order[i]`` holds
+            :math:`P(U_{order[i]} \le u_{order[i]} \mid U_{order[0]}, \dots,
+            U_{order[i-1]})`, so column ``order[0]`` is passed through unchanged
+            and column ``order[-1]`` is conditioned on every other variable.
+            (rcopula 0.2.0 and earlier returned the columns in path order; with the
+            default ``order`` the two agree.)
 
         Raises
         ------
@@ -463,14 +612,22 @@ class VineCopula(Copula):
                 "C-vine, use rvs and compare distributions instead"
             )
 
+        # Trees past the truncation level are independence: their h-functions
+        # are the identity, so they are skipped.
+        depth = self.truncation_level
         out = np.empty_like(arranged)
         out[:, 0] = arranged[:, 0]
         left: list[NDArray[np.float64]] = []
         for i in range(1, self.dim):
+            if depth == 0:
+                out[:, i] = arranged[:, i]
+                continue
             value = _h(self.pair_copulas[0][i - 1], arranged[:, i - 1], arranged[:, i], given=0)
-            for k in range(1, i):
+            for k in range(1, min(i, depth)):
                 value = _h(self.pair_copulas[k][i - k - 1], left[k - 1], value, given=0)
             out[:, i] = value
+            if depth == 1 or i == self.dim - 1:
+                continue  # no deeper tree will ask for a conditional
 
             new_left = [
                 _h(self.pair_copulas[0][i - 1], arranged[:, i - 1], arranged[:, i], given=1)
@@ -478,7 +635,7 @@ class VineCopula(Copula):
             new_right = [
                 _h(self.pair_copulas[0][i - 1], arranged[:, i - 1], arranged[:, i], given=0)
             ]
-            for k in range(1, i):
+            for k in range(1, min(i, depth - 1)):
                 new_left.append(
                     _h(self.pair_copulas[k][i - k - 1], left[k - 1], new_right[k - 1], given=1)
                 )
@@ -486,7 +643,10 @@ class VineCopula(Copula):
                     _h(self.pair_copulas[k][i - k - 1], left[k - 1], new_right[k - 1], given=0)
                 )
             left = new_left
-        return out
+        # Back to the caller's column order, as rvs and logpdf use.
+        result = np.empty_like(out)
+        result[:, list(self.order)] = out
+        return result
 
     # -- the Gaussian identity -----------------------------------------
 
@@ -765,7 +925,10 @@ def fit_vine(
         Fit only the first ``truncate`` trees and set every pair-copula in the
         higher trees to independence. ``None`` fits all ``d - 1`` trees.
         Higher trees usually carry little, and truncating is the standard way
-        to stop a vine from spending parameters on noise.
+        to stop a vine from spending parameters on noise. It also keeps the
+        cost linear in ``d``: neither the fit nor the resulting vine's
+        density, sampler or Rosenblatt transform touches the independence
+        trees (see :attr:`VineCopula.truncation_level`).
 
     Returns
     -------
@@ -845,7 +1008,9 @@ def fit_vine(
             root = level_data[0]
             chosen = [choose(root, level_data[i + 1], k) for i in range(d - 1 - k)]
             trees.append(chosen)
-            if k < d - 2:
+            # Past the truncation depth every later edge is independence
+            # whatever its data, so the next level's h-transforms are not needed.
+            if k < d - 2 and k + 1 < depth:
                 level_data = [
                     _h(chosen[i], level_data[i + 1], root, given=1) for i in range(d - 1 - k)
                 ]
@@ -853,9 +1018,9 @@ def fit_vine(
         left = [arranged[:, j] for j in range(d - 1)]
         right = [arranged[:, j + 1] for j in range(d - 1)]
         for k in range(d - 1):
-            chosen = [choose(left[i], right[i], k) for i in range(len(left))]
+            chosen = [choose(left[i], right[i], k) for i in range(d - 1 - k)]
             trees.append(chosen)
-            if k < d - 2:
+            if k < d - 2 and k + 1 < depth:
                 left, right = (
                     [_h(chosen[i], left[i], right[i], given=1) for i in range(len(chosen) - 1)],
                     [

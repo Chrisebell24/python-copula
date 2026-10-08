@@ -569,3 +569,64 @@ class TestCmsSpreadOption:
             cms_spread_option(rc.GaussianCopula(0.5), self.LEGS[:1], 0.0, 5.0)
         with pytest.raises(ValueError, match="kind must be"):
             cms_spread_option(rc.GaussianCopula(0.5), self.LEGS, 0.0, 5.0, kind="digital")
+
+
+class TestDerivativesRegressions:
+    def test_implied_volatility_rejects_unknown_kind(self) -> None:
+        with pytest.raises(ValueError, match="kind must be"):
+            implied_volatility(5.0, 100.0, 100.0, 1.0, kind="straddle")
+
+    def test_basket_implied_vol_checks_weights_length(self) -> None:
+        margins = [lognormal_terminal(100.0, 0.25, 1.0)] * 3
+        with pytest.raises(ValueError, match="weights has length 2"):
+            basket_implied_vol(
+                rc.GaussianCopula(0.5, dim=3), margins, [100.0], 1.0, weights=[0.5, 0.5], n=100
+            )
+
+    def test_smile_margin_extrapolates_lognormal_tails(self) -> None:
+        """A flat smile quoted on a narrow grid must still recover the full lognormal."""
+        strikes = np.linspace(80.0, 125.0, 40)
+        smile = SmileMargin(strikes, np.full(40, 0.25), forward=100.0, maturity=1.0)
+        exact = lognormal_terminal(100.0, 0.25, 1.0)
+        # Quantiles beyond the quoted strikes are now reachable...
+        assert smile.ppf(0.01) < strikes[0]
+        assert smile.ppf(0.99) > strikes[-1]
+        for q in (0.001, 0.01, 0.99, 0.999):
+            assert smile.ppf(q) == pytest.approx(float(exact.ppf(q)), rel=0.03)
+        for x in (50.0, 70.0, 150.0, 200.0):
+            assert smile.cdf(x) == pytest.approx(float(exact.cdf(x)), abs=0.005)
+            assert smile.pdf(x) == pytest.approx(float(exact.pdf(x)), rel=0.1)
+        # ... the CDF is continuous across the end strikes and ppf inverts cdf there.
+        eps = 1e-9
+        for k in (strikes[0], strikes[-1]):
+            assert smile.cdf(k - eps) == pytest.approx(float(smile.cdf(k + eps)), abs=1e-6)
+        q = np.array([1e-6, 0.002, 0.5, 0.998, 1 - 1e-6])
+        assert np.allclose(smile.cdf(smile.ppf(q)), q, atol=1e-9)
+        # Edge probabilities map to the natural bounds without warnings.
+        assert smile.ppf(0.0) == 0.0 and np.isinf(smile.ppf(1.0))
+        assert smile.cdf(-1.0) == 0.0 and smile.pdf(-1.0) == 0.0
+
+    def test_smile_margin_flat_tails_keep_the_old_behaviour(self) -> None:
+        strikes = np.linspace(80.0, 125.0, 40)
+        smile = SmileMargin(strikes, np.full(40, 0.25), 100.0, 1.0, tails="flat")
+        assert smile.ppf(0.0001) == pytest.approx(80.0)
+        assert smile.ppf(0.9999) == pytest.approx(125.0)
+        with pytest.raises(ValueError, match="tails"):
+            SmileMargin(strikes, np.full(40, 0.25), 100.0, 1.0, tails="cubic")
+
+    def test_cms_margin_normal_rejects_degenerate_vol_or_maturity(self) -> None:
+        with pytest.raises(ValueError, match="positive"):
+            cms_margin(0.02, 0.0, 5.0, 10.0, model="normal")
+        with pytest.raises(ValueError, match="positive"):
+            cms_margin(0.02, 0.008, 0.0, 10.0, model="normal")
+
+    def test_spread_option_prices_puts_with_parity(self) -> None:
+        margins = [lognormal_terminal(100.0, 0.2, 1.0), lognormal_terminal(95.0, 0.3, 1.0)]
+        cop, k, t, r = rc.GaussianCopula(0.5), 3.0, 1.0, 0.02
+        call = spread_option(cop, margins, k, t, r, n=200_000, random_state=0)
+        put = spread_option(cop, margins, k, t, r, n=200_000, random_state=0, kind="put")
+        # Same scenarios, so parity holds up to the sample mean of the spread.
+        assert call.price - put.price == pytest.approx(np.exp(-r * t) * (100.0 - 95.0 - k), abs=0.1)
+        assert put.price > 0.0
+        with pytest.raises(ValueError, match="kind must be"):
+            spread_option(cop, margins, k, t, kind="digital", n=10)

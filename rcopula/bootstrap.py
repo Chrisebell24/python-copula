@@ -101,16 +101,18 @@ class BootstrapResult:
 
     Attributes
     ----------
-    estimate : float or numpy.ndarray of float, shape (k,)
+    estimate : float or numpy.ndarray of float
         The statistic on the original data. A float for a scalar statistic,
-        an array of the statistic's ``k`` values otherwise.
+        otherwise an array with the statistic's own shape (``(k,)`` for a
+        vector, ``(d, d)`` for a matrix, ...).
     confidence_interval : tuple of (float, float) or tuple of (numpy.ndarray, numpy.ndarray)
-        ``(lower, upper)``. Scalars for a scalar statistic, arrays of shape
-        ``(k,)`` otherwise.
-    standard_error : float or numpy.ndarray of float, shape (k,)
-        Standard deviation of the replicates. Note this is a bootstrap estimate
-        of the standard error, not the asymptotic one.
-    replicates : numpy.ndarray of float, shape (n_kept,) or (n_kept, k)
+        ``(lower, upper)``. Scalars for a scalar statistic, arrays shaped like
+        ``estimate`` otherwise.
+    standard_error : float or numpy.ndarray of float
+        Standard deviation of the replicates, shaped like ``estimate``. Note
+        this is a bootstrap estimate of the standard error, not the asymptotic
+        one.
+    replicates : numpy.ndarray of float, shape (n_kept,) or (n_kept, *estimate.shape)
         Every replicate that succeeded (``n_kept = n_resamples - n_failed``),
         kept so the distribution can be plotted -- which is usually more
         informative than the interval.
@@ -136,7 +138,8 @@ class BootstrapResult:
         """How far the resampled values sit from the original estimate, on average.
 
         Returns ``mean(replicates) - estimate``: the bootstrap estimate of
-        bias, a float for a scalar statistic or an array of shape ``(k,)``.
+        bias, a float for a scalar statistic or an array shaped like
+        ``estimate``.
 
         A bias comparable to the standard error is a warning that the statistic
         is not well behaved at this sample size, whatever the interval says.
@@ -149,15 +152,16 @@ class BootstrapResult:
         Returns
         -------
         str
-            One row per component of the statistic, with columns estimate,
+            One row per component of the statistic (flattened in C order for
+            a matrix-valued statistic), with columns estimate,
             SE, bias and the lower and upper interval limits, followed by a
             note of how many resamples were refused, if any.
         """
-        estimate = np.atleast_1d(np.asarray(self.estimate, dtype=float))
-        lower = np.atleast_1d(np.asarray(self.confidence_interval[0], dtype=float))
-        upper = np.atleast_1d(np.asarray(self.confidence_interval[1], dtype=float))
-        error = np.atleast_1d(np.asarray(self.standard_error, dtype=float))
-        bias = np.atleast_1d(np.asarray(self.bias, dtype=float))
+        estimate = np.ravel(np.asarray(self.estimate, dtype=float))
+        lower = np.ravel(np.asarray(self.confidence_interval[0], dtype=float))
+        upper = np.ravel(np.asarray(self.confidence_interval[1], dtype=float))
+        error = np.ravel(np.asarray(self.standard_error, dtype=float))
+        bias = np.ravel(np.asarray(self.bias, dtype=float))
 
         percent = round(100 * self.level)
         lines = [
@@ -265,7 +269,7 @@ def bootstrap(
     level: float = 0.95,
     method: Method = "bca",
     random_state: Any = None,
-    n_jobs: int = 1,
+    n_jobs: int | None = 1,
 ) -> BootstrapResult:
     """Get a confidence interval for any number computed from a data table, by resampling rows.
 
@@ -281,8 +285,11 @@ def bootstrap(
         The data. Rows are observations; at least 2 rows.
     statistic : callable
         Function ``statistic(sample)`` taking a ``numpy.ndarray`` of shape
-        ``(n, d)`` and returning a float or a 1-D array of floats.
-        Raising is allowed and is treated as refusing that resample.
+        ``(n, d)`` and returning a float or an array of floats of any fixed
+        shape (a vector, a ``(d, d)`` matrix, ...). The estimate, interval
+        limits, standard error and replicates keep that shape. Raising, or
+        returning a value of a different shape, is allowed and is treated as
+        refusing that resample.
     n_resamples : int, default 999
         Number of bootstrap replicates, at least 2. 999 rather than 1000 by
         convention: the percentile of ``B`` replicates is exact when
@@ -294,9 +301,10 @@ def bootstrap(
         ``n``-point jackknife, so it costs one extra pass over the data.
     random_state : int, numpy.random.Generator or None, default None
         Seed for the resampling. Pass an int for reproducible output.
-    n_jobs : int, default 1
+    n_jobs : int or None, default 1
         Processes to spread the resamples over. ``1`` stays in this process;
-        a negative value uses all cores. Anything other than ``1`` needs
+        a negative value (conventionally ``-1``) or ``None`` uses all cores.
+        ``0`` is rejected. Anything other than ``1`` needs
         ``statistic`` to be picklable, which rules out
         lambdas and closures -- use a module-level function or
         :func:`functools.partial`.
@@ -321,7 +329,8 @@ def bootstrap(
     ValueError
         If ``x`` has fewer than 2 rows, ``level`` is not strictly between 0
         and 1, ``n_resamples`` is below 2, ``method`` is not one of the three
-        names, or ``statistic`` fails on the original data.
+        names, ``n_jobs`` is 0 or not an integer, or ``statistic`` fails on
+        the original data.
     RuntimeError
         If more than 10% of the resamples are refused by ``statistic``.
 
@@ -348,9 +357,20 @@ def bootstrap(
     if method not in ("bca", "percentile", "basic"):
         raise ValueError(f"method must be bca, percentile or basic; got {method!r}")
 
+    if n_jobs is not None and (not isinstance(n_jobs, (int, np.integer)) or n_jobs == 0):
+        raise ValueError(
+            f"n_jobs must be a positive integer, or negative / None for all cores; got {n_jobs!r}"
+        )
+
     estimate = _evaluate(statistic, x)
     if estimate is None:
         raise ValueError("the statistic failed on the original data")
+    # Work on flat vectors throughout and restore the statistic's own shape at
+    # the end, so a matrix-valued statistic (a correlation matrix, say) gets
+    # intervals of the same shape.
+    shape = estimate.shape
+    scalar = estimate.ndim == 0
+    flat_estimate = estimate.reshape(-1)
 
     rng = np.random.default_rng(random_state)
     seeds = rng.integers(0, 2**63 - 1, size=n_resamples)
@@ -358,10 +378,12 @@ def bootstrap(
     if n_jobs == 1:
         values = [_one_resample((statistic, x, int(seed))) for seed in seeds]
     else:
-        with ProcessPoolExecutor(max_workers=None if n_jobs < 0 else n_jobs) as pool:
+        workers = None if n_jobs is None or n_jobs < 0 else int(n_jobs)
+        with ProcessPoolExecutor(max_workers=workers) as pool:
             values = list(pool.map(_one_resample, [(statistic, x, int(s)) for s in seeds]))
 
-    kept = [v for v in values if v is not None]
+    # A replicate of the wrong shape is as unusable as one that raised.
+    kept = [v.reshape(-1) for v in values if v is not None and v.shape == shape]
     n_failed = n_resamples - len(kept)
     if n_failed > _MAX_FAILURE_FRACTION * n_resamples:
         raise RuntimeError(
@@ -369,49 +391,41 @@ def bootstrap(
             "That is too many to be incidental -- check that it handles ties and "
             "degenerate columns."
         )
-    replicates = np.asarray(kept, dtype=float)
-
-    estimate = np.atleast_1d(estimate)
-    scalar = estimate.size == 1 and np.asarray(_evaluate(statistic, x)).ndim == 0
+    flat = np.asarray(kept, dtype=float).reshape(len(kept), flat_estimate.size)
 
     if method == "percentile":
-        lower, upper = _percentile_interval(replicates, level)
+        lower, upper = _percentile_interval(flat, level)
     elif method == "basic":
-        lower, upper = _basic_interval(
-            replicates, estimate if replicates.ndim > 1 else estimate[0], level
-        )
+        lower, upper = _basic_interval(flat, flat_estimate, level)
     else:
         jackknife = []
         for i in range(x.shape[0]):
             value = _evaluate(statistic, np.delete(x, i, axis=0))
-            if value is not None:
-                jackknife.append(value)
+            if value is not None and value.shape == shape:
+                jackknife.append(value.reshape(-1))
         lower, upper = _bca_interval(
-            np.atleast_2d(replicates.reshape(replicates.shape[0], -1)),
-            estimate,
-            np.atleast_2d(np.asarray(jackknife, dtype=float).reshape(len(jackknife), -1)),
+            flat,
+            flat_estimate,
+            np.asarray(jackknife, dtype=float).reshape(len(jackknife), flat_estimate.size),
             level,
         )
 
-    error = np.std(replicates, axis=0, ddof=1)
+    error = np.std(flat, axis=0, ddof=1)
     if scalar:
         return BootstrapResult(
-            estimate=float(estimate[0]),
-            confidence_interval=(float(np.ravel(lower)[0]), float(np.ravel(upper)[0])),
-            standard_error=float(np.ravel(error)[0]),
-            replicates=replicates,
+            estimate=float(flat_estimate[0]),
+            confidence_interval=(float(lower[0]), float(upper[0])),
+            standard_error=float(error[0]),
+            replicates=flat[:, 0],
             method=method,
             level=level,
             n_failed=n_failed,
         )
     return BootstrapResult(
-        estimate=estimate,
-        confidence_interval=(
-            np.asarray(lower).reshape(estimate.shape),
-            np.asarray(upper).reshape(estimate.shape),
-        ),
-        standard_error=error,
-        replicates=replicates,
+        estimate=flat_estimate.reshape(shape),
+        confidence_interval=(np.asarray(lower).reshape(shape), np.asarray(upper).reshape(shape)),
+        standard_error=error.reshape(shape),
+        replicates=flat.reshape((len(kept), *shape)),
         method=method,
         level=level,
         n_failed=n_failed,
@@ -480,7 +494,7 @@ def bootstrap_measure(
     level: float = 0.95,
     method: Method = "bca",
     random_state: Any = None,
-    n_jobs: int = 1,
+    n_jobs: int | None = 1,
 ) -> BootstrapResult:
     """Get a confidence interval for how strongly two variables move together.
 
@@ -504,9 +518,10 @@ def bootstrap_measure(
         Interval type; see :func:`bootstrap`.
     random_state : int, numpy.random.Generator or None, default None
         Seed for the resampling. Pass an int for reproducible output.
-    n_jobs : int, default 1
+    n_jobs : int or None, default 1
         Number of worker processes. ``1`` stays in this process; a negative
-        value uses all cores. See :func:`bootstrap` for when parallelism pays.
+        value or ``None`` uses all cores; ``0`` is rejected. See
+        :func:`bootstrap` for when parallelism pays.
 
     Returns
     -------
@@ -576,7 +591,7 @@ def bootstrap_fit(
     level: float = 0.95,
     method: Method = "bca",
     random_state: Any = None,
-    n_jobs: int = 1,
+    n_jobs: int | None = 1,
 ) -> BootstrapResult:
     """Get confidence intervals for a copula's fitted parameters by refitting it on resampled data.
 
@@ -605,9 +620,10 @@ def bootstrap_fit(
         Interval type; see :func:`bootstrap`.
     random_state : int, numpy.random.Generator or None, default None
         Seed for the resampling. Pass an int for reproducible output.
-    n_jobs : int, default 1
+    n_jobs : int or None, default 1
         Number of worker processes. ``1`` stays in this process; a negative
-        value uses all cores. See :func:`bootstrap` for when parallelism pays.
+        value or ``None`` uses all cores; ``0`` is rejected. See
+        :func:`bootstrap` for when parallelism pays.
 
     Returns
     -------

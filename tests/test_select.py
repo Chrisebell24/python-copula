@@ -296,3 +296,49 @@ class TestGoodnessOfFitColumn:
         table = select_copula(u, families=["frank"], gof=True, n_rep=60, random_state=0).table
         assert 0.0 < table.loc["frank", "gof_pvalue"] < 1.0
         assert table.loc["frank", "gof_statistic"] > 0.0
+
+
+class TestFairRandomness:
+    """A Generator used to be consumed family after family, so each family was
+    scored on different folds -- unlike an int seed, which gives every family
+    the same ones."""
+
+    def test_a_generator_gives_every_family_the_same_folds(self) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(150, random_state=0)
+        both = select_copula(
+            u,
+            families=["clayton", "gumbel"],
+            criterion="xv",
+            k=3,
+            random_state=np.random.default_rng(5),
+        )
+        alone = select_copula(
+            u, families=["gumbel"], criterion="xv", k=3, random_state=np.random.default_rng(5)
+        )
+        assert both.table.loc["gumbel", "xv"] == pytest.approx(alone.table.loc["gumbel", "xv"])
+
+    def test_an_int_seed_still_means_the_same_folds_as_cross_validate(self) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(150, random_state=0)
+        table = select_copula(
+            u, families=["clayton", "gumbel"], criterion="xv", k=3, random_state=7
+        ).table
+        expected = cross_validate(rc.GumbelCopula(), u, k=3, random_state=7)
+        assert table.loc["gumbel", "xv"] == pytest.approx(expected)
+
+    def test_both_failure_messages_are_kept(self, monkeypatch) -> None:
+        import rcopula.select as select_module
+
+        def broken_cv(*args, **kwargs):
+            raise RuntimeError("cv broke")
+
+        def broken_gof(*args, **kwargs):
+            raise RuntimeError("gof broke")
+
+        monkeypatch.setattr(select_module, "cross_validate", broken_cv)
+        monkeypatch.setattr(select_module, "gof_test", broken_gof)
+        u = rc.ClaytonCopula(2.0).rvs(100, random_state=0)
+        table = select_copula(
+            u, families=["clayton"], criterion="xv", gof="mult", n_rep=5, random_state=0
+        ).table
+        message = table.loc["clayton", "message"]
+        assert "cv broke" in message and "gof broke" in message

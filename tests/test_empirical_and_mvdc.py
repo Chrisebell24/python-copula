@@ -253,3 +253,107 @@ class TestCopulaDistribution:
         u = stats.t(4).cdf(x)
         expected = cop.logpdf(u)[0] + float(np.sum(stats.t(4).logpdf(x)))
         assert mv.logpdf(x)[0] == pytest.approx(expected, rel=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Regression tests: input validation and ties in the smoothed estimators
+# ---------------------------------------------------------------------------
+
+
+class TestEmpiricalValidation:
+    def test_unknown_keyword_is_an_error(self) -> None:
+        x = np.random.default_rng(0).uniform(size=(20, 2))
+        with pytest.raises(TypeError):
+            rc.EmpiricalCopula(x, smothing="beta")
+
+    def test_one_dimensional_data_gets_a_clear_message(self) -> None:
+        with pytest.raises(ValueError, match="2-D array"):
+            rc.EmpiricalCopula(np.arange(10.0))
+
+
+class TestEmpiricalTies:
+    @staticmethod
+    def tied_data() -> np.ndarray:
+        rng = np.random.default_rng(3)
+        # Heavy rounding: tie groups of varying size, including even sizes whose
+        # mid-ranks end in .5 and used to be rounded (to even) onto one rank.
+        x = np.round(rng.normal(size=(41, 2)) * 2.0) / 2.0
+        x[:, 1] = np.round(x[:, 0] + rng.normal(size=41), 0)
+        return x
+
+    @pytest.mark.parametrize("smoothing", ["beta", "checkerboard"])
+    def test_margins_stay_uniform(self, smoothing: str) -> None:
+        emp = rc.EmpiricalCopula(self.tied_data(), smoothing=smoothing)
+        grid = np.linspace(0.0, 1.0, 23)
+        ones = np.ones_like(grid)
+        for points in (np.column_stack([grid, ones]), np.column_stack([ones, grid])):
+            assert np.allclose(emp.cdf(points), grid, atol=1e-12)
+
+    def test_beta_density_integrates_to_the_cdf(self) -> None:
+        emp = rc.EmpiricalCopula(self.tied_data(), smoothing="beta")
+        # The marginal density in u_1 (u_2 integrated out) must be 1.
+        nodes, weights = np.polynomial.legendre.leggauss(80)
+        v = 0.5 * (nodes + 1.0)
+        for u1 in (0.1, 0.5, 0.8):
+            dens = emp.pdf(np.column_stack([np.full_like(v, u1), v]))
+            assert float(np.sum(0.5 * weights * dens)) == pytest.approx(1.0, abs=1e-10)
+
+    @pytest.mark.parametrize("smoothing", ["beta", "checkerboard"])
+    def test_samples_have_uniform_margins(self, smoothing: str) -> None:
+        emp = rc.EmpiricalCopula(self.tied_data(), smoothing=smoothing)
+        u = emp.rvs(40_000, random_state=1)
+        for j in range(2):
+            assert stats.kstest(u[:, j], "uniform").pvalue > 1e-3
+
+    @pytest.mark.parametrize("smoothing", ["beta", "checkerboard"])
+    def test_untied_data_unchanged(self, smoothing: str) -> None:
+        x = np.random.default_rng(5).normal(size=(30, 2))
+        emp = rc.EmpiricalCopula(x, smoothing=smoothing)
+        ranks = np.column_stack([stats.rankdata(c) for c in x.T])
+        n = 30
+        point = np.array([0.37, 0.61])
+        if smoothing == "beta":
+            expected = np.prod(stats.beta.cdf(point, ranks, n - ranks + 1), axis=1).mean()
+        else:
+            expected = np.prod(np.clip(n * point - ranks + 1.0, 0.0, 1.0), axis=1).mean()
+        assert emp.cdf(point[None, :])[0] == pytest.approx(expected, rel=1e-14)
+
+
+class TestDistributionInputs:
+    @staticmethod
+    def model() -> rc.CopulaDistribution:
+        return rc.CopulaDistribution(
+            rc.ClaytonCopula(2.0), [stats.norm(1, 2), stats.expon()], names=["a", "b"]
+        )
+
+    def test_dataframe_is_read_by_name(self) -> None:
+        import pandas as pd
+
+        mv = self.model()
+        x = np.array([[1.0, 0.5], [0.0, 2.0]])
+        swapped = pd.DataFrame({"b": x[:, 1], "extra": [9.0, 9.0], "a": x[:, 0]})
+        assert np.allclose(mv.cdf(swapped), mv.cdf(x), rtol=1e-14)
+        assert np.allclose(mv.logpdf(swapped), mv.logpdf(x), rtol=1e-14)
+        assert np.allclose(mv.marginal_cdf(swapped), mv.marginal_cdf(x), rtol=1e-14)
+
+    def test_dataframe_missing_a_name_raises(self) -> None:
+        import pandas as pd
+
+        with pytest.raises(ValueError, match="no column"):
+            self.model().cdf(pd.DataFrame({"a": [1.0], "c": [0.5]}))
+
+    def test_dataframe_without_names_is_positional(self) -> None:
+        import pandas as pd
+
+        mv = rc.CopulaDistribution(rc.ClaytonCopula(2.0), [stats.norm(1, 2), stats.expon()])
+        frame = pd.DataFrame({"y": [1.0], "x": [0.5]})
+        assert mv.cdf(frame)[0] == pytest.approx(mv.cdf([[1.0, 0.5]])[0], rel=1e-14)
+
+    def test_array_of_margins_is_one_per_variable(self) -> None:
+        margins = np.array([stats.norm(1, 2), stats.expon()], dtype=object)
+        mv = rc.CopulaDistribution(rc.ClaytonCopula(2.0), margins)
+        reference = rc.CopulaDistribution(rc.ClaytonCopula(2.0), list(margins))
+        assert mv.margins == list(margins)
+        assert mv.cdf([[1.0, 0.5]])[0] == pytest.approx(reference.cdf([[1.0, 0.5]])[0])
+        with pytest.raises(ValueError, match="margin"):
+            rc.CopulaDistribution(rc.ClaytonCopula(2.0, dim=3), margins)

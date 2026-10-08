@@ -115,6 +115,11 @@ class LayerStatistics(NamedTuple):
     expected_loss_ratio : float
         ``expected_loss / limit``: expected payout as a fraction of the limit,
         the usual way layers of different size are compared.
+
+    Notes
+    -----
+    The ``repr`` follows the market convention ``"<limit> xs <attachment>"``,
+    so a layer paying 5m above a 10m retention prints as ``5e+06 xs 1e+07``.
     """
 
     attachment: float
@@ -126,7 +131,7 @@ class LayerStatistics(NamedTuple):
 
     def __repr__(self) -> str:
         return (
-            f"LayerStatistics({self.attachment:g} xs {self.limit:g}, "
+            f"LayerStatistics({self.limit:g} xs {self.attachment:g}, "
             f"EL={self.expected_loss:.4g}, "
             f"P(attach)={self.attachment_probability:.4%}, "
             f"P(exhaust)={self.exhaustion_probability:.4%})"
@@ -563,7 +568,8 @@ def catastrophe_bond(
     Parameters
     ----------
     losses : array_like of float, shape (n,)
-        Simulated sponsor losses over the risk period, in currency units
+        Simulated sponsor losses over the **whole term** of the bond (one
+        number per scenario covering ``maturity`` years), in currency units
         (positive numbers are losses).
     attachment : float
         Loss level at which principal starts to be written down. Must be
@@ -577,7 +583,9 @@ def catastrophe_bond(
         Annual risk-free rate as a decimal, continuously compounded for
         discounting.
     maturity : float, default 1.0
-        Term in years. Used only in ``"fair_price"``.
+        Term in years, ``> 0``. The whole-term expected loss is divided by
+        ``maturity`` to annualise it before it is compared with the annual
+        spread.
 
     Returns
     -------
@@ -585,7 +593,10 @@ def catastrophe_bond(
         Rates and losses are fractions of principal (0.02 = 2%).
 
         ``"expected_loss"``
-            Average fraction of principal lost.
+            Average fraction of principal lost over the whole term.
+        ``"annual_expected_loss"``
+            ``expected_loss / maturity``: the per-year expected loss the ILS
+            market quotes.
         ``"attachment_probability"``
             Probability that the loss exceeds ``attachment`` (any principal
             lost).
@@ -598,9 +609,12 @@ def catastrophe_bond(
         ``"spread"``
             ``coupon - risk_free``.
         ``"multiple"``
-            ``spread / expected_loss`` (``inf`` if the expected loss is 0).
+            ``spread / annual_expected_loss`` (``inf`` if the expected loss is
+            0). Both numbers are per year, so the ratio does not depend on
+            the term.
         ``"expected_return"``
-            ``spread - expected_loss``: excess return net of expected losses.
+            ``spread - annual_expected_loss``: annual excess return net of
+            expected losses.
         ``"fair_price"``
             ``exp(-risk_free * maturity) * (1 + coupon * maturity -
             expected_loss)``, per unit of principal.
@@ -608,7 +622,7 @@ def catastrophe_bond(
     Raises
     ------
     ValueError
-        Unless ``0 <= attachment < exhaustion``.
+        Unless ``0 <= attachment < exhaustion`` and ``maturity > 0``.
 
     Notes
     -----
@@ -619,7 +633,10 @@ def catastrophe_bond(
     Returns the three numbers the ILS market quotes: **expected loss** (the
     fraction of principal expected to be lost), **attachment probability**, and
     the **multiple** -- spread divided by expected loss -- which is how relative
-    value is judged across deals.
+    value is judged across deals. The spread is an annual rate while
+    ``losses`` cover the whole term, so the expected loss is annualised
+    (divided by ``maturity``) before the multiple and expected return are
+    formed; with the default ``maturity=1`` the two coincide.
 
     Examples
     --------
@@ -638,14 +655,20 @@ def catastrophe_bond(
     """
     if not 0 <= attachment < exhaustion:
         raise ValueError(f"need 0 <= attachment < exhaustion, got {attachment} and {exhaustion}")
+    if not maturity > 0:
+        raise ValueError(f"maturity must be > 0 years, got {maturity}")
     x = np.asarray(losses, dtype=np.float64)
     width = exhaustion - attachment
     principal_lost = np.clip(x - attachment, 0.0, width) / width
 
     expected = float(principal_lost.mean())
+    # `losses` cover the whole term; the spread is annual. Annualise the loss
+    # so the multiple and expected return compare like with like.
+    annual_expected = expected / maturity
     spread = coupon - risk_free
     return {
         "expected_loss": expected,
+        "annual_expected_loss": annual_expected,
         "attachment_probability": float(np.mean(x > attachment)),
         "exhaustion_probability": float(np.mean(x >= exhaustion)),
         "conditional_severity": float(
@@ -653,7 +676,7 @@ def catastrophe_bond(
         ),
         "spread": spread,
         # Spread per unit of expected loss: the ILS market's relative-value yardstick.
-        "multiple": spread / expected if expected > 0 else float("inf"),
-        "expected_return": spread - expected,
+        "multiple": spread / annual_expected if annual_expected > 0 else float("inf"),
+        "expected_return": spread - annual_expected,
         "fair_price": float(np.exp(-risk_free * maturity) * (1.0 + coupon * maturity - expected)),
     }

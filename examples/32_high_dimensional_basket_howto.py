@@ -98,15 +98,21 @@ check("a full matrix has 319,600 entries to estimate", n_pairs == 319_600)
 z_all = special.ndtri(rc.pseudo_obs(returns.to_numpy()))
 
 
-def sampled_tau(u, same, n_pairs, rng):
-    """Average Kendall's tau over random pairs -- the full 319,600 is too slow."""
-    pool = np.argwhere(np.triu(same, 1))
-    pick = pool[rng.choice(len(pool), n_pairs, replace=False)]
-    return float(np.mean([stats.kendalltau(u[:, i], u[:, j]).statistic for i, j in pick]))
+# All 319,600 pairwise Kendall's taus at once: rc.cor_kendall computes the whole
+# matrix in one blocked pass (seconds), identical to calling scipy pair by pair.
+t0 = time.time()
+tau_all = rc.cor_kendall(z_all)
+show("seconds for all 319,600 Kendall's taus", time.time() - t0)
+OFF_DIAGONAL = ~np.eye(N_STOCKS, dtype=bool)
 
 
-tau_within = sampled_tau(z_all, SAME_SECTOR, 300, rng)
-tau_across = sampled_tau(z_all, ~SAME_SECTOR, 300, rng)
+def mean_tau(tau, mask):
+    """Average Kendall's tau over the pairs selected by ``mask``."""
+    return float(tau[mask & OFF_DIAGONAL].mean())
+
+
+tau_within = mean_tau(tau_all, SAME_SECTOR)
+tau_across = mean_tau(tau_all, ~SAME_SECTOR)
 show("Kendall's tau, two stocks in the same sector", tau_within)
 show("Kendall's tau, two stocks in different sectors", tau_across)
 one_clayton = rc.ClaytonCopula.from_tau(0.1 * tau_within + 0.9 * tau_across)
@@ -259,17 +265,18 @@ check(
 heading("Step 2B. A nested copula: one copula per sector, one linking them")
 # ---------------------------------------------------------------------------
 # A Clayton copula inside each sector catches its crashes; a weaker Clayton
-# at the top links the sectors. 11 parameters in all. (rcopula's fit_nested
-# computes all 319,600 pairwise taus, which takes minutes at this size, so
-# the same estimator is applied here to a random sample of pairs.)
+# at the top links the sectors. 11 parameters in all, each the Clayton whose
+# tau matches the average sample tau of the pairs it governs -- the estimator
+# rcopula's fit_nested uses -- read off the full tau matrix.
 
-theta_root = rc.ClaytonCopula.from_tau(sampled_tau(u_train, ~SAME_SECTOR, 300, rng)).theta
+tau_train = rc.cor_kendall(u_train)
+theta_root = rc.ClaytonCopula.from_tau(mean_tau(tau_train, ~SAME_SECTOR)).theta
 children = []
 for s in range(N_SECTORS):
     block = np.where(SECTOR == s)[0]
     in_block = np.zeros_like(SAME_SECTOR)
     in_block[np.ix_(block, block)] = True
-    theta = rc.ClaytonCopula.from_tau(sampled_tau(u_train, in_block, 150, rng)).theta
+    theta = rc.ClaytonCopula.from_tau(mean_tau(tau_train, in_block)).theta
     children.append(NestedArchimedean(rc.ClaytonCopula(max(theta, theta_root)), list(block)))
 nested = NestedArchimedean(rc.ClaytonCopula(theta_root), children=children)
 show(
@@ -317,22 +324,13 @@ def mass_moves(v):
     return crash, rally
 
 
-def sample_truncated_vine(vine, n, rng):
-    """Tree 1 only: draw the index, then each stock given the index.
-
-    vine.rvs() would also walk the 319,600 independence edges above tree 1,
-    which at this size takes hours; for a vine truncated after one tree,
-    sampling tree 1 directly is exact and takes seconds.
-    """
-    root = rng.uniform(size=n)
-    out = np.empty((n, N_STOCKS))
-    for j, pair in enumerate(vine.pair_copulas[0]):
-        w = np.column_stack([root, rng.uniform(size=n)])
-        out[:, j] = rc.inverse_rosenblatt(pair, w)[:, 1]
-    return out
-
-
 n_sim = 20_000
+# vine.rvs knows the vine is truncated after tree 1 (vine.truncation_level is
+# 1), so it unwinds only that tree: 800 pair-copulas, not 319,600.
+t0 = time.time()
+vine_draws = vine.rvs(n_sim, random_state=2)[:, 1:]  # drop the index column
+show("seconds to draw 20,000 days from the 801-variable vine", time.time() - t0)
+
 graded = pd.DataFrame(
     {
         "truth": mass_moves(simulate_factor_t(n_sim, true_market, true_sector, TRUE_DF, rng)),
@@ -343,7 +341,7 @@ graded = pd.DataFrame(
             simulate_factor_t(n_sim, fit_market, fit_sector, np.inf, rng)
         ),
         "nested Clayton": mass_moves(nested.rvs(n_sim, random_state=1)),
-        "vine (index root)": mass_moves(sample_truncated_vine(vine, n_sim, rng)),
+        "vine (index root)": mass_moves(vine_draws),
     },
     index=["mass crash", "mass rally"],
 ).T

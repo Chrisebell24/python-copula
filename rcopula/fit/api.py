@@ -43,6 +43,7 @@ from scipy.stats import qmc
 
 from rcopula.core.base import Copula
 from rcopula.core.elliptical import EllipticalCopula, P2p, StudentCopula, p2P
+from rcopula.core.extreme_value import TEVCopula
 from rcopula.dependence import pseudo_obs
 from rcopula.fit.results import CopulaFitResult
 from rcopula.fit.variance import var_inversion_multi, var_itau, var_ml, var_mpl
@@ -219,66 +220,196 @@ def _pairwise_measure(u: NDArray[np.float64], measure: str) -> NDArray[np.float6
     return np.array(out)
 
 
-def _fit_by_inversion(
-    copula: Copula, u: NDArray[np.float64], measure: str, estimate_variance: bool
-) -> CopulaFitResult:
-    """Estimate by inverting Kendall's tau or Spearman's rho."""
+def _names(copula: Copula, mask: NDArray[np.bool_]) -> tuple[str, ...]:
+    """Parameter names selected by ``mask``, as plain ``str`` (never ``numpy.str_``)."""
+    return tuple(str(name) for name, keep in zip(copula.param_names, mask, strict=True) if keep)
+
+
+def _calibrate(copula: Copula, measure: str, value: float) -> Copula:
+    """Re-tune ``copula`` to a target tau/rho, keeping everything inversion does not set.
+
+    :meth:`Copula.calibrated` rebuilds the family from ``(value, dim)`` alone, so
+    for a family with more than one parameter it would quietly reset the rest to
+    the constructor defaults -- a t copula fitted at ``df=3`` came back at
+    ``df=4``, and its ``"irho"`` inversion was computed at the wrong ``df``. The
+    correlation structure and the degrees of freedom are passed through here.
+    """
+    if isinstance(copula, (EllipticalCopula, TEVCopula)):
+        kwargs: dict[str, object] = {}
+        if isinstance(copula, EllipticalCopula):
+            kwargs["dispstr"] = copula.dispstr
+        df = getattr(copula, "df", np.nan)
+        if isinstance(copula, (StudentCopula, TEVCopula)) and np.isfinite(df):
+            kwargs["df"] = float(df)
+        factory = type(copula).from_tau if measure == "tau" else type(copula).from_rho
+        return factory(value, dim=copula.dim, **kwargs)
+    return copula.calibrated(measure, value)
+
+
+def _determined_by_inversion(copula: Copula) -> NDArray[np.bool_]:
+    """Which parameters an inversion of tau/rho actually estimates.
+
+    The correlations of an elliptical copula, and otherwise the first (the
+    dependence) parameter. Anything else -- a t copula's ``df``, say -- does not
+    enter Kendall's tau at all and cannot be recovered from it.
+    """
+    mask = np.zeros(len(copula.param_names), dtype=bool)
+    if isinstance(copula, EllipticalCopula):
+        mask[: len(copula.params) - (1 if isinstance(copula, StudentCopula) else 0)] = True
+    else:
+        mask[0] = True
+    return mask
+
+
+def _carried_value(copula: Copula, fitted: Copula, index: int) -> float:
+    """Value of a parameter inversion does not estimate: the input's, else the default."""
+    value = float(copula.params[index])
+    return value if np.isfinite(value) else float(fitted.params[index])
+
+
+def _inverted_correlations(
+    copula: EllipticalCopula, u: NDArray[np.float64], measure: str
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Pairwise-inverted correlations of an unstructured elliptical copula.
+
+    Returns the correlation vector and the pairwise statistics it came from.
+    Correlations pinned with ``fix_params`` keep their values. The assembled
+    matrix is repaired to the nearest correlation matrix (as R does with
+    ``nearPD``); with pinned entries the repair is applied only when needed, and
+    the pinned entries are then restored -- if the result is still not positive
+    definite the pinned values are incompatible with the data and an error says
+    so rather than silently moving them.
+    """
     d = copula.dim
+    stat = _pairwise_measure(u, measure)
+    rho = np.sin(np.pi * stat / 2.0) if measure == "tau" else 2.0 * np.sin(np.pi * stat / 6.0)
+    n_corr = rho.size
+    corr_free = np.asarray(copula.free[:n_corr], dtype=bool)
+    if corr_free.all():
+        return P2p(nearest_correlation(p2P(rho, d))), stat
 
-    def from_measure(value: float, dim: int = 2) -> Copula:
-        # Instance-level, so structural copulas (a rotation, say) can calibrate
-        # the family they wrap rather than being reconstructed from scratch.
-        return copula.calibrated(measure, value)
+    pinned = np.asarray(copula.params[:n_corr], dtype=np.float64)
+    rho = np.where(corr_free, rho, pinned)
+    sigma = p2P(rho, d)
+    if np.linalg.eigvalsh(sigma).min() <= 0.0:
+        rho = np.where(corr_free, P2p(nearest_correlation(sigma)), pinned)
+        if np.linalg.eigvalsh(p2P(rho, d)).min() <= 0.0:
+            raise ValueError(
+                f"cannot invert {measure} for the {copula.name} copula: the correlations "
+                "pinned with fix_params cannot be completed to a positive-definite "
+                "correlation matrix with the inverted free ones"
+            )
+    return rho, stat
 
+
+def _correlation_cov(
+    u: NDArray[np.float64], stat: NDArray[np.float64], measure: str
+) -> NDArray[np.float64] | None:
+    """Delta-method covariance of pairwise-inverted correlations (all pairs)."""
+    # Each correlation depends only on its own pairwise statistic, so the
+    # Jacobian is diagonal: d(sin(pi t / 2))/dt for tau, and d(2 sin(pi r / 6))/dr
+    # for rho.
+    jac = np.diag(
+        (np.pi / 2.0) * np.cos(np.pi * stat / 2.0)
+        if measure == "tau"
+        else (np.pi / 3.0) * np.cos(np.pi * stat / 6.0)
+    )
+    return var_inversion_multi(u, jac, measure=measure)
+
+
+def _fit_by_inversion(
+    copula: Copula,
+    u: NDArray[np.float64],
+    measure: str,
+    estimate_variance: bool,
+    warn: bool = True,
+) -> CopulaFitResult:
+    """Estimate by inverting Kendall's tau or Spearman's rho.
+
+    Only the parameters that tau/rho determine are estimated (see
+    :func:`_determined_by_inversion`); parameters pinned with ``fix_params``
+    keep their values; any other free parameter (a t copula's ``df``) is held
+    at its current value with a warning, and is not reported as an estimate.
+    """
+    d = copula.dim
+    free = np.asarray(copula.free, dtype=bool)
+    determined = _determined_by_inversion(copula)
+    full = np.array(copula.params, dtype=np.float64)
+
+    cov_all: NDArray[np.float64] | None = None
     if isinstance(copula, EllipticalCopula) and copula.dispstr == "un" and d > 2:
         # Invert each pair separately, then repair the matrix.
-        stat = _pairwise_measure(u, measure)
-        rho = np.sin(np.pi * stat / 2.0) if measure == "tau" else 2.0 * np.sin(np.pi * stat / 6.0)
-        sigma = nearest_correlation(p2P(rho, d))
-        params = P2p(sigma)
-        if isinstance(copula, StudentCopula):
-            params = np.append(params, copula.df)
-        fitted = copula.with_params(params)
-
-        cov = None
-        if estimate_variance:
-            # Each correlation depends only on its own pairwise statistic, so
-            # the Jacobian is diagonal: d(sin(pi t / 2))/dt for tau, and
-            # d(2 sin(pi r / 6))/dr for rho.
-            jac = np.diag(
-                (np.pi / 2.0) * np.cos(np.pi * stat / 2.0)
-                if measure == "tau"
-                else (np.pi / 3.0) * np.cos(np.pi * stat / 6.0)
+        n_corr = int(determined.sum())
+        if not free[:n_corr].any():
+            raise ValueError(
+                f"cannot fit {_names(copula, free & ~determined)} by {measure} inversion: "
+                "it estimates only the correlations, and they are all fixed; use "
+                "method='mpl'"
             )
-            cov = var_inversion_multi(u, jac, measure=measure)
+        corr, stat = _inverted_correlations(copula, u, measure)
+        full[:n_corr] = corr
+        if estimate_variance:
+            cov_all = _correlation_cov(u, stat, measure)
+        reference: Copula = copula
     else:
-        # One-parameter case: average the pairwise statistics, then invert once.
+        # One dependence parameter: average the pairwise statistics, invert once.
+        if not free[determined].any():
+            raise ValueError(
+                f"cannot fit {_names(copula, free & ~determined)} by {measure} inversion: "
+                f"{measure} determines only {_names(copula, determined)}, which is fixed; "
+                "use method='mpl'"
+            )
         scalar_stat = float(np.mean(_pairwise_measure(u, measure)))
         try:
-            fitted = from_measure(scalar_stat, dim=d)
+            reference = _calibrate(copula, measure, scalar_stat)
         except (ValueError, NotImplementedError) as exc:
             raise ValueError(
                 f"cannot invert {measure} = {scalar_stat:.4f} for the {copula.name} "
                 f"family in dimension {d}: {exc}"
             ) from exc
-        params = fitted.params
+        full[determined] = np.asarray(reference.params, dtype=np.float64)[determined]
 
-        cov = None
-        if estimate_variance and params.size == 1:
+        if estimate_variance and determined.sum() == 1:
             # Delta method needs g'(stat); differentiate the inverse map.
+            index = int(np.flatnonzero(determined)[0])
             h = 1e-5
             try:
-                hi = float(np.atleast_1d(from_measure(scalar_stat + h, dim=d).params)[0])
-                lo = float(np.atleast_1d(from_measure(scalar_stat - h, dim=d).params)[0])
-                cov = var_itau(u, (hi - lo) / (2.0 * h), measure=measure)
+                hi = float(_calibrate(copula, measure, scalar_stat + h).params[index])
+                lo = float(_calibrate(copula, measure, scalar_stat - h).params[index])
+                cov_all = var_itau(u, (hi - lo) / (2.0 * h), measure=measure)
             except (ValueError, NotImplementedError):
-                cov = None
+                cov_all = None
 
+    # Parameters tau/rho cannot see: keep their current value (or, when that is
+    # unset, the family default the calibration used).
+    for position in np.flatnonzero(~determined):
+        full[position] = _carried_value(copula, reference, int(position))
+    held = free & ~determined
+    if warn and held.any():
+        values = ", ".join(
+            f"{name}={full[i]:g}" for i, name in enumerate(copula.param_names) if held[i]
+        )
+        warnings.warn(
+            f"method='i{measure}' cannot estimate {_names(copula, held)}: {measure} does "
+            f"not depend on it. Held at {values} and not reported as an estimate. Pin "
+            "it with fix_params to silence this, or use method='mpl' (or 'itau.mpl' "
+            "for a t copula) to estimate it.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+    estimated = free & determined
+    cov = None
+    if cov_all is not None:
+        keep = estimated[determined]
+        cov = np.asarray(cov_all, dtype=np.float64)[np.ix_(keep, keep)]
+
+    fitted = copula.with_params(full)
     loglik = _safe_loglik(fitted, u)
     return CopulaFitResult(
         copula=fitted,
-        params=fitted.params,
-        param_names=fitted.param_names,
+        params=full[estimated],
+        param_names=_names(copula, estimated),
         loglik=loglik,
         n_obs=u.shape[0],
         method=f"i{measure}",
@@ -415,8 +546,11 @@ def _candidate_starts(copula: Copula, free: NDArray[np.bool_]) -> NDArray[np.flo
 def _starting_value(copula: Copula, u: NDArray[np.float64]) -> NDArray[np.float64]:
     """Default start: the inversion-of-tau estimate, as in R."""
     try:
-        return _fit_by_inversion(copula, u, "tau", estimate_variance=False).params
-    except (ValueError, NotImplementedError):
+        return np.asarray(
+            _fit_by_inversion(copula, u, "tau", estimate_variance=False, warn=False).copula.params,
+            dtype=np.float64,
+        )
+    except (ValueError, NotImplementedError, np.linalg.LinAlgError):
         # Fall back to the midpoint of each admissible interval.
         out = []
         for lo, hi in copula.param_bounds:
@@ -474,16 +608,26 @@ def fit(
 
         See the module docstring for details.
     start : array_like of float, shape (p,), or None, default None
-        Starting parameters for ``"mpl"`` and ``"ml"`` (full vector, in the
-        order of ``copula.param_names``). ``None`` uses the inversion-of-tau
-        estimate, as in R. Ignored by the other methods.
+        Starting parameters (full vector, in the order of
+        ``copula.param_names``; entries of fixed parameters are ignored).
+        For ``"mpl"`` and ``"ml"``, ``None`` uses the inversion-of-tau
+        estimate, as in R. For ``"itau.mpl"`` only the last element -- the
+        starting ``df`` -- is used, since the correlations come from tau
+        (a scalar is accepted too). Ignored by ``"itau"`` and ``"irho"``,
+        which have nothing to start.
     optim_method : str or None, default None
         A ``scipy.optimize.minimize`` method name, e.g. ``"BFGS"``. ``None``
         uses ``L-BFGS-B`` for multi-parameter problems and ``Nelder-Mead``
-        for one. Used by ``"mpl"`` and ``"ml"`` only.
+        for one. Used by ``"mpl"`` and ``"ml"``, and by ``"itau.mpl"`` for
+        its search over ``df`` (where ``None`` together with ``start=None``
+        means R's bounded Brent search on ``(0.2, 200)``; giving either one
+        switches to ``minimize`` with those bounds, ``Nelder-Mead`` by
+        default). Ignored by ``"itau"`` and ``"irho"``.
     estimate_variance : bool, default True
         Whether to compute the asymptotic covariance matrix (and therefore
-        standard errors). Set to ``False`` to save time.
+        standard errors). Set to ``False`` to save time. For ``"itau.mpl"``
+        the correlations get their inversion covariance and the ``df``
+        entries are ``nan`` (see Notes).
     ties_method : {"average", "min", "max", "dense", "ordinal", "random"}, default "average"
         How tied values are ranked; passed to
         :func:`~rcopula.dependence.pseudo_obs` when transforming raw data.
@@ -493,6 +637,11 @@ def fit(
     CopulaFitResult
         Fitted copula, estimates of the free parameters, standard errors
         (``bse``), log-likelihood, AIC/BIC and a printable ``summary()``.
+        Whatever the method, ``params`` and ``param_names`` (plain ``str``)
+        list the *estimated* parameters only -- those free in
+        ``copula.free`` -- as R's ``fitCopula`` does; parameters pinned with
+        ``fix_params`` appear only in ``result.copula.params``, which is
+        always the full vector.
 
     Raises
     ------
@@ -500,8 +649,20 @@ def fit(
         If ``method`` is not one of the five listed; if the number of data
         columns differs from ``copula.dim``; if ``"itau"``/``"irho"`` cannot
         invert the sample measure for this family (e.g. negative tau for a
-        Gumbel copula); or if ``"itau.mpl"`` is used with anything other than
-        a Student-t copula with ``dispstr="un"``.
+        Gumbel copula), or the parameter tau/rho determines is fixed while
+        another one is free; if correlations pinned with ``fix_params``
+        cannot be completed to a valid correlation matrix; or if
+        ``"itau.mpl"`` is used with anything other than a Student-t copula
+        with ``dispstr="un"``.
+
+    Warns
+    -----
+    UserWarning
+        For ``"itau"``/``"irho"`` when a free parameter does not enter
+        tau/rho at all -- a t copula's ``df`` -- and so cannot be estimated
+        by inversion. It is held at its current value (``df=4`` by default)
+        and left out of ``params``. Pin it with ``fix_params`` (or
+        ``df_fixed=True``) to silence the warning, or use ``"itau.mpl"``.
 
     See Also
     --------
@@ -511,10 +672,17 @@ def fit(
     Notes
     -----
     ``"mpl"`` and ``"ml"`` produce the same point estimate and differ only
-    in the variance. ``"itau.mpl"`` does not compute a covariance matrix,
-    whatever ``estimate_variance`` says. A copula with no free parameters is
-    not optimised; its log-likelihood is still reported so it can take part
-    in AIC/BIC comparisons.
+    in the variance. Every method respects parameters pinned with
+    ``fix_params``: inversion keeps pinned correlations (repairing the matrix
+    around them when needed) and ``"itau.mpl"`` skips the ``df`` search when
+    ``df`` is pinned. For ``"itau.mpl"`` the correlations' standard errors are
+    those of the inversion estimator -- the correlations *are* the ``"itau"``
+    estimates -- while the ``df`` row and column of ``cov_params`` are
+    ``nan``: a variance for the second stage would have to account for the
+    first, which is not standard, and R reports no variance for this method
+    at all. A copula with no free parameters is not optimised; its
+    log-likelihood is still reported so it can take part in AIC/BIC
+    comparisons.
 
     Examples
     --------
@@ -572,7 +740,7 @@ def fit(
         return _fit_by_inversion(copula, u, method[1:], estimate_variance)
 
     if method == "itau.mpl":
-        return _fit_itau_mpl(copula, u, optim_method, estimate_variance)
+        return _fit_itau_mpl(copula, u, optim_method, estimate_variance, start)
 
     # -- mpl / ml ------------------------------------------------------
     x0 = np.asarray(start, dtype=np.float64) if start is not None else _starting_value(copula, u)
@@ -603,7 +771,7 @@ def fit(
     return CopulaFitResult(
         copula=fitted,
         params=theta,
-        param_names=tuple(np.array(copula.param_names)[free]),
+        param_names=_names(copula, np.asarray(free, dtype=bool)),
         loglik=-float(res.fun),
         n_obs=n,
         method=method,
@@ -618,6 +786,7 @@ def _fit_itau_mpl(
     u: NDArray[np.float64],
     optim_method: str | None,
     estimate_variance: bool,
+    start: ArrayLike | None = None,
 ) -> CopulaFitResult:
     """Mashal-Zeevi two-stage estimator for the t copula.
 
@@ -626,6 +795,17 @@ def _fit_itau_mpl(
     higher dimensions -- the likelihood is very flat in ``df`` once the
     correlations are even roughly right -- which is exactly the problem this
     avoids.
+
+    Parameters pinned with ``fix_params`` are respected: pinned correlations
+    keep their values, and a pinned ``df`` is not optimised at all. ``start``
+    supplies the starting ``df`` (its last element) and ``optim_method`` picks
+    the optimiser for it; with neither, a bounded Brent search over
+    ``(0.2, 200)`` is used, as R does. With ``estimate_variance`` the
+    correlations get their inversion (delta-method) covariance -- they *are*
+    the ``itau`` estimates, so that variance is exact to first order -- while
+    the ``df`` entries are ``nan``: the second stage's variance would have to
+    account for the first, which is not standard (R reports no variance here at
+    all).
     """
     if not isinstance(copula, StudentCopula):
         raise ValueError(
@@ -636,36 +816,66 @@ def _fit_itau_mpl(
             f"method='itau.mpl' requires dispstr='un', as in R; got dispstr={copula.dispstr!r}"
         )
 
-    d = copula.dim
-    stat = _pairwise_measure(u, "tau")
-    sigma = nearest_correlation(p2P(np.sin(np.pi * stat / 2.0), d))
-    corr = P2p(sigma)
+    free = np.asarray(copula.free, dtype=bool)
+    n_corr = free.size - 1
+    corr, stat = _inverted_correlations(copula, u, "tau")
 
-    def negative_loglik(x: NDArray[np.float64]) -> float:
-        value = loglik_copula(np.append(corr, x[0]), u, copula)
+    def negative_loglik(df: float) -> float:
+        value = loglik_copula(np.append(corr, df), u, copula)
         return 1e10 if not np.isfinite(value) else -value
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        res = optimize.minimize_scalar(
-            lambda df: negative_loglik(np.array([df])),
-            bounds=(0.2, 200.0),
-            method="bounded",
-            options={"xatol": 1e-8},
-        )
+    lower, upper = 0.2, 200.0
+    if not free[-1]:
+        df_hat = float(copula.df)
+        neg = negative_loglik(df_hat)
+        converged, message = True, "correlations by inverted tau; df fixed"
+    elif start is None and optim_method is None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = optimize.minimize_scalar(
+                negative_loglik, bounds=(lower, upper), method="bounded", options={"xatol": 1e-8}
+            )
+        df_hat, neg = float(res.x), float(res.fun)
+        converged = bool(res.success)
+        message = "correlations by inverted tau; df by pseudo-likelihood"
+    else:
+        if start is not None:
+            df0 = float(np.atleast_1d(np.asarray(start, dtype=np.float64))[-1])
+        else:
+            df0 = float(copula.df) if np.isfinite(copula.df) else 4.0
+        df0 = float(np.clip(df0, lower, upper))
+        method = optim_method or "Nelder-Mead"
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = optimize.minimize(
+                lambda x: negative_loglik(float(x[0])),
+                np.array([df0]),
+                method=method,
+                bounds=[(lower, upper)],
+            )
+        df_hat, neg = float(np.atleast_1d(res.x)[0]), float(res.fun)
+        converged = bool(res.success)
+        message = f"correlations by inverted tau; df by pseudo-likelihood ({method})"
 
-    params = np.append(corr, res.x)
-    fitted = copula.with_params(params)
+    full = np.append(corr, df_hat)
+    fitted = copula.with_params(full)
+
+    cov = None
+    if estimate_variance:
+        corr_cov = _correlation_cov(u, stat, "tau")
+        cov_full = np.full((free.size, free.size), np.nan)
+        if corr_cov is not None:
+            cov_full[:n_corr, :n_corr] = corr_cov
+        cov = cov_full[np.ix_(free, free)]
+
     return CopulaFitResult(
         copula=fitted,
-        params=params,
-        param_names=fitted.param_names,
-        loglik=-float(res.fun),
+        params=full[free],
+        param_names=_names(copula, free),
+        loglik=-neg,
         n_obs=u.shape[0],
         method="itau.mpl",
-        # R does not compute a variance here either: the two stages use
-        # different information and combining them is not standard.
-        cov_params=None,
-        converged=bool(res.success),
-        message="correlations by inverted tau; df by pseudo-likelihood",
+        cov_params=cov,
+        converged=converged,
+        message=message,
     )

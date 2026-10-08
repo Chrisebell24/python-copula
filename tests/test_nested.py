@@ -304,3 +304,103 @@ class TestEstimation:
         assert rebuilt.leaves() == truth.leaves()
         with pytest.raises(ValueError, match="parameters for"):
             truth.with_thetas([1.0, 2.0])
+
+
+class TestFitClipsToTheFamilyRange:
+    """A weakly dependent block can have a slightly negative sample tau.
+
+    That used to be clipped only to [-0.999, 0.999], so Gumbel's ``from_tau``
+    raised "Gumbel requires tau in [0, 1)". It is now clipped to the family's
+    attainable range and the nesting floor is applied on top.
+    """
+
+    @staticmethod
+    def _weak(family: type, inner: float) -> tuple[NestedArchimedean, np.ndarray]:
+        block = family(inner).rvs(500, random_state=1)
+        noise = np.random.default_rng(7).uniform(size=(500, 1))
+        shape = NestedArchimedean(family(inner), [2], [NestedArchimedean(family(inner), [0, 1])])
+        data = np.hstack([block, noise])
+        assert np.mean(rc.cor_kendall(data)[2, :2]) < 0  # the case that used to fail
+        return shape, data
+
+    @pytest.mark.parametrize(
+        ("family", "inner", "independence"),
+        [(rc.GumbelCopula, 3.0, 1.0), (rc.ClaytonCopula, 2.0, 0.0), (rc.JoeCopula, 2.0, 1.0)],
+    )
+    def test_a_weak_root_fits_as_independence(
+        self, family: type, inner: float, independence: float
+    ) -> None:
+        shape, data = self._weak(family, inner)
+        fitted = fit_nested(shape, data)
+        assert fitted.theta == independence
+        assert fitted.children[0].theta == pytest.approx(inner, rel=0.15)
+
+    def test_the_fitted_tree_can_still_be_sampled(self) -> None:
+        # Clayton at theta = 0 has no frailty (Gamma(1/0)); the sampler treats
+        # an independence node as the product copula it is.
+        shape, data = self._weak(rc.ClaytonCopula, 2.0)
+        fitted = fit_nested(shape, data)
+        u = fitted.rvs(4000, random_state=0)
+        tau = rc.cor_kendall(u)
+        assert abs(tau[0, 2]) < 0.05 and abs(tau[1, 2]) < 0.05
+        assert tau[0, 1] == pytest.approx(fitted.children[0].generator_copula.tau(), abs=0.05)
+
+    def test_a_material_clip_warns(self) -> None:
+        block = rc.GumbelCopula(3.0).rvs(500, random_state=1)
+        data = np.column_stack([block, 1.0 - block[:, 0]])  # strongly negative
+        shape = NestedArchimedean(
+            rc.GumbelCopula(1.5), [2], [NestedArchimedean(rc.GumbelCopula(3.0), [0, 1])]
+        )
+        with pytest.warns(UserWarning, match="attainable tau range"):
+            fitted = fit_nested(shape, data)
+        assert fitted.theta == 1.0
+
+    def test_noise_level_adjustments_are_silent(self) -> None:
+        import warnings
+
+        shape, data = self._weak(rc.GumbelCopula, 3.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            fit_nested(shape, data)
+
+    def test_a_material_nesting_floor_warns(self) -> None:
+        # The root governs (0,1) [strong] and (0,2) [independent], so it lands
+        # around tau 0.37; the child governs only (1,2) [independent]. Lifting
+        # the child to its parent's parameter keeps the tree a copula, and moves
+        # its tau far enough to be reported.
+        strong = rc.GumbelCopula(4.0).rvs(800, random_state=0)
+        noise = np.random.default_rng(0).uniform(size=800)
+        data = np.column_stack([strong[:, 0], strong[:, 1], noise])
+        shape = NestedArchimedean(
+            rc.GumbelCopula(2.0), [0], [NestedArchimedean(rc.GumbelCopula(2.0), [1, 2])]
+        )
+        with pytest.warns(UserWarning, match="nesting condition"):
+            fitted = fit_nested(shape, data)
+        assert fitted.children[0].theta == fitted.theta
+
+    def test_a_flat_bivariate_clayton_keeps_negative_dependence(self) -> None:
+        u = rc.ClaytonCopula(-0.5).rvs(2000, random_state=0)
+        fitted = fit_nested(NestedArchimedean(rc.ClaytonCopula(1.0), [0, 1]), u)
+        assert fitted.theta < -0.3
+
+    def test_a_flat_trivariate_clayton_is_clipped_at_independence(self) -> None:
+        u = rc.ClaytonCopula(-0.5).rvs(600, random_state=0)
+        noise = np.random.default_rng(3).uniform(size=(600, 1))
+        data = np.hstack([u, noise])
+        with pytest.warns(UserWarning):
+            fitted = fit_nested(NestedArchimedean(rc.ClaytonCopula(1.0), [0, 1, 2]), data)
+        assert fitted.theta == 0.0
+
+
+class TestLowestCommonAncestorValidation:
+    def test_an_unknown_leaf_is_refused(self) -> None:
+        tree = two_block(rc.GumbelCopula, 1.5, 4.0, 3.0)
+        with pytest.raises(ValueError, match=r"\[7\] are not in this tree"):
+            tree.lowest_common_ancestor(0, 7)
+        with pytest.raises(ValueError, match="not in this tree"):
+            tree.children[0].lowest_common_ancestor(0, 3)  # 3 is in the other block
+
+    def test_known_leaves_still_resolve(self) -> None:
+        tree = two_block(rc.GumbelCopula, 1.5, 4.0, 3.0)
+        assert tree.lowest_common_ancestor(0, 2) is tree.children[0]
+        assert tree.lowest_common_ancestor(1, 4) is tree

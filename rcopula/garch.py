@@ -139,7 +139,7 @@ def _neg_loglik(
 
 @dataclass(frozen=True)
 class GarchResult:
-    r"""One asset's fitted volatility model: parameters, daily volatility, forecasts.
+    r"""One asset's fitted volatility model: parameters, per-period volatility, forecasts.
 
     This is what :func:`fit_garch` returns. It tells you how volatile the
     asset is today, how volatile it is on average, how quickly a volatility
@@ -159,9 +159,9 @@ class GarchResult:
     omega : float
         Variance intercept :math:`\omega`, in squared return units.
     alpha : float
-        Reaction to yesterday's shock (ARCH coefficient), between 0 and 1.
+        Reaction to the previous period's shock (ARCH coefficient), between 0 and 1.
     beta : float
-        Weight on yesterday's variance (GARCH coefficient), between 0 and 1.
+        Weight on the previous period's variance (GARCH coefficient), between 0 and 1.
     df : float or None
         Student-t degrees of freedom of the innovations; ``None`` for normal
         innovations.
@@ -188,8 +188,8 @@ class GarchResult:
         Fitted conditional standard deviations, one per observation, in the
         units of the input returns (e.g. daily volatility for daily returns).
     resid : numpy.ndarray of float, shape (n,)
-        Standardised residuals :math:`z_t = (r_t - \mu)/\sigma_t`: each day's
-        return divided by that day's volatility. These are the input to the
+        Standardised residuals :math:`z_t = (r_t - \mu)/\sigma_t`: each period's
+        return divided by that period's volatility. These are the input to the
         copula step.
     loglik : float
         Maximised log-likelihood.
@@ -217,7 +217,7 @@ class GarchResult:
 
         Values near 1 (typical for daily equity returns: 0.97-0.99) mean a
         volatility spike fades slowly; values well below 1 mean it dies out
-        within days.
+        within a few periods.
 
         Returns
         -------
@@ -247,14 +247,23 @@ class GarchResult:
     def half_life(self) -> float:
         """Number of periods for a volatility shock to fade by half.
 
-        Computed as ``log(0.5) / log(persistence)``.
+        Computed as ``log(0.5) / log(persistence)``. The unit is one period of
+        the input data: days for daily returns, weeks for weekly returns, and
+        so on.
 
         Returns
         -------
         float
-            Half-life in periods of the input data (days for daily returns).
+            Half-life in periods of the input data. ``0.0`` when
+            ``persistence == 0`` (no persistence: a shock is gone by the next
+            period), and ``inf`` when ``persistence >= 1`` (shocks never fade).
         """
-        return float(np.log(0.5) / np.log(self.persistence))
+        p = self.persistence
+        if p <= 0.0:
+            return 0.0
+        if p >= 1.0:
+            return float("inf")
+        return float(np.log(0.5) / np.log(p))
 
     @property
     def n_params(self) -> int:
@@ -314,7 +323,7 @@ class GarchResult:
         r"""Forecast the variance (volatility squared) for each of the next periods.
 
         Use it to see how today's elevated (or depressed) volatility is
-        expected to drift back to its long-run level over the coming days.
+        expected to drift back to its long-run level over the coming periods.
 
         Parameters
         ----------
@@ -809,7 +818,7 @@ class CopulaGarch:
         Raises
         ------
         ValueError
-            If ``horizon < 1``.
+            If ``horizon < 1`` or ``n < 1``.
 
         Examples
         --------
@@ -830,6 +839,8 @@ class CopulaGarch:
         """
         if horizon < 1:
             raise ValueError(f"horizon must be >= 1, got {horizon}")
+        if n < 1:
+            raise ValueError(f"n must be >= 1, got {n}")
         rng = (
             random_state
             if isinstance(random_state, np.random.Generator)
@@ -885,7 +896,7 @@ class CopulaGarch:
         Raises
         ------
         ValueError
-            If ``horizon < 1``.
+            If ``horizon < 1`` or ``n < 1``.
 
         Examples
         --------
@@ -918,8 +929,12 @@ class CopulaGarch:
         Parameters
         ----------
         weights : array_like of float, shape (d,), optional
-            Portfolio weights, one per asset in column order (e.g. ``[0.6,
-            0.4]``); not rescaled. Equal-weighted if omitted.
+            Portfolio exposures, one per asset in column order (e.g. ``[0.6,
+            0.4]``). They are used **as given and not rescaled** to sum to 1,
+            so they can describe a leveraged, long-short or partly invested
+            book: the portfolio return is ``asset_returns @ weights``, and
+            doubling the weights doubles every statistic. Equal-weighted
+            (``1 / d`` each) if omitted.
         alpha : float, default 0.99
             Confidence level, e.g. 0.99 for a 99% VaR.
         horizon : int, default 1
@@ -941,12 +956,14 @@ class CopulaGarch:
             - ``"expected_shortfall"`` -- average loss given the VaR is
               exceeded, as a **loss**.
             - ``"mean"`` -- mean portfolio return (a return, not a loss).
-            - ``"volatility"`` -- standard deviation of the portfolio return.
+            - ``"volatility"`` -- sample standard deviation (``ddof=1``) of
+              the simulated portfolio return.
 
         Raises
         ------
         ValueError
-            If ``weights`` does not have length ``d`` or ``horizon < 1``.
+            If ``weights`` does not have length ``d``, ``horizon < 1`` or
+            ``n < 2``.
 
         Examples
         --------
@@ -973,6 +990,10 @@ class CopulaGarch:
         )
         if w.size != self.dim:
             raise ValueError(f"weights has length {w.size}, expected {self.dim}")
+        if horizon < 1:
+            raise ValueError(f"horizon must be >= 1, got {horizon}")
+        if n < 2:
+            raise ValueError(f"n must be >= 2 to estimate a volatility, got {n}")
 
         returns = self.forecast(horizon, n, random_state) @ w
         losses = -returns
@@ -980,7 +1001,7 @@ class CopulaGarch:
             "var": float(value_at_risk(losses, alpha)),
             "expected_shortfall": float(expected_shortfall(losses, alpha)),
             "mean": float(returns.mean()),
-            "volatility": float(returns.std()),
+            "volatility": float(returns.std(ddof=1)),
         }
 
     def summary(self) -> pd.DataFrame:

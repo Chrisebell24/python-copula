@@ -790,3 +790,106 @@ class TestRadialDistribution:
 
         with pytest.raises(ValueError, match=r"\[0, 1\]"):
             radial_ppf(rc.ClaytonCopula(2.0), 1.4)
+
+
+# ======================================================================
+# Portfolio regressions
+# ======================================================================
+
+
+class TestPortfolioRegressions:
+    def test_pairs_signal_holds_until_reversion(self) -> None:
+        """exit_band gives the signal memory: enter beyond `entry`, hold until back in the band."""
+        cop = rc.GaussianCopula(0.0)  # independence: h1 = u1, h2 = u2 exactly
+        u = np.array(
+            [
+                [0.03, 0.97],  # enter long
+                [0.20, 0.80],  # still cheap: hold
+                [0.35, 0.70],  # still outside [0.4, 0.6]: hold
+                [0.45, 0.70],  # h1 back inside the band: close
+                [0.50, 0.50],
+                [0.97, 0.03],  # enter short
+                [0.80, 0.20],  # hold
+                [0.03, 0.97],  # flip straight to long
+            ]
+        )
+        assert list(pairs_signal(cop, u, exit_band=0.1)) == [1, 1, 1, 0, 0, -1, -1, 1]
+        # exit_band=0 holds until the conditional crosses 0.5 itself.
+        assert list(pairs_signal(cop, u, exit_band=0.0)) == [1, 1, 1, 1, 0, -1, -1, 1]
+        # Default 0.5 is the memoryless one-row signal.
+        assert list(pairs_signal(cop, u)) == [1, 0, 0, 0, 0, -1, 0, 1]
+
+    def test_pairs_signal_rejects_bad_exit_band(self) -> None:
+        with pytest.raises(ValueError, match="exit_band"):
+            pairs_signal(rc.ClaytonCopula(2.0), np.full((3, 2), 0.5), exit_band=0.7)
+
+    def test_backtest_sharpe_uses_all_live_periods_and_counts_entries(self, monkeypatch) -> None:
+        import rcopula.portfolio as pf
+
+        rng = np.random.default_rng(0)
+        r = rng.normal(0.0, 0.01, (40, 2))
+        train = 10
+        # A fixed state sequence of h-values: enter long, hold 3, close, ... (independence copula).
+        seq = iter([(0.02, 0.98), (0.2, 0.8), (0.2, 0.8), (0.5, 0.5)] * 10)
+
+        def fake_index(copula, u):
+            h1, h2 = next(seq)
+            return np.array([h1]), np.array([h2])
+
+        monkeypatch.setattr(pf, "mispricing_index", fake_index)
+        result = pf.backtest_pairs(
+            r, rc.GaussianCopula(0.0), train=train, refit_every=100, exit_band=0.1
+        )
+        pos = result.positions
+        # Positions persist (held 3 periods), so trades = number of entries, not changes.
+        opened = int(np.sum((pos[1:] != 0) & (pos[1:] != pos[:-1])))
+        assert result.n_trades == opened
+        assert result.n_trades < int(np.sum(np.diff(pos) != 0))
+        live = result.returns[train + 1 :]
+        expected = live.mean() / live.std(ddof=1) * np.sqrt(252)
+        assert result.annualised_sharpe == pytest.approx(expected)
+
+    def test_frontier_reports_achieved_returns_by_name(self) -> None:
+        rng = np.random.default_rng(0)
+        r = np.column_stack([rng.normal(0.0004, 0.01, 2000), rng.normal(0.0010, 0.02, 2000)])
+        front = efficient_frontier(r, n_points=5)
+        assert np.allclose(front.achieved_returns, front.weights @ r.mean(axis=0))
+        mu, cvar, w = front  # still unpacks as a 3-tuple
+        assert mu is front.achieved_returns
+        assert cvar is front.cvars and w is front.weights
+
+    def test_mean_cvar_handles_20000_scenarios(self) -> None:
+        """The dense n x n identity needed 3.2 GB here; the sparse program needs ~MB."""
+        import tracemalloc
+
+        rng = np.random.default_rng(0)
+        r = rng.normal(0.0005, 0.01, (20_000, 4)) * np.array([1.0, 1.5, 2.0, 3.0])
+        tracemalloc.start()
+        w = mean_cvar_weights(r, alpha=0.95, target_return=0.0005)
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        assert abs(w.sum() - 1.0) < 1e-8
+        assert w[0] > w[3]
+        assert peak < 200e6
+
+
+class TestTransformEdges:
+    @pytest.mark.parametrize(("w", "cond"), [(1.5, 0.5), (-0.2, 0.5), (0.5, 1.2), (0.5, -1e-3)])
+    def test_conditional_ppf_rejects_values_outside_the_unit_interval(self, w, cond) -> None:
+        with pytest.raises(ValueError, match=r"must lie in \[0, 1\]"):
+            conditional_ppf(rc.ClaytonCopula(2.0), w, cond)
+
+    def test_conditional_ppf_still_accepts_the_endpoints(self) -> None:
+        out = conditional_ppf(rc.ClaytonCopula(2.0), [0.0, 1.0], [0.5, 0.5])
+        assert np.all((out > 0.0) & (out < 1.0))
+
+    def test_radial_simplex_has_a_direction_at_zero_radius(self) -> None:
+        from rcopula.transforms import radial_simplex
+
+        copula = rc.ClaytonCopula(2.0, dim=3)
+        u = np.vstack([np.ones(3), copula.rvs(5, random_state=0)])
+        radial, angular = radial_simplex(copula, u)
+        assert radial[0] == 0.0
+        assert not np.isnan(angular).any()
+        np.testing.assert_allclose(angular[0], 1 / 3)
+        np.testing.assert_allclose(angular.sum(axis=1), 1.0)

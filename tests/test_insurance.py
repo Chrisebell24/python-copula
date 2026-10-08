@@ -227,3 +227,30 @@ class TestCatastropheBond:
     def test_rejects_inverted_triggers(self) -> None:
         with pytest.raises(ValueError, match="attachment < exhaustion"):
             catastrophe_bond([1.0], 200.0, 100.0)
+
+
+class TestInsuranceRegressions:
+    def test_layer_repr_uses_limit_xs_attachment(self) -> None:
+        """Market convention: '<limit> xs <attachment>'."""
+        stat = layer_statistics(np.array([0.0, 50.0, 200.0]), 100.0, 30.0)
+        assert repr(stat).startswith("LayerStatistics(30 xs 100,")
+
+    def test_cat_bond_multiple_and_return_use_annualised_loss(self) -> None:
+        """Losses cover the whole term; the spread is annual -- compare per year."""
+        losses = aggregate_loss(
+            stats.poisson(20), stats.lognorm(1.5, scale=2000), n=40_000, random_state=0
+        )
+        one = catastrophe_bond(losses, 100_000, 200_000, maturity=1.0)
+        three = catastrophe_bond(losses, 100_000, 200_000, maturity=3.0)
+        assert three["expected_loss"] == pytest.approx(one["expected_loss"])
+        assert three["annual_expected_loss"] == pytest.approx(one["expected_loss"] / 3.0)
+        assert three["multiple"] == pytest.approx(three["spread"] / three["annual_expected_loss"])
+        assert three["expected_return"] == pytest.approx(
+            three["spread"] - three["annual_expected_loss"]
+        )
+        # Multiple and expected return tell the same story: multiple > 1 <=> return > 0.
+        assert (three["multiple"] > 1.0) == (three["expected_return"] > 0.0)
+
+    def test_cat_bond_rejects_non_positive_maturity(self) -> None:
+        with pytest.raises(ValueError, match="maturity"):
+            catastrophe_bond([1.0], 0.0, 1.0, maturity=0.0)

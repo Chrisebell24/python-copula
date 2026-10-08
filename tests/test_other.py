@@ -302,3 +302,53 @@ class TestExtremeValueDefaultConstruction:
     def test_fitting_the_bare_family_recovers_the_parameter(self, ctor: type, truth: float) -> None:
         u = ctor(truth).rvs(2000, random_state=0)
         assert rc.fit(ctor(), u, method="mpl").params[0] == pytest.approx(truth, rel=0.15)
+
+
+class TestKeywordHandling:
+    """Regression tests: keywords must be forwarded or rejected, never dropped."""
+
+    def test_plackett_from_rho_forwards_free_and_dim(self) -> None:
+        cop = rc.PlackettCopula.from_rho(0.5, free=[False])
+        assert cop.free.tolist() == [False]
+        assert cop.rho() == pytest.approx(0.5, abs=1e-10)
+        assert rc.PlackettCopula.from_rho(0.0, free=[False]).free.tolist() == [False]
+        with pytest.raises(ValueError, match="bivariate"):
+            rc.PlackettCopula.from_rho(0.5, dim=3)
+
+    @pytest.mark.parametrize("method, value", [("from_tau", 0.1), ("from_rho", 0.2)])
+    def test_fgm_calibration_forwards_free_and_dim(self, method: str, value: float) -> None:
+        cop = getattr(rc.FGMCopula, method)(value, free=[False])
+        assert cop.free.tolist() == [False]
+        with pytest.raises(ValueError, match="bivariate"):
+            getattr(rc.FGMCopula, method)(value, dim=3)
+        with pytest.raises(TypeError):
+            getattr(rc.FGMCopula, method)(value, bogus=1)
+
+    @pytest.mark.parametrize(
+        "ctor", [rc.IndependenceCopula, rc.FrechetUpperCopula, rc.FrechetLowerCopula]
+    )
+    def test_parameterless_copulas_reject_unknown_keywords(self, ctor: type) -> None:
+        with pytest.raises(TypeError):
+            ctor(dimm=3)
+        assert ctor(dim=2).dim == 2
+
+    @pytest.mark.parametrize(
+        "cop", [rc.IndependenceCopula(3), rc.FrechetUpperCopula(3), rc.FrechetLowerCopula()]
+    )
+    def test_internal_rebuilds_still_work(self, cop: rc.Copula) -> None:
+        # serialize, fix_params and marginal_copula all rebuild these copulas.
+        from rcopula.serialize import from_json, to_json
+
+        assert from_json(to_json(cop)) == cop
+        assert cop.fix_params([]) == cop
+        assert rc.marginal_copula(cop, [0, 1]).dim == 2
+
+    def test_marshall_olkin_rejects_alpha2_alongside_a_pair(self) -> None:
+        with pytest.raises(ValueError, match="already holds both"):
+            rc.MarshallOlkinCopula([0.2, 0.8], 0.5)
+        with pytest.raises(ValueError, match="scalar or the pair"):
+            rc.MarshallOlkinCopula([0.2, 0.8, 0.1])
+        cop = rc.MarshallOlkinCopula([0.2, 0.8])
+        assert cop.alpha.tolist() == [0.2, 0.8]
+        assert cop.with_params([0.3, 0.4]).alpha.tolist() == [0.3, 0.4]
+        assert rc.MarshallOlkinCopula(0.2, 0.8) == cop

@@ -528,7 +528,7 @@ def kendall_return_period(
         :func:`kendall_cdf` for supported families and dimensions).
     t : float or array_like of float, any shape
         Critical level, in copula units: the value of :math:`C(\mathbf u)` at
-        the event of interest, between 0 and 1.
+        the event of interest, in :math:`[0, 1]`.
     interval : float, default 1.0
         Mean time between observations, in whatever unit the answer should be
         in -- 1 for annual maxima. Must be positive.
@@ -537,12 +537,18 @@ def kendall_return_period(
     -------
     numpy.ndarray of float, shape (m,)
         Return periods in the units of ``interval``, one per element of ``t``
-        (flattened to 1-D). Infinite where :math:`K(t) = 1`, e.g. at ``t >= 1``.
+        (flattened to 1-D). Exactly ``inf`` where :math:`K(t) = 1` -- always
+        at ``t = 1``, an event that never happens, and possibly just below it
+        once :math:`K(t)` rounds to 1 in floating point. This is the
+        mathematically correct value, returned deliberately (no
+        divide-by-zero warning is raised for it).
 
     Raises
     ------
     ValueError
-        If ``interval`` is not positive.
+        If ``interval`` is not positive, or any ``t`` lies outside
+        :math:`[0, 1]` (or is NaN): no copula takes such a value, so there is
+        no return period to report.
     NotImplementedError
         If :func:`kendall_cdf` does not support ``copula``.
 
@@ -582,11 +588,20 @@ def kendall_return_period(
     >>> float(round(kendall_return_period(ClaytonCopula(2.0), 0.99)[0], 1))
     6689.0
     """
-    if interval <= 0.0:
+    if not interval > 0.0:
         raise ValueError(f"interval must be positive, got {interval}")
-    k = kendall_cdf(copula, t)
-    with np.errstate(divide="ignore"):
-        return np.asarray(interval / (1.0 - k))
+    levels = np.atleast_1d(np.asarray(t, dtype=np.float64)).ravel()
+    if not np.all((levels >= 0.0) & (levels <= 1.0)):
+        raise ValueError(
+            "t must lie in [0, 1]: it is a value of the copula C(u); got "
+            f"{levels[~((levels >= 0.0) & (levels <= 1.0))][:5].tolist()}"
+        )
+    exceed = 1.0 - kendall_cdf(copula, levels)
+    # P(C(U) > t) = 0 means the event never happens: an infinite return
+    # period, assigned explicitly rather than by dividing by zero.
+    out = np.full(exceed.shape, np.inf)
+    np.divide(interval, exceed, out=out, where=exceed > 0.0)
+    return out
 
 
 def return_period_level(
@@ -606,10 +621,12 @@ def return_period_level(
         The fitted dependence structure, with its parameters set (see
         :func:`kendall_cdf` for supported families and dimensions).
     period : float or array_like of float, any shape
-        Target return periods, in the units of ``interval``. Each must be
-        positive and at least ``interval``.
+        Target return periods, in the units of ``interval``. Each must be at
+        least ``interval``: no event recurs, on average, more often than
+        observations arrive. ``inf`` gives ``t = 1``.
     interval : float, default 1.0
-        Mean time between observations -- 1 for annual maxima.
+        Mean time between observations -- 1 for annual maxima. Must be
+        positive.
 
     Returns
     -------
@@ -620,9 +637,9 @@ def return_period_level(
     Raises
     ------
     ValueError
-        If any ``period`` is not positive, or is shorter than ``interval``
-        (which would need a probability below zero; the message then reads
-        "p must lie in [0, 1]").
+        If ``interval`` is not positive, any ``period`` is not positive, or
+        any ``period`` is shorter than ``interval`` (or is NaN).
+        ``period == interval`` gives ``t = 0``.
 
     Examples
     --------
@@ -633,7 +650,15 @@ def return_period_level(
     >>> bool(abs(kendall_return_period(cop, t)[0] - 100.0) < 1e-6)
     True
     """
+    if not interval > 0.0:
+        raise ValueError(f"interval must be positive, got {interval}")
     years = np.atleast_1d(np.asarray(period, dtype=np.float64))
     if np.any(years <= 0.0):
         raise ValueError("period must be positive")
+    if not np.all(years >= interval):
+        bad = years[~(years >= interval)][:5].tolist()
+        raise ValueError(
+            f"period must be at least interval={interval}: a joint event cannot recur "
+            f"more often than observations arrive; got {bad}"
+        )
     return kendall_ppf(copula, 1.0 - interval / years)

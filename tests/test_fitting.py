@@ -489,3 +489,125 @@ class TestOptimiserRobustness:
         # They use Nelder-Mead already, so the guard must not apply to them.
         result = rc.fit(template, truth.rvs(2000, random_state=0), method="mpl")
         assert float(result.params[0]) == pytest.approx(float(truth.params[0]), rel=0.15)
+
+
+class TestFreeParametersOnly:
+    """Every method reports the *estimated* parameters only, named with plain ``str``.
+
+    ``mpl``/``ml`` used to return the free parameters with ``numpy.str_`` names,
+    while ``itau``/``irho``/``itau.mpl`` returned the full vector -- parameters
+    pinned with ``fix_params`` included, and for ``itau`` overwritten or reset
+    to constructor defaults. The covariance then had fewer rows than ``params``
+    and ``summary()`` crashed.
+    """
+
+    @staticmethod
+    def _t3() -> np.ndarray:
+        return rc.StudentCopula([0.5, 0.3, 0.4], dim=3, dispstr="un", df=5).rvs(400, random_state=0)
+
+    @pytest.mark.parametrize("method", ["mpl", "ml", "itau", "irho"])
+    def test_names_are_plain_str(self, method: str) -> None:
+        u = rc.ClaytonCopula(2.0).rvs(300, random_state=0)
+        res = rc.fit(rc.ClaytonCopula(), u, method=method)
+        assert all(type(name) is str for name in res.param_names)
+        assert "np.str_" not in repr(res)
+
+    @pytest.mark.parametrize("method", ["mpl", "ml", "itau", "irho"])
+    def test_a_pinned_correlation_is_kept_and_not_reported(self, method: str) -> None:
+        u = rc.GaussianCopula([0.5, 0.3, 0.4], dim=3, dispstr="un").rvs(500, random_state=0)
+        template = rc.GaussianCopula([0.2, 0.0, 0.0], dim=3, dispstr="un").fix_params(
+            [False, True, True]
+        )
+        res = rc.fit(template, u, method=method)
+        assert res.copula.params[0] == 0.2
+        assert res.params.shape == (2,)
+        assert res.param_names == tuple(str(n) for n in template.param_names[1:])
+        assert all(type(name) is str for name in res.param_names)
+        assert res.bse is not None and res.bse.shape == (2,)
+        assert res.param_names[0] in res.summary()
+
+    def test_inversion_of_a_t_copula_with_fixed_df(self) -> None:
+        template = rc.StudentCopula(dim=3, dispstr="un", df=5, df_fixed=True)
+        res = rc.fit(template, self._t3(), method="itau")
+        assert res.copula.df == 5.0
+        assert res.param_names == tuple(str(n) for n in template.param_names[:3])
+        assert res.params.shape == res.bse.shape == (3,)
+        assert res.param_names[2] in res.summary()  # crashed: 4 params, 3 standard errors
+
+    def test_bivariate_t_inversion_keeps_df_and_structure(self) -> None:
+        """``calibrated`` rebuilt the family from defaults: df=3 came back as 4."""
+        u = rc.StudentCopula(0.6, df=3).rvs(400, random_state=0)
+        for method in ("itau", "irho"):
+            template = rc.StudentCopula(dim=2, dispstr="un", df=3, df_fixed=True)
+            res = rc.fit(template, u, method=method)
+            assert res.copula.df == 3.0
+            assert res.copula.dispstr == "un"
+            assert res.param_names == (str(template.param_names[0]),)
+            assert res.bse is not None and res.bse[0] > 0
+
+    def test_inversion_warns_that_a_free_df_is_not_estimated(self) -> None:
+        with pytest.warns(UserWarning, match="cannot estimate"):
+            res = rc.fit(rc.StudentCopula(dim=3, dispstr="un"), self._t3(), method="itau")
+        assert res.copula.df == 4.0
+        assert "df" not in res.param_names and len(res.param_names) == 3
+
+    def test_inversion_refuses_when_only_df_is_free(self) -> None:
+        u = rc.StudentCopula(0.5, df=4).rvs(200, random_state=0)
+        template = rc.StudentCopula(0.5, df=4).fix_params([False, True])
+        with pytest.raises(ValueError, match="cannot fit"):
+            rc.fit(template, u, method="itau")
+
+    def test_itau_mpl_respects_a_fixed_df(self) -> None:
+        template = rc.StudentCopula(dim=3, dispstr="un", df=7, df_fixed=True)
+        res = rc.fit(template, self._t3(), method="itau.mpl")
+        assert res.copula.df == 7.0
+        assert res.param_names == tuple(str(n) for n in template.param_names[:3])
+
+
+class TestItauMplHonoursItsArguments:
+    """``start``, ``optim_method`` and ``estimate_variance`` were silently ignored."""
+
+    @staticmethod
+    def _t3() -> np.ndarray:
+        return rc.StudentCopula([0.5, 0.3, 0.4], dim=3, dispstr="un", df=5).rvs(400, random_state=0)
+
+    def test_start_and_optim_method_drive_the_df_search(self, monkeypatch) -> None:
+        import importlib
+
+        # `rcopula.fit` is also the function, so import the module by path.
+        api = importlib.import_module("rcopula.fit.api")
+
+        calls: list[tuple[float, str]] = []
+        original = api.optimize.minimize
+
+        def spy(fun, x0, *args, **kwargs):
+            calls.append((float(np.atleast_1d(x0)[0]), kwargs.get("method")))
+            return original(fun, x0, *args, **kwargs)
+
+        monkeypatch.setattr(api.optimize, "minimize", spy)
+        u = self._t3()
+        default = rc.fit(rc.StudentCopula(dim=3, dispstr="un"), u, method="itau.mpl")
+        assert calls == []  # R's bounded search when neither is given
+        res = rc.fit(
+            rc.StudentCopula(dim=3, dispstr="un"),
+            u,
+            method="itau.mpl",
+            start=[0.5, 0.3, 0.4, 12.0],
+            optim_method="Powell",
+        )
+        assert calls == [(12.0, "Powell")]
+        assert res.copula.df == pytest.approx(default.copula.df, rel=1e-3)
+
+    def test_estimate_variance_gives_correlation_standard_errors(self) -> None:
+        u = self._t3()
+        res = rc.fit(rc.StudentCopula(dim=3, dispstr="un"), u, method="itau.mpl")
+        assert res.bse is not None and res.bse.shape == (4,)
+        assert np.all(res.bse[:3] > 0)
+        assert np.isnan(res.bse[3])  # df: not standard, as R
+        # The correlations are the itau estimates, so their errors agree too.
+        itau = rc.fit(rc.StudentCopula(dim=3, dispstr="un", df_fixed=True), u, method="itau")
+        assert np.allclose(res.bse[:3], itau.bse)
+        quiet = rc.fit(
+            rc.StudentCopula(dim=3, dispstr="un"), u, method="itau.mpl", estimate_variance=False
+        )
+        assert quiet.cov_params is None

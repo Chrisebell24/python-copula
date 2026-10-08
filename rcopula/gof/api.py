@@ -45,8 +45,9 @@ from numpy.typing import ArrayLike, NDArray
 from rcopula.core.base import Copula
 from rcopula.dependence import pseudo_obs
 from rcopula.fit import fit
+from rcopula.fit.api import METHODS
 from rcopula.fit.variance import mpl_influence
-from rcopula.gof.statistics import empirical_copula_at, gof_statistic
+from rcopula.gof.statistics import STATISTICS, empirical_copula_at, gof_statistic
 
 __all__ = ["GofResult", "gof_test", "gof_two_sample"]
 
@@ -124,17 +125,29 @@ def _empirical_partials(u: NDArray[np.float64]) -> NDArray[np.float64]:
     return out
 
 
+def _at_free(fitted: Copula, theta: NDArray[np.float64]) -> Copula:
+    """``fitted`` with its *free* parameters replaced by ``theta``.
+
+    :func:`~rcopula.fit` reports the free parameters only, so a copula with
+    some parameters pinned by ``fix_params`` needs them re-inserted before
+    ``with_params``, which takes the full vector.
+    """
+    full = np.array(fitted.params, dtype=np.float64)
+    full[np.asarray(fitted.free, dtype=bool)] = theta
+    return fitted.with_params(full)
+
+
 def _cdf_gradient(
     copula: Copula, u: NDArray[np.float64], theta: NDArray[np.float64]
 ) -> NDArray[np.float64]:
-    r""":math:`\partial C_\theta(u)/\partial\theta` at each data point."""
+    r""":math:`\partial C_\theta(u)/\partial\theta` at each data point (free parameters)."""
     cols = []
     for j in range(theta.size):
         h = 1e-5 * max(abs(theta[j]), 1.0)
         hi, lo = theta.copy(), theta.copy()
         hi[j] += h
         lo[j] -= h
-        cols.append((copula.with_params(hi).cdf(u) - copula.with_params(lo).cdf(u)) / (2 * h))
+        cols.append((_at_free(copula, hi).cdf(u) - _at_free(copula, lo).cdf(u)) / (2 * h))
     return np.column_stack(cols)
 
 
@@ -185,9 +198,9 @@ def _multiplier_bootstrap(
 
     cn = empirical_copula_at(u)
     partials = _empirical_partials(u)
-    grad = _cdf_gradient(template, u, theta)
+    grad = _cdf_gradient(fitted, u, theta)
 
-    influence, hessian = mpl_influence(lambda uu, t: template.with_params(t).logpdf(uu), u, theta)
+    influence, hessian = mpl_influence(lambda uu, t: _at_free(fitted, t).logpdf(uu), u, theta)
     h_inv = np.linalg.inv(hessian)
 
     # indicator[j, i] = 1 if observation i lies below evaluation point j.
@@ -272,7 +285,9 @@ def gof_test(
     ValueError
         If ``simulation`` is not ``"pb"`` or ``"mult"``, if
         ``simulation="mult"`` is combined with a ``method`` other than ``"Sn"``,
-        or if ``method`` is not a recognised statistic.
+        if ``method`` is not a recognised statistic, or if ``estim_method`` is
+        not a :func:`~rcopula.fit` method. All of these are checked before
+        anything is fitted.
 
     Notes
     -----
@@ -302,8 +317,14 @@ def gof_test(
     >>> bool(fast.pvalue < 0.05)
     True
     """
+    # Validate everything before the (possibly slow) fit, so a typo costs
+    # nothing rather than a full estimation first.
     if simulation not in ("pb", "mult"):
         raise ValueError(f"simulation must be 'pb' or 'mult', got {simulation!r}")
+    if method not in STATISTICS:
+        raise ValueError(f"method must be one of {STATISTICS}, got {method!r}")
+    if estim_method not in METHODS:
+        raise ValueError(f"estim_method must be one of {METHODS}, got {estim_method!r}")
     if simulation == "mult" and method != "Sn":
         raise ValueError(
             "the multiplier bootstrap is implemented for method='Sn' only; "
@@ -333,7 +354,9 @@ def gof_test(
             copula, result.copula, u, method, estim_method, n_rep, rng
         )
     else:
-        replicates = _multiplier_bootstrap(copula, result.copula, u, result.params, n_rep, rng)
+        fitted = result.copula
+        theta = np.asarray(fitted.params, dtype=np.float64)[np.asarray(fitted.free, dtype=bool)]
+        replicates = _multiplier_bootstrap(copula, fitted, u, theta, n_rep, rng)
 
     return GofResult(
         statistic=observed,
@@ -387,8 +410,9 @@ def gof_two_sample(
     random_state : int, numpy.random.Generator or None, default None
         Seed or generator, for reproducible p-values.
     ties_method : str, default "average"
-        How tied values are ranked when computing the observed statistic;
-        passed to :func:`~rcopula.pseudo_obs`.
+        How tied values are ranked; passed to :func:`~rcopula.pseudo_obs` for
+        the observed statistic and for every permutation replicate alike, so
+        the null is built the same way as the statistic it calibrates.
 
     Returns
     -------
@@ -479,8 +503,8 @@ def gof_two_sample(
         # Measured before the fix: 0% rejection at a nominal 5%.
         shuffled = pooled[rng.permutation(n + m)]
         replicates[b] = statistic(
-            np.asarray(pseudo_obs(shuffled[:n]), dtype=np.float64),
-            np.asarray(pseudo_obs(shuffled[n:]), dtype=np.float64),
+            np.asarray(pseudo_obs(shuffled[:n], ties_method=ties_method), dtype=np.float64),
+            np.asarray(pseudo_obs(shuffled[n:], ties_method=ties_method), dtype=np.float64),
         )
 
     return GofResult(

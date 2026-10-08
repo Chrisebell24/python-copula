@@ -28,6 +28,7 @@ Joe, H. (2014). *Dependence Modeling with Copulas*. Chapman & Hall/CRC.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
@@ -37,6 +38,24 @@ from numpy.typing import ArrayLike, NDArray
 from rcopula.core.base import Copula
 
 __all__ = ["CopulaDistribution", "Margin"]
+
+
+def _margin_list(margins: Any, dim: int) -> list[Any]:
+    """Turn the ``margins`` argument into a list of ``dim`` margin objects.
+
+    Anything that already looks like a margin (has ``cdf``) is one margin, to
+    be repeated. Otherwise any non-string sequence -- list, tuple, object
+    ``ndarray``, ``pandas.Series`` -- is taken as one margin per variable.
+    An ndarray used to fall through to the "single margin" branch and be
+    repeated ``dim`` times as a whole, which then failed confusingly.
+    """
+    if hasattr(margins, "cdf") or isinstance(margins, (str, bytes)):
+        return [margins] * dim
+    if isinstance(margins, np.ndarray):
+        return list(margins.ravel()) if margins.ndim <= 1 else [margins] * dim
+    if isinstance(margins, Iterable):
+        return list(margins)
+    return [margins] * dim
 
 
 @runtime_checkable
@@ -85,15 +104,19 @@ class CopulaDistribution:
     copula : Copula
         The dependence structure, e.g. ``ClaytonCopula(2.0, dim=2)``. Must be
         fully specified (no ``nan`` parameters) before evaluating or sampling.
-    margins : Margin or list of Margin
+    margins : Margin or sequence of Margin
         One distribution per variable, in column order, typically scipy frozen
-        distributions such as ``stats.norm(loc=1, scale=2)``. A list or tuple
-        must have exactly ``copula.dim`` entries; a single distribution is used
-        for every variable. Each margin needs ``cdf``, ``ppf`` and either
+        distributions such as ``stats.norm(loc=1, scale=2)``. Any sequence --
+        a list, a tuple, a 1-D object ``numpy.ndarray``, a ``pandas.Series``
+        -- must have exactly ``copula.dim`` entries; a single distribution is
+        used for every variable. Each margin needs ``cdf``, ``ppf`` and either
         ``pdf`` (continuous) or ``pmf`` (discrete).
     names : list of str or None, default None
         Column names, length ``copula.dim``. When given, :meth:`rvs` returns a
-        ``pandas.DataFrame`` with these columns instead of an array.
+        ``pandas.DataFrame`` with these columns instead of an array, and a
+        ``DataFrame`` passed to :meth:`cdf`, :meth:`pdf`, :meth:`logpdf` or
+        :meth:`marginal_cdf` is read by these column labels (so its columns
+        may be in any order, and extra columns are ignored).
 
     Attributes
     ----------
@@ -116,6 +139,12 @@ class CopulaDistribution:
         lacks the required methods.
     ValueError
         If the number of margins or names does not match ``copula.dim``.
+
+    Notes
+    -----
+    How a ``pandas.DataFrame`` input is read: with ``names`` set, columns are
+    selected by label and a missing label is an error; without ``names``,
+    columns are taken by position.
 
     Examples
     --------
@@ -159,13 +188,13 @@ class CopulaDistribution:
     def __init__(
         self,
         copula: Copula,
-        margins: Margin | list[Margin],
+        margins: Margin | Sequence[Margin] | NDArray[Any],
         names: list[str] | None = None,
     ) -> None:
         if not isinstance(copula, Copula):
             raise TypeError(f"copula must be a Copula instance, got {type(copula).__name__}")
 
-        marg = list(margins) if isinstance(margins, (list, tuple)) else [margins] * copula.dim
+        marg = _margin_list(margins, copula.dim)
         if len(marg) != copula.dim:
             raise ValueError(f"got {len(marg)} margin(s) for a copula of dimension {copula.dim}")
         for j, m in enumerate(marg):
@@ -205,8 +234,20 @@ class CopulaDistribution:
     # ------------------------------------------------------------------
 
     def _validate_x(self, x: ArrayLike) -> NDArray[np.float64]:
-        frame = x if isinstance(x, pd.DataFrame) else None
-        arr = np.asarray(frame.to_numpy() if frame is not None else x, dtype=np.float64)
+        if isinstance(x, pd.DataFrame):
+            if self.names is not None:
+                missing = [name for name in self.names if name not in x.columns]
+                if missing:
+                    raise ValueError(
+                        f"the DataFrame has no column(s) {missing}; this distribution's "
+                        f"variables are named {self.names}. Rename the columns, or pass "
+                        "x.to_numpy() to use them by position"
+                    )
+                arr = np.asarray(x.loc[:, list(self.names)].to_numpy(), dtype=np.float64)
+            else:
+                arr = np.asarray(x.to_numpy(), dtype=np.float64)
+        else:
+            arr = np.asarray(x, dtype=np.float64)
         if arr.ndim == 1:
             arr = arr.reshape(1, -1)
         if arr.shape[1] != self.dim:
@@ -231,8 +272,9 @@ class CopulaDistribution:
         ----------
         x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
             Points on the original scale of the variables, one row per point.
-            A 1-D input is treated as a single point. A DataFrame is used by
-            column position, not by name.
+            A 1-D input is treated as a single point. A DataFrame is read by
+            the column labels in :attr:`names` when those are set, otherwise by
+            column position.
 
         Returns
         -------
@@ -242,7 +284,8 @@ class CopulaDistribution:
         Raises
         ------
         ValueError
-            If ``x`` does not have ``d`` columns, or the copula is unfitted.
+            If ``x`` does not have ``d`` columns, a DataFrame lacks one of
+            :attr:`names`, or the copula is unfitted.
         """
         return self.copula.cdf(self._to_uniform(self._validate_x(x)))
 
@@ -256,7 +299,8 @@ class CopulaDistribution:
         ----------
         x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
             Points on the original scale of the variables, one row per point.
-            A 1-D input is treated as a single point.
+            A 1-D input is treated as a single point. DataFrames are read as
+            for :meth:`cdf`.
 
         Returns
         -------
@@ -300,7 +344,8 @@ class CopulaDistribution:
         ----------
         x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
             Points on the original scale of the variables, one row per point.
-            A 1-D input is treated as a single point.
+            A 1-D input is treated as a single point. DataFrames are read as
+            for :meth:`cdf`.
 
         Returns
         -------
@@ -383,7 +428,8 @@ class CopulaDistribution:
         Parameters
         ----------
         x : array_like of float or pandas.DataFrame, shape (n, d) or (d,)
-            Points on the original scale, one row per point.
+            Points on the original scale, one row per point. DataFrames are
+            read as for :meth:`cdf`.
 
         Returns
         -------

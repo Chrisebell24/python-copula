@@ -41,8 +41,8 @@ Joe, H. (2014). *Dependence Modeling with Copulas*. Chapman & Hall/CRC.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Sequence
-from typing import Any, cast
 
 import numpy as np
 
@@ -61,7 +61,8 @@ def marginal_copula(copula: Copula, indices: Sequence[int]) -> Copula:
     larger fitted model. Nothing is re-estimated: the result is read off the
     existing parameters.
 
-    Supported inputs: Archimedean families (same parameter, fewer
+    Supported inputs: Archimedean families (same parameters -- all of them,
+    for a multi-parameter subclass -- and the same class, fewer
     dimensions), Gaussian and Student-t copulas (the sub-matrix of the
     correlation), independence and comonotonicity, and the structural
     wrappers -- :class:`~rcopula.structural.RotatedCopula`,
@@ -169,12 +170,15 @@ def marginal_copula(copula: Copula, indices: Sequence[int]) -> Copula:
         return type(copula)(dim=size)
 
     if isinstance(copula, ArchimedeanCopula):
-        # Exchangeable, so only the dimension changes. Rebuilding through the
-        # *concrete* class matters: ArchimedeanCopula(generator, ...) would work
-        # but returns a copula whose type is no longer ClaytonCopula, which
-        # breaks isinstance checks and the serialization registry.
-        builder = cast("Any", type(copula))
-        return cast("Copula", builder(float(copula.params[0]), dim=size))
+        # Exchangeable, so only the dimension changes. Rebuild through the
+        # copula's *own* _reconstruct, on a shallow copy whose dimension is the
+        # margin's: that keeps the concrete class (ClaytonCopula stays a
+        # ClaytonCopula, which isinstance checks and the serialization registry
+        # need), keeps a user-supplied generator, and passes the *full*
+        # parameter vector and free mask -- so a multi-parameter subclass loses
+        # nothing -- while the real constructor re-validates the parameters
+        # against the new dimension's bounds.
+        return _with_dim(copula, size)
 
     if isinstance(copula, EllipticalCopula):
         block = np.asarray(copula.sigma())[np.ix_(chosen, chosen)]
@@ -233,3 +237,15 @@ def marginal_copula(copula: Copula, indices: Sequence[int]) -> Copula:
         "else the margin is generally not in the same family -- fit the "
         "sub-copula to data[:, indices] instead."
     )
+
+
+def _with_dim(copula: Copula, size: int) -> Copula:
+    """Rebuild an exchangeable copula in dimension ``size``, keeping every parameter.
+
+    The family's ``_reconstruct`` builds the copy through the real constructor
+    using ``self._dim``; running it on a shallow copy with ``_dim`` changed is
+    the documented reconstruction path with only the dimension swapped.
+    """
+    template = copy.copy(copula)
+    template._dim = size
+    return template._reconstruct(np.array(copula.params, dtype=np.float64), copula.free)

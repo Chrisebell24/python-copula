@@ -446,6 +446,26 @@ class ArchimedeanGenerator(ABC):
         # imprecise.
         return float(np.clip(12.0 * integral - 3.0, -1.0, 1.0))
 
+    def _attained_at_bound(self, func: Any, target: float, dim: int) -> float | None:
+        """A finite bound of theta whose measure is exactly ``target``, if any.
+
+        The bracket search only looks strictly inside the theta range, so a
+        target sitting *on* a bound -- tau = 0 for Joe or Gumbel, whose
+        independence point is the lower bound theta = 1 -- used to be reported
+        as unattainable.
+        """
+        for bound in self.bounds(dim):
+            if not np.isfinite(bound):
+                continue
+            try:
+                with np.errstate(all="ignore"):
+                    value = float(func(bound))
+            except (ZeroDivisionError, ValueError, FloatingPointError):
+                continue
+            if np.isfinite(value) and abs(value - target) <= 1e-12:
+                return float(bound)
+        return None
+
     def _bracket(
         self, func: Callable[[float], float], target: float, dim: int
     ) -> tuple[float, float]:
@@ -531,6 +551,9 @@ class ArchimedeanGenerator(ABC):
         The generic implementation is a bracketed root-find on the monotone
         ``tau(theta)`` curve; families with a closed form override it.
         """
+        edge = self._attained_at_bound(self.tau, tau, dim)
+        if edge is not None:
+            return edge
         a, b = self._bracket(self.tau, tau, dim)
         return float(brentq(lambda th: self.tau(th) - tau, a, b, xtol=1e-14, rtol=8.9e-16))
 
@@ -561,6 +584,9 @@ class ArchimedeanGenerator(ABC):
         evaluation of ``rho`` is a 256x256 quadrature for families without a
         closed form, so this is slower than :meth:`itau`.
         """
+        edge = self._attained_at_bound(self.rho, rho, dim)
+        if edge is not None:
+            return edge
         a, b = self._bracket(self.rho, rho, dim)
         return float(brentq(lambda th: self.rho(th) - rho, a, b, xtol=1e-12, rtol=8.9e-16))
 
@@ -615,6 +641,12 @@ class _ClaytonGenerator(ArchimedeanGenerator):
     def itau(self, tau, dim=2):
         if not -1.0 <= tau < 1.0:
             raise ValueError(f"Clayton requires tau in [-1, 1), got {tau}")
+        if dim > 2 and tau < 0.0:
+            # theta < 0 is only a valid (2-monotone) generator in two dimensions.
+            raise ValueError(
+                f"Clayton in dimension {dim} requires tau in [0, 1), got {tau}; "
+                "negative dependence is only attainable for dim=2"
+            )
         return 2.0 * tau / (1.0 - tau)
 
     def lambda_(self, theta):
@@ -904,22 +936,51 @@ class _FrankGenerator(ArchimedeanGenerator):
     def lambda_(self, theta):
         return TailDependence(lower=0.0, upper=0.0)
 
-    def itau(self, tau, dim=2):
-        if not -1.0 < tau < 1.0:
-            raise ValueError(f"Frank requires tau in (-1, 1), got {tau}")
-        if tau == 0.0:
+    #: Largest ``|theta|`` searched by :meth:`itau` / :meth:`irho`. Frank's tau
+    #: approaches 1 like ``1 - 4/theta`` (rho like ``1 - 6/theta``), so this
+    #: reaches ``|tau|`` within about ``4e-12`` of 1 -- far beyond anything a
+    #: sample can estimate -- while every quantity involved stays finite.
+    _INVERSION_THETA_MAX = 1e12
+
+    def _invert(
+        self, measure: Callable[[float], float], target: float, label: str, dim: int
+    ) -> float:
+        """Root-find ``measure(theta) = target`` over the family's full range."""
+        if not -1.0 < target < 1.0:
+            raise ValueError(f"Frank requires {label} in (-1, 1), got {target}")
+        if dim > 2 and target < 0.0:
+            raise ValueError(
+                f"Frank in dimension {dim} requires {label} in [0, 1), got {target}; "
+                "negative dependence is only attainable for dim=2"
+            )
+        if target == 0.0:
             return 0.0
-        lo, hi = (1e-12, 1e3) if tau > 0 else (-1e3, -1e-12)
-        return float(brentq(lambda th: self.tau(th) - tau, lo, hi, xtol=1e-14, rtol=8.9e-16))
+        edge = self._INVERSION_THETA_MAX
+        lo, hi = (1e-12, edge) if target > 0 else (-edge, -1e-12)
+        extreme = measure(hi if target > 0 else lo)
+        if abs(target) >= abs(extreme):
+            raise ValueError(
+                f"{label} = {target} is too close to {'+' if target > 0 else '-'}1 to be "
+                f"attained by the Frank family (the most extreme {label} it reaches in "
+                f"floating point, at |theta| = {edge:g}, is {extreme!r})"
+            )
+        return float(brentq(lambda th: measure(th) - target, lo, hi, xtol=1e-14, rtol=8.9e-16))
+
+    def itau(self, tau, dim=2):
+        """Invert Kendall's tau for Frank, searching ``|theta|`` up to ``1e12``.
+
+        Raises a ``ValueError`` naming the limit when ``tau`` is so close to
+        ``+-1`` that no representable ``theta`` reaches it, and when a negative
+        ``tau`` is asked for with ``dim > 2``.
+        """
+        return self._invert(self.tau, tau, "tau", dim)
 
     def irho(self, rho: float, dim: int = 2) -> float:
-        """Invert Spearman's rho for Frank, using its closed-form Debye expression."""
-        if not -1.0 < rho < 1.0:
-            raise ValueError(f"Frank requires rho in (-1, 1), got {rho}")
-        if rho == 0.0:
-            return 0.0
-        lo, hi = (1e-12, 1e3) if rho > 0 else (-1e3, -1e-12)
-        return float(brentq(lambda th: self.rho(th) - rho, lo, hi, xtol=1e-14, rtol=8.9e-16))
+        """Invert Spearman's rho for Frank, using its closed-form Debye expression.
+
+        Same search range and errors as :meth:`itau`.
+        """
+        return self._invert(self.rho, rho, "rho", dim)
 
     def rvs_frailty(self, size, theta, rng):
         # log(1 - p) is exactly -theta; pass it, because 1 - e^{-theta}
@@ -1077,9 +1138,11 @@ class _AMHGenerator(ArchimedeanGenerator):
         interval, so an optimiser walks straight into it.
         """
         z = theta * np.exp(-t)
-        # For theta < 0 both (1-theta) e^{-t} and Li_{-d}(z)/z can carry signs
-        # that cancel. Take the absolute value of the *product*, not of each
-        # factor: logging a negative polylog gives nan.
+        # (1 - theta) e^{-t} is positive for every admissible theta < 1, so its
+        # log is taken directly. Only Li_{-d}(z)/z can change sign -- for
+        # theta < 0, where z < 0 and the Eulerian polynomial may be negative --
+        # and _log_polylog_neg_int_over_z already returns the log of its
+        # absolute value, so no nan arises from logging a negative polylog.
         return np.log1p(-theta) - t + _log_polylog_neg_int_over_z(z, d)
 
     def tau(self, theta):
@@ -1139,7 +1202,7 @@ def _gumbel_poly_coefs(d: int, alpha: float) -> NDArray[np.float64]:
 def _polylog_neg_int(
     z: NDArray[np.float64], n: int, one_minus_z: NDArray[np.float64] | None = None
 ) -> NDArray[np.float64]:
-    r"""``Li_{-n}(z)`` for integer ``n >= 0`` and ``0 < z < 1``.
+    r"""``Li_{-n}(z)`` for integer ``n >= 0`` and real ``z < 1``.
 
     Uses the Eulerian-number closed form
 
@@ -1151,10 +1214,17 @@ def _polylog_neg_int(
     with :math:`\mathrm{Li}_0(z) = z/(1-z)`. This turns what would be an
     infinite sum into a degree-``n`` polynomial.
 
+    The rational closed form is the analytic continuation of the series
+    :math:`\sum_{k \ge 1} k^n z^k`, so it is valid for every real ``z < 1``,
+    not only inside the unit disc: the Frank generator with ``theta < 0``
+    evaluates it at negative ``z`` of arbitrarily large magnitude, and AMH with
+    ``theta < 0`` at ``z`` in ``(-1, 0)``. For ``z < 0`` the value can be
+    negative, depending on ``n``.
+
     Parameters
     ----------
     z : ndarray
-        Argument in ``(0, 1)``.
+        Argument, any real value below 1.
     n : int
         Non-negative order.
     one_minus_z : ndarray, optional
@@ -1475,7 +1545,12 @@ class ArchimedeanCopula(Copula):
         Returns
         -------
         numpy.ndarray of float, same shape as ``t``
-            Generator values in ``[0, 1]``. ``nan`` if ``theta`` is unset.
+            Generator values in ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is ``nan`` (not yet set), as for :meth:`tau`.
 
         Examples
         --------
@@ -1484,6 +1559,7 @@ class ArchimedeanCopula(Copula):
         >>> c.psi([0.0, 1.0]).tolist()
         [1.0, 0.5]
         """
+        self._require_specified()
         return self.generator.psi(np.asarray(t, dtype=np.float64), self.theta)
 
     def ipsi(self, u: ArrayLike) -> NDArray[np.float64]:
@@ -1499,7 +1575,12 @@ class ArchimedeanCopula(Copula):
         Returns
         -------
         numpy.ndarray of float, same shape as ``u``
-            Non-negative values. ``nan`` if ``theta`` is unset.
+            Non-negative values.
+
+        Raises
+        ------
+        ValueError
+            If ``theta`` is ``nan`` (not yet set), as for :meth:`tau`.
 
         Examples
         --------
@@ -1508,6 +1589,7 @@ class ArchimedeanCopula(Copula):
         >>> c.ipsi([1.0, 0.5]).tolist()
         [0.0, 1.0]
         """
+        self._require_specified()
         return self.generator.ipsi(np.asarray(u, dtype=np.float64), self.theta)
 
 

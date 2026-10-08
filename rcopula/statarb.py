@@ -9,10 +9,12 @@ rule is not a preliminary to the strategy -- for a copula strategy it largely
 
 ===================  =========================================================
 ``distance``         Sum of squared deviations between normalised cumulative
-                     returns. The classic (Gatev et al.), and it selects for
-                     *level* agreement, which is not what a copula uses.
-``pearson``          Linear correlation. Included to be argued with: it is not
-                     invariant to the marginal transforms a copula discards.
+                     returns (raw values, not ranks). The classic (Gatev et
+                     al.), and it selects for *level* agreement, which is not
+                     what a copula uses.
+``pearson``          Linear correlation of the raw values. Included to be
+                     argued with: it is not invariant to the marginal
+                     transforms a copula discards.
 ``spearman``         Rank correlation. Cheap, and close to ``kendall``.
 ``kendall``          Rank correlation, concordance-based.
 ``tail``             Lower-tail dependence, estimated nonparametrically. Picks
@@ -43,8 +45,16 @@ set first, exactly as Stübinger, Mangold and Krauss do.
                      :func:`select_partners` about what this is and is not.
 ===================  =========================================================
 
-Everything here works on **ranks**, which is the point: a copula does not see
-the margins, so neither should the rule that chooses its inputs.
+Almost everything here works on **ranks**, which is the point: a copula does
+not see the margins, so neither should the rule that chooses its inputs. The
+two exceptions are deliberate and are the conventional definitions of those
+rules: ``distance`` works on the raw values (it treats each column as a
+return series, cumulates it into a price path and normalises that path, as
+Gatev et al. do with normalised prices), and ``pearson`` is the linear
+correlation of the raw values. Ranking first would turn them into different
+rules -- ``pearson`` on ranks *is* ``spearman`` -- so they are kept as the
+literature defines them, as baselines to compare the rank-based rules with.
+Every partner-selection rule uses ranks.
 
 ============================  ================================================
 :func:`select_pairs`          Rank every pair by one of six criteria.
@@ -424,7 +434,8 @@ def select_pairs(
         measures. ``"distance"`` and ``"pearson"`` use the raw values; the
         others use ranks.
     top : int or None, default None, keyword-only
-        Keep only the best ``top`` pairs. ``None`` (or 0) keeps all
+        Keep only the best ``top`` pairs (a non-negative integer; ``0``
+        returns an empty frame with the usual columns). ``None`` keeps all
         ``k(k-1)/2``.
     names : list of str or None, default None, keyword-only
         Column names to use when ``data`` is a plain array (length ``k``).
@@ -447,15 +458,15 @@ def select_pairs(
     Raises
     ------
     ValueError
-        If ``method`` is not one of the six names, or ``data`` has fewer than
-        two columns.
+        If ``method`` is not one of the six names, ``data`` has fewer than
+        two columns, or ``top`` is negative or not an integer.
 
     Notes
     -----
-    Cost is :math:`O(k^2)` pairs, each :math:`O(n\\log n)` for ``kendall`` and
-    :math:`O(n)` otherwise. Five hundred names is 124,750 pairs and takes a
-    couple of minutes on ``kendall``; screen with ``spearman`` first if that
-    matters, since the two rank nearly the same candidates.
+    Cost is :math:`O(k^2)` pairs, each :math:`O(n)` for most rules. For
+    ``kendall`` the whole matrix is computed at once by
+    :func:`~rcopula.cor_kendall`, which for hundreds of names is seconds rather
+    than the minutes that separate pairwise calls would take.
 
     Examples
     --------
@@ -486,28 +497,61 @@ def select_pairs(
     frame = _frame(data, names)
     if frame.shape[1] < 2:
         raise ValueError(f"need at least 2 columns to form a pair, got {frame.shape[1]}")
+    if top is not None and (
+        isinstance(top, bool) or not isinstance(top, int | np.integer) or top < 0
+    ):
+        raise ValueError(f"top must be a non-negative integer or None, got {top!r}")
     values = frame.to_numpy(dtype=float)
     ranks = _ranks(frame)
     columns = list(frame.columns)
 
+    # Kendall's tau for every pair at once: identical to the pairwise values,
+    # and far faster than k(k-1)/2 separate calls.
+    kendall = None
+    if method == "kendall":
+        from rcopula.dependence import cor_kendall
+
+        kendall = np.asarray(cor_kendall(ranks))
+
     rows = []
     for i, j in itertools.combinations(range(len(columns)), 2):
-        rows.append(
-            {
-                "first": columns[i],
-                "second": columns[j],
-                "score": _pair_score(method, values[:, [i, j]], ranks[:, [i, j]]),
-            }
+        score = (
+            float(kendall[i, j])
+            if kendall is not None
+            else _pair_score(method, values[:, [i, j]], ranks[:, [i, j]])
         )
+        rows.append({"first": columns[i], "second": columns[j], "score": score})
     out = pd.DataFrame(rows).sort_values("score", ascending=False).reset_index(drop=True)
     out["rank"] = np.arange(1, len(out) + 1)
     out.attrs["method"] = method
-    return out.head(top) if top else out
+    return out if top is None else out.head(int(top))
 
 
 # --------------------------------------------------------------------------
 # partner selection
 # --------------------------------------------------------------------------
+
+
+def _resolve_column(columns: list[Any], target: Any) -> Any:
+    """The column label ``target`` refers to: a label first, then a position."""
+    matches = [label for label in columns if _same_label(label, target)]
+    if matches:
+        return matches[0]
+    if isinstance(target, int | np.integer) and not isinstance(target, bool | np.bool_):
+        position = int(target)
+        if not 0 <= position < len(columns):
+            raise ValueError(
+                f"target position {position} is out of range for {len(columns)} columns"
+            )
+        return columns[position]
+    raise ValueError(f"target {target!r} is not a column; have {columns[:8]}...")
+
+
+def _same_label(label: Any, target: Any) -> bool:
+    try:
+        return bool(label == target) and type(label) is not bool and type(target) is not bool
+    except (TypeError, ValueError):
+        return False
 
 
 def _partner_score(method: str, block: NDArray[np.float64]) -> float:
@@ -551,10 +595,11 @@ def select_partners(
     data : pandas.DataFrame or array_like of float, shape (n, k)
         Returns, one row per period and one column per instrument. Needs at
         least ``n_partners + 1`` columns.
-    target : str or int
-        The column to find partners for: a column label, or (if an ``int``)
-        its position. Note that a Python ``int`` is always read as a
-        position, even if the DataFrame has integer column labels.
+    target : str, int or other column label
+        The column to find partners for. It is first looked up as a column
+        label -- so with integer column labels an ``int`` names the label --
+        and only if it is not a label is an integer (Python or NumPy) read as
+        a position, ``0 <= target < k``.
     method : {"traditional", "extended", "geometric", "extremal"}, default "extended", keyword-only
         How a candidate group is scored: ``"traditional"`` sums the pairwise
         Spearman correlations, ``"extended"`` uses
@@ -591,9 +636,9 @@ def select_partners(
     Raises
     ------
     ValueError
-        If ``method`` is not one of the four names, ``target`` is not a
-        column, ``n_partners < 1``, or there are fewer than ``n_partners``
-        columns besides the target.
+        If ``method`` is not one of the four names, ``target`` is neither a
+        column label nor a valid position, ``n_partners < 1``, or there are
+        fewer than ``n_partners`` columns besides the target.
 
     Notes
     -----
@@ -634,10 +679,7 @@ def select_partners(
         raise ValueError(f"method must be one of {PARTNER_METHODS}, got {method!r}")
     frame = _frame(data, names)
     columns = list(frame.columns)
-    if isinstance(target, int):
-        target = columns[target]
-    if target not in columns:
-        raise ValueError(f"target {target!r} is not a column; have {columns[:8]}...")
+    target = _resolve_column(columns, target)
     if n_partners < 1:
         raise ValueError(f"n_partners must be at least 1, got {n_partners}")
     others = [c for c in columns if c != target]

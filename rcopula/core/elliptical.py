@@ -43,6 +43,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.linalg import cho_factor, cho_solve, toeplitz
+from scipy.optimize import brentq
 from scipy.special import gammaln, ndtr, ndtri
 from scipy.stats import t as student_t
 
@@ -170,6 +171,20 @@ def _build_sigma(rho: NDArray[np.float64], dispstr: str, dim: int) -> NDArray[np
     if dispstr == "toep":
         return toeplitz(np.concatenate([[1.0], rho]))
     return p2P(rho, dim)
+
+
+def _equicorrelation(value: float, dim: int, kwargs: dict[str, Any]) -> NDArray[np.float64]:
+    """Correlation parameters giving *every* pair the correlation ``value``.
+
+    Used by ``from_tau`` / ``from_rho``: a single target pins down a single
+    correlation, so for the multi-parameter structures (``"toep"`` with
+    ``d - 1`` values, ``"un"`` with ``d (d - 1) / 2``) it is repeated --
+    the exchangeable matrix, expressed in that structure. ``"ex"`` and
+    ``"ar1"`` take the one value as it is (for ``"ar1"`` that is the lag-1
+    correlation; pairs further apart get its powers).
+    """
+    dispstr = str(kwargs.get("dispstr", "ex"))
+    return np.full(_n_corr_params(dispstr, int(dim)), float(value))
 
 
 class EllipticalCopula(Copula):
@@ -421,9 +436,10 @@ class EllipticalCopula(Copula):
             Number of variables.
         **kwargs
             Passed to the constructor, e.g. ``dispstr`` or (for the t copula)
-            ``df``. Only one correlation value is produced, so the result must
-            use a one-parameter structure (``"ex"`` or ``"ar1"``, or any
-            structure when ``dim=2``).
+            ``df``. One target fixes one correlation, so with ``"toep"`` or
+            ``"un"`` every pair gets that same correlation (the exchangeable
+            matrix written in that structure, with the right number of
+            parameters); with ``"ar1"`` it is the lag-1 correlation.
 
         Returns
         -------
@@ -434,11 +450,19 @@ class EllipticalCopula(Copula):
         ------
         ValueError
             If ``tau`` is not in ``(-1, 1)``, or the resulting correlation is
-            not admissible for ``dim`` (e.g. too negative for ``"ex"``).
+            not admissible for ``dim`` (e.g. too negative for an equicorrelated
+            matrix, which needs at least ``-1 / (d - 1)``).
+
+        Examples
+        --------
+        >>> from rcopula import GaussianCopula
+        >>> c = GaussianCopula.from_tau(0.5, dim=3, dispstr="un")
+        >>> c.rho_params.round(6).tolist()
+        [0.707107, 0.707107, 0.707107]
         """
         if not -1.0 < tau < 1.0:
             raise ValueError(f"tau must lie in (-1, 1), got {tau}")
-        return cls(np.sin(np.pi * tau / 2.0), dim, **kwargs)
+        return cls(_equicorrelation(np.sin(np.pi * tau / 2.0), dim, kwargs), dim, **kwargs)
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> EllipticalCopula:
@@ -457,7 +481,8 @@ class EllipticalCopula(Copula):
             Number of variables.
         **kwargs
             Passed to the constructor, e.g. ``dispstr``. As for
-            :meth:`from_tau`, the structure must take a single correlation.
+            :meth:`from_tau`, ``"toep"`` and ``"un"`` get the same correlation
+            for every pair.
 
         Returns
         -------
@@ -472,7 +497,8 @@ class EllipticalCopula(Copula):
         """
         if not -1.0 < rho < 1.0:
             raise ValueError(f"rho must lie in (-1, 1), got {rho}")
-        return cls(2.0 * np.sin(np.pi * rho / 6.0), dim, **kwargs)
+        value = 2.0 * np.sin(np.pi * rho / 6.0)
+        return cls(_equicorrelation(value, dim, kwargs), dim, **kwargs)
 
 
 class GaussianCopula(EllipticalCopula):
@@ -790,17 +816,43 @@ class StudentCopula(EllipticalCopula):
         Raises
         ------
         ValueError
-            If the parameters are still unspecified (``nan``).
+            If the parameters are still unspecified (``nan``), or if
+            ``dim > 2`` and the pairs do not all share one correlation (see
+            Notes).
 
         Notes
         -----
-        Only the first pairwise correlation (variables 1 and 2) is used, so
-        for a non-exchangeable structure with ``dim > 2`` the result describes
-        that pair only.
+        Tail dependence is a pairwise quantity. It is a single number when
+        ``dim == 2`` or when every pair has the same correlation (always so
+        for ``dispstr="ex"``). Otherwise each pair has its own value and no
+        single answer is honest, so this raises rather than silently
+        reporting one pair; take the pair you want with
+        :func:`~rcopula.marginal_copula`, e.g.
+        ``marginal_copula(cop, [0, 2]).lambda_()``.
+
+        Examples
+        --------
+        >>> from rcopula import StudentCopula, marginal_copula
+        >>> cop = StudentCopula([0.2, 0.5, 0.7], dim=3, dispstr="un", df=4)
+        >>> cop.lambda_()
+        Traceback (most recent call last):
+            ...
+        ValueError: tail dependence differs between pairs of this 3-dimensional t copula...
+        >>> pair = marginal_copula(cop, [1, 2])
+        >>> bool(pair.lambda_().upper > 0)
+        True
         """
         self._require_specified()
         nu = self.df
-        rho = float(P2p(self.sigma())[0])
+        pairs = P2p(self.sigma())
+        if np.ptp(pairs) != 0.0:
+            raise ValueError(
+                f"tail dependence differs between pairs of this {self._dim}-dimensional "
+                f"t copula (dispstr={self.dispstr!r}), so there is no single value. "
+                "Take the bivariate margin of the pair you want, e.g. "
+                "rcopula.marginal_copula(cop, [0, 1]).lambda_()"
+            )
+        rho = float(pairs[0])
         value = 2.0 * student_t.cdf(-np.sqrt((nu + 1.0) * (1.0 - rho) / (1.0 + rho)), df=nu + 1.0)
         return TailDependence(lower=float(value), upper=float(value))
 
@@ -869,8 +921,9 @@ class StudentCopula(EllipticalCopula):
         dim : int, default 2
             Number of variables.
         **kwargs
-            Passed to the constructor, e.g. ``df=3`` or ``dispstr="ar1"``. The
-            structure must take a single correlation.
+            Passed to the constructor, e.g. ``df=3`` or ``dispstr="ar1"``.
+            With ``"toep"`` or ``"un"`` every pair gets the same correlation,
+            as in :meth:`EllipticalCopula.from_tau`.
 
         Returns
         -------
@@ -879,7 +932,8 @@ class StudentCopula(EllipticalCopula):
         Raises
         ------
         ValueError
-            If ``tau`` is not in ``(-1, 1)``.
+            If ``tau`` is not in ``(-1, 1)``, or the correlation is not
+            admissible for ``dim``.
 
         Examples
         --------
@@ -890,15 +944,15 @@ class StudentCopula(EllipticalCopula):
         """
         if not -1.0 < tau < 1.0:
             raise ValueError(f"tau must lie in (-1, 1), got {tau}")
-        return cls(np.sin(np.pi * tau / 2.0), dim, **kwargs)
+        return cls(_equicorrelation(np.sin(np.pi * tau / 2.0), dim, kwargs), dim, **kwargs)
 
     @classmethod
     def from_rho(cls, rho: float, dim: int = 2, **kwargs: Any) -> StudentCopula:
         r"""Build a t copula whose Spearman's rho equals the value you ask for.
 
         Because the t copula's Spearman's rho has no closed form, the
-        correlation is found numerically (by bisection on :meth:`rho`), so this
-        takes a few seconds.
+        correlation is found numerically (Brent's method on :meth:`rho`), so
+        this takes around a second.
 
         Parameters
         ----------
@@ -908,7 +962,9 @@ class StudentCopula(EllipticalCopula):
             Number of variables.
         **kwargs
             Passed to the constructor. ``df`` (default 4.0) is also used in the
-            inversion, since the answer depends on it.
+            inversion, since the answer depends on it. With ``"toep"`` or
+            ``"un"`` every pair gets the same correlation, as in
+            :meth:`EllipticalCopula.from_tau`.
 
         Returns
         -------
@@ -917,14 +973,21 @@ class StudentCopula(EllipticalCopula):
         Raises
         ------
         ValueError
-            If ``rho`` is not in ``(-1, 1)``.
+            If ``rho`` is not in ``(-1, 1)``, is too close to ``+-1`` to be
+            reached by any representable correlation, or the correlation found
+            is not admissible for ``dim``.
 
         Notes
         -----
         The Gaussian relation :math:`\rho_P = 2\sin(\pi\rho_S/6)` -- which R
         uses, and which this method used to use -- is not valid for a t copula,
-        so the inversion is done against the quadrature value instead. It starts
-        from the Gaussian answer, which is close, and refines by bisection.
+        so the inversion is done against the quadrature value instead.
+        Spearman's rho is strictly increasing in the correlation, so the root is
+        bracketed by the whole half-range: ``[0, 1)`` for a positive target and
+        ``(-1, 0]`` for a negative one. Brent's method then needs about ten
+        quadratures, against the eighty bisection steps used before (which also
+        searched only ``+-0.2`` around the Gaussian value and silently returned
+        the edge of that window when the root lay outside it).
 
         Examples
         --------
@@ -936,24 +999,22 @@ class StudentCopula(EllipticalCopula):
         if not -1.0 < rho < 1.0:
             raise ValueError(f"rho must lie in (-1, 1), got {rho}")
         df = float(kwargs.get("df", 4.0))
-        start = 2.0 * np.sin(np.pi * rho / 6.0)
         if rho == 0.0:
-            return cls(0.0, dim, **kwargs)
+            return cls(_equicorrelation(0.0, dim, kwargs), dim, **kwargs)
 
-        # rho_S is strictly increasing in the correlation, and the Gaussian
-        # value brackets the answer once nudged either way.
-        lo, hi = (
-            (start, min(start + 0.2, 1.0 - 1e-12))
-            if rho > 0
-            else (max(start - 0.2, -1.0 + 1e-12), start)
+        edge = 1.0 - 1e-10
+        end = edge if rho > 0 else -edge
+        reached = _student_rho(end, df)
+        if abs(rho) >= abs(reached):
+            raise ValueError(
+                f"Spearman's rho = {rho} is too close to {'+' if rho > 0 else '-'}1 for a "
+                f"t copula with df={df}: the most extreme value reachable is {reached!r}"
+            )
+        lo, hi = (0.0, end) if rho > 0 else (end, 0.0)
+        correlation = float(
+            brentq(lambda r: _student_rho(r, df) - rho, lo, hi, xtol=1e-13, rtol=8.9e-16)
         )
-        for _ in range(80):
-            mid = 0.5 * (lo + hi)
-            if _student_rho(mid, df) < rho:
-                lo = mid
-            else:
-                hi = mid
-        return cls(0.5 * (lo + hi), dim, **kwargs)
+        return cls(_equicorrelation(correlation, dim, kwargs), dim, **kwargs)
 
 
 #: Quadrature level for the Student-t Spearman rho. The bivariate t CDF is

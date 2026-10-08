@@ -68,10 +68,6 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from rcopula.core.archimedean import (
-    ClaytonCopula,
-    FrankCopula,
-    GumbelCopula,
-    JoeCopula,
     _ConcreteArchimedean,
 )
 from rcopula.core.base import Copula, TailDependence
@@ -431,14 +427,26 @@ class NestedArchimedean(Copula):
                     f"Nested {' and '.join(_SAMPLEABLE)} copulas are exact."
                 )
         out = np.empty((size, self.dim))
-        root = self.generator_copula.generator.rvs_frailty(size, self.theta, rng)
-        self._fill(out, root, rng, family)
+        self._fill(out, self._own_frailty(size, rng), rng, family)
         return np.clip(out, np.nextafter(0.0, 1.0), np.nextafter(1.0, 0.0))
+
+    def _own_frailty(self, size: int, rng: np.random.Generator) -> NDArray[np.float64] | None:
+        """This node's unconditional frailty, or ``None`` at the independence point.
+
+        At independence (Clayton ``theta = 0``, Gumbel ``theta = 1``) there is no
+        frailty to draw -- Clayton's would be ``Gamma(1/0)`` -- and none is
+        needed, because the node's generator is ``exp(-t)`` and its copula is
+        the plain product of its arguments.
+        """
+        generator = self.generator_copula.generator
+        if generator.is_independent(self.theta):
+            return None
+        return np.asarray(generator.rvs_frailty(size, self.theta, rng))
 
     def _fill(
         self,
         out: NDArray[np.float64],
-        frailty: NDArray[np.float64],
+        frailty: NDArray[np.float64] | None,
         rng: np.random.Generator,
         family: str,
     ) -> None:
@@ -450,8 +458,20 @@ class NestedArchimedean(Copula):
         :math:`\exp(-V\,\psi_0^{-1}(\psi_1(t)))`, which for these two families
         is a stable law -- untilted for Gumbel, exponentially tilted for
         Clayton.
+
+        ``frailty is None`` marks a node at the independence point (which
+        :func:`fit_nested` produces for a weakly dependent block): its copula is
+        the product of its arguments, so its own variables are independent
+        uniforms and each child is an independent sub-copula with a fresh
+        frailty of its own.
         """
         size = out.shape[0]
+        if frailty is None:
+            if self.components:
+                out[:, list(self.components)] = rng.uniform(size=(size, len(self.components)))
+            for child in self.children:
+                child._fill(out, child._own_frailty(size, rng), rng, family)
+            return
         if self.components:
             exponential = rng.exponential(1.0, size=(size, len(self.components)))
             out[:, list(self.components)] = self.generator_copula.psi(
@@ -500,20 +520,41 @@ class NestedArchimedean(Copula):
         Returns
         -------
         NestedArchimedean
-            The deepest node whose leaves include both ``i`` and ``j``. If
-            either index is not in the tree, this node is returned.
+            The deepest node whose leaves include both ``i`` and ``j``.
 
         Raises
         ------
         ValueError
-            If ``i == j``.
+            If ``i == j``, or if ``i`` or ``j`` is not a variable of this
+            (sub-)tree.
+
+        Examples
+        --------
+        >>> import rcopula as rc
+        >>> from rcopula.structural import NestedArchimedean
+        >>> inner = NestedArchimedean(rc.GumbelCopula(3.0), [0, 1])
+        >>> tree = NestedArchimedean(rc.GumbelCopula(1.5), [2], [inner])
+        >>> tree.lowest_common_ancestor(0, 1) is tree.children[0]
+        True
+        >>> tree.lowest_common_ancestor(0, 2) is tree
+        True
         """
         if i == j:
             raise ValueError("a variable has no common ancestor with itself")
+        leaves = set(self.leaves())
+        missing = [k for k in (i, j) if k not in leaves]
+        if missing:
+            raise ValueError(
+                f"variable(s) {missing} are not in this tree, whose variables are {sorted(leaves)}"
+            )
+        return self._meeting_node(i, j)
+
+    def _meeting_node(self, i: int, j: int) -> NestedArchimedean:
+        """Descend to the deepest node holding both ``i`` and ``j`` (both known present)."""
         for child in self.children:
             below = set(child.leaves())
             if i in below and j in below:
-                return child.lowest_common_ancestor(i, j)
+                return child._meeting_node(i, j)
         return self
 
     def tau_matrix(self) -> NDArray[np.float64]:
@@ -672,6 +713,47 @@ class NestedArchimedean(Copula):
         )
 
 
+#: How far (in Kendall's tau) clipping or the nesting floor may move a node's
+#: estimate before :func:`fit_nested` warns about it. Sampling noise in a sample
+#: tau is around ``0.7 / sqrt(n)``, so smaller moves are routine and silent.
+_CLIP_WARN_TAU = 0.05
+
+#: Kendall's tau used in place of +-1 for families whose parameter is unbounded
+#: there (Gumbel, Clayton, Frank, Joe): tau = 0.999 is already theta = 1000 for
+#: Gumbel, and anything closer is numerically meaningless.
+_TAU_EDGE = 0.999
+
+
+def _tau_window(
+    generator: Any, dim: int
+) -> tuple[tuple[float, float | None], tuple[float, float | None]]:
+    """The Kendall's tau a family can attain in ``dim`` dimensions, as two ends.
+
+    Each end is ``(tau, theta)``. ``theta`` is the parameter to use when the
+    target sits at or beyond that end (``None`` means "invert tau there", for an
+    unbounded parameter, where the end is ``+-_TAU_EDGE``). Taken from the
+    generator's own ``bounds(dim)``, so a family's dimension-dependence -- Clayton,
+    Frank and AMH admit negative dependence only in two dimensions -- comes for
+    free.
+    """
+    lo, hi = generator.bounds(dim)
+    lower: tuple[float, float | None]
+    upper: tuple[float, float | None]
+    if np.isinf(lo):
+        lower = (-_TAU_EDGE, None)
+    elif generator.is_independent(lo):
+        lower = (0.0, float(lo))
+    else:
+        inside = float(lo) + 1e-9 * (1.0 + abs(float(lo)))
+        lower = (max(float(generator.tau(inside)), -_TAU_EDGE), inside)
+    if np.isinf(hi):
+        upper = (_TAU_EDGE, None)
+    else:
+        inside = float(hi) - 1e-9 * (1.0 + abs(float(hi)))
+        upper = (min(float(generator.tau(inside)), _TAU_EDGE), inside)
+    return lower, upper
+
+
 def fit_nested(structure: NestedArchimedean, data: ArrayLike) -> NestedArchimedean:
     r"""Fit a nested Archimedean copula to data, given the tree shape you want.
 
@@ -685,9 +767,28 @@ def fit_nested(structure: NestedArchimedean, data: ArrayLike) -> NestedArchimede
     estimator and R's ``etau``, and it needs no density -- which matters here,
     because the nested density is not available.
 
-    The estimates are then made to respect the nesting condition by taking a
-    running maximum down the tree. Sampling noise can otherwise leave a child
-    below its parent, which would not be a copula.
+    Two constraints are then imposed, root first:
+
+    * **The family's attainable range.** A node's averaged tau is clipped to
+      the Kendall's tau its family can reach. For a genuinely nested tree
+      (depth at least 2) that is ``[0, 1)`` for every family -- Gumbel and Joe
+      cannot go below independence at all, and Clayton, Frank and AMH reach
+      negative tau only as bivariate copulas, while the nesting condition is
+      only known to hold for generators that are completely monotone -- capped
+      at ``1/3`` for AMH. A flat tree (one node) gets the family's range in
+      ``structure.dim`` dimensions, so a bivariate Clayton or Frank can still
+      be negatively dependent. Near ``+-1`` the clip is ``+-0.999`` for families
+      whose parameter is unbounded there. A weakly dependent block whose sample
+      tau is slightly negative therefore fits as (near-)independence instead of
+      raising.
+    * **The nesting condition.** A child's parameter is raised to its parent's
+      if sampling noise left it below (a running maximum down the tree);
+      otherwise the result would not be a copula.
+
+    Either adjustment is silent when it moves a node's tau by at most
+    ``0.05`` -- ordinary sampling noise -- and emits a :class:`UserWarning`
+    naming the node when it moves it further, since the tree shape or the
+    family is then probably wrong for the data.
 
     Parameters
     ----------
@@ -706,8 +807,13 @@ def fit_nested(structure: NestedArchimedean, data: ArrayLike) -> NestedArchimede
     Raises
     ------
     ValueError
-        If ``data`` does not have ``d`` columns, or if a node's average tau is
-        outside its family's range (for example negative tau with Gumbel).
+        If ``data`` does not have ``d`` columns.
+
+    Warns
+    -----
+    UserWarning
+        If clipping to the family's range or enforcing the nesting condition
+        changes a node's Kendall's tau by more than ``0.05``.
 
     Examples
     --------
@@ -721,34 +827,85 @@ def fit_nested(structure: NestedArchimedean, data: ArrayLike) -> NestedArchimede
     True
     >>> bool(abs(fitted.children[0].theta - 4.0) < 0.4)
     True
+
+    A block that is independent of the rest fits as independence, even when
+    its sample tau comes out slightly negative:
+
+    >>> import numpy as np
+    >>> block = rc.GumbelCopula(3.0).rvs(500, random_state=1)
+    >>> noise = np.random.default_rng(7).uniform(size=(500, 1))
+    >>> shape = NestedArchimedean(
+    ...     rc.GumbelCopula(1.5), [2], [NestedArchimedean(rc.GumbelCopula(3.0), [0, 1])]
+    ... )
+    >>> fit_nested(shape, np.hstack([block, noise])).theta
+    1.0
     """
+    import warnings
+
     u = np.atleast_2d(np.asarray(data, dtype=np.float64))
     if u.shape[1] != structure.dim:
         raise ValueError(f"data has {u.shape[1]} columns but the tree has dim={structure.dim}")
     sample_tau = cor_kendall(u)
+    generator = structure.generator_copula.generator
+    # A nested tree's generators act on (at least) three arguments, so take the
+    # family's range there; a flat tree is an ordinary Archimedean copula.
+    window_dim = structure.dim if structure.depth == 1 else max(structure.dim, 3)
+    (tau_lo, theta_lo), (tau_hi, theta_hi) = _tau_window(generator, window_dim)
 
-    def estimate(node: NestedArchimedean, floor: float) -> NestedArchimedean:
-        governed = [
-            sample_tau[i, j]
-            for i in range(structure.dim)
-            for j in range(i + 1, structure.dim)
-            if structure.lowest_common_ancestor(i, j) is node
-        ]
-        family = type(node.generator_copula)
-        if governed:
+    def governed_taus(node: NestedArchimedean) -> NDArray[np.float64]:
+        """Sample taus of the pairs whose lowest common ancestor is ``node``.
+
+        Those are exactly the pairs of leaves below ``node`` that sit on
+        different branches of it (a direct component is a branch of its own),
+        found with one mask per node instead of a tree search per pair.
+        """
+        leaves, branch = list(node.components), list(range(len(node.components)))
+        for k, child in enumerate(node.children):
+            below = child.leaves()
+            leaves.extend(below)
+            branch.extend([len(node.components) + k] * len(below))
+        labels = np.asarray(branch)
+        apart = np.triu(labels[:, None] != labels[None, :], k=1)
+        return np.asarray(sample_tau[np.ix_(leaves, leaves)][apart], dtype=np.float64)
+
+    def invert(tau: float) -> float:
+        if tau <= tau_lo and theta_lo is not None:
+            return theta_lo
+        if tau >= tau_hi and theta_hi is not None:
+            return theta_hi
+        return float(generator.itau(float(np.clip(tau, tau_lo, tau_hi)), window_dim))
+
+    def estimate(node: NestedArchimedean, floor: float | None) -> NestedArchimedean:
+        governed = governed_taus(node)
+        if governed.size:
             target = float(np.mean(governed))
-            fitted = family.from_tau(float(np.clip(target, -0.999, 0.999)))
-            theta = max(float(fitted.params[0]), floor)
+            theta = invert(target)
         else:  # pragma: no cover - a node governing no pair is degenerate
-            theta = floor
+            target = float("nan")
+            theta = floor if floor is not None else invert(0.0)
+        floored = False
+        if floor is not None and theta < floor:
+            theta, floored = floor, True
+        achieved = float(generator.tau(theta)) if not generator.is_independent(theta) else 0.0
+        if np.isfinite(target) and abs(achieved - target) > _CLIP_WARN_TAU:
+            where = list(node.components) or sorted(node.leaves())
+            reason = (
+                "raised to its parent's parameter (the nesting condition)"
+                if floored
+                else f"clipped to the family's attainable tau range [{tau_lo:g}, {tau_hi:g}]"
+            )
+            warnings.warn(
+                f"fit_nested: the node over variables {where} has average sample "
+                f"tau {target:.3f}, but the fitted {node.generator_copula.name} "
+                f"node has tau {achieved:.3f} (theta={theta:g}): the estimate was "
+                f"{reason}. The tree shape or family may not suit the data.",
+                UserWarning,
+                stacklevel=3,
+            )
         return NestedArchimedean(
             node.generator_copula.with_params([theta]),
             node.components,
             [estimate(child, theta) for child in node.children],
         )
 
-    # The root's own floor is the family's independence point.
-    independence = 1.0 if isinstance(structure.generator_copula, GumbelCopula | JoeCopula) else 0.0
-    if isinstance(structure.generator_copula, FrankCopula | ClaytonCopula):
-        independence = -np.inf
-    return estimate(structure, independence)
+    return estimate(structure, None)

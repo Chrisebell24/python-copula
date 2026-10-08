@@ -49,7 +49,7 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike, NDArray
-from scipy import optimize
+from scipy import optimize, sparse
 
 from rcopula.core.base import Copula
 from rcopula.dependence import pseudo_obs
@@ -60,6 +60,7 @@ from rcopula.transforms import conditional_cdf
 
 __all__ = [
     "BacktestResult",
+    "EfficientFrontier",
     "backtest_pairs",
     "efficient_frontier",
     "mean_cvar_weights",
@@ -152,11 +153,26 @@ def pairs_signal(
     Returns ``+1`` to go long the spread (long asset 1, short asset 2), ``-1``
     for the reverse, and ``0`` to stand aside, one value per row of ``u``.
 
-    A position opens when **both** legs agree that one asset is mispriced
-    relative to the other -- ``h1`` at or below ``entry`` *and* ``h2`` at or
-    above ``1 - entry`` (see :func:`mispricing_index`). Requiring both is what
-    distinguishes relative mispricing from a common move: if the whole market
-    falls, both conditionals stay near 0.5 and no signal fires.
+    The rows of ``u`` are read **in time order** and the signal has memory:
+
+    * **Entry.** From flat, a long position (``+1``) opens when **both** legs
+      agree that asset 1 is cheap relative to asset 2 -- ``h1`` at or below
+      ``entry`` *and* ``h2`` at or above ``1 - entry`` (see
+      :func:`mispricing_index`); a short position (``-1``) opens on the mirror
+      condition. Requiring both is what distinguishes relative mispricing from
+      a common move: if the whole market falls, both conditionals stay near
+      0.5 and no signal fires.
+    * **Hold.** An open position is kept on later rows until the mispricing
+      has reverted: a long closes once ``h1 >= 0.5 - exit_band`` or
+      ``h2 <= 0.5 + exit_band`` (either leg is back inside the band
+      ``[0.5 - exit_band, 0.5 + exit_band]`` or beyond it); a short closes on
+      the mirror condition.
+    * **Flip.** An opposite entry signal while a position is open reverses it
+      directly.
+
+    With the default ``exit_band=0.5`` the band is all of ``[0, 1]``, so every
+    position closes on the next row unless the entry condition still holds:
+    a memoryless, one-row signal.
 
     Parameters
     ----------
@@ -170,10 +186,12 @@ def pairs_signal(
         Probability threshold for opening, strictly between 0 and 0.5.
         Smaller means rarer, higher-conviction trades.
     exit_band : float, default 0.5
-        Intended to close positions once the conditional returns within
-        ``exit_band`` of 0.5. **Currently not used**: the signal is computed
-        row by row with no memory of earlier positions, so any row that does
-        not meet the entry rule returns ``0``.
+        Half-width of the exit band around 0.5, in ``[0, 0.5]``. A position is
+        held until the conditional probability that triggered it crosses back
+        inside ``[0.5 - exit_band, 0.5 + exit_band]``. ``0.0`` holds until the
+        conditional crosses 0.5 itself (full reversion); ``0.5`` (the default)
+        closes on the next row unless the entry rule fires again. Values
+        between ``0.5 - entry`` and ``0.5`` behave like ``0.5``.
 
     Returns
     -------
@@ -184,8 +202,8 @@ def pairs_signal(
     Raises
     ------
     ValueError
-        If ``entry`` is not strictly between 0 and 0.5, or ``u`` does not have
-        two columns.
+        If ``entry`` is not strictly between 0 and 0.5, ``exit_band`` is not
+        in ``[0, 0.5]``, or ``u`` does not have two columns.
 
     Examples
     --------
@@ -197,6 +215,13 @@ def pairs_signal(
     >>> pairs_signal(cop, u)
     array([ 1, -1,  0])
 
+    With a narrower exit band the long is held while asset 1 is still cheap
+    (row 2) and closed once it has reverted (row 3):
+
+    >>> u = np.array([[0.02, 0.95], [0.20, 0.80], [0.60, 0.50]])
+    >>> pairs_signal(cop, u, exit_band=0.1)
+    array([1, 1, 0])
+
     Signals are rare by construction -- a few percent of observations:
 
     >>> signals = pairs_signal(cop, cop.rvs(5000, random_state=0))
@@ -205,12 +230,30 @@ def pairs_signal(
     """
     if not 0.0 < entry < 0.5:
         raise ValueError(f"entry must lie in (0, 0.5), got {entry}")
+    if not 0.0 <= exit_band <= 0.5:
+        raise ValueError(f"exit_band must lie in [0, 0.5], got {exit_band}")
     h1, h2 = mispricing_index(copula, u)
 
     signal = np.zeros(h1.size, dtype=int)
-    signal[(h1 <= entry) & (h2 >= 1.0 - entry)] = 1
-    signal[(h1 >= 1.0 - entry) & (h2 <= entry)] = -1
+    position = 0
+    for i in range(h1.size):
+        position = _next_position(position, float(h1[i]), float(h2[i]), entry, exit_band)
+        signal[i] = position
     return signal
+
+
+def _next_position(position: int, h1: float, h2: float, entry: float, exit_band: float) -> int:
+    """One step of the pairs state machine used by :func:`pairs_signal`."""
+    if h1 <= entry and h2 >= 1.0 - entry:
+        return 1
+    if h1 >= 1.0 - entry and h2 <= entry:
+        return -1
+    # No fresh entry: keep the open position until it has reverted into the band.
+    if position == 1 and (h1 >= 0.5 - exit_band or h2 <= 0.5 + exit_band):
+        return 0
+    if position == -1 and (h1 <= 0.5 + exit_band or h2 >= 0.5 - exit_band):
+        return 0
+    return position
 
 
 class BacktestResult(NamedTuple):
@@ -225,12 +268,15 @@ class BacktestResult(NamedTuple):
         Compounded return of the strategy over the whole sample, as a
         fraction (0.05 means +5%).
     annualised_sharpe : float
-        Mean over standard deviation of the per-period strategy return,
-        computed over the periods in which a position was held only, scaled
-        by ``sqrt(periods_per_year)``. ``0.0`` if fewer than two such periods.
+        Mean over standard deviation (``ddof=1``) of the per-period strategy
+        return over **every live period** -- all periods after the first
+        ``train + 1`` warm-up rows, flat periods counting as a zero return --
+        scaled by ``sqrt(periods_per_year)``. ``0.0`` if the returns have zero
+        variance.
     n_trades : int
-        Number of times the position changed from one period to the next.
-        Opening and later closing a position counts as two.
+        Number of trades **opened**: each move from flat into a position, and
+        each direct flip from long to short or back, counts once. Closing a
+        position does not count, so this is the number of round trips.
     hit_rate : float
         Fraction of in-position periods with a positive strategy return,
         between 0 and 1. ``0.0`` if no position was ever held.
@@ -263,6 +309,7 @@ def backtest_pairs(
     entry: float = 0.05,
     periods_per_year: int = 252,
     refit_every: int = 0,
+    exit_band: float = 0.5,
 ) -> BacktestResult:
     r"""Replay the copula pairs strategy through history, without look-ahead.
 
@@ -270,8 +317,9 @@ def backtest_pairs(
     pair and whether the trades made money before costs.
 
     At each period ``t`` the copula is fitted on the trailing ``train``
-    returns, today's return is ranked within that window, and the resulting
-    signal is held for the *next* period only (``t + 1``). The position earned
+    returns, today's return is ranked within that window, and the
+    :func:`pairs_signal` entry/exit rule (with ``entry`` and ``exit_band``)
+    updates the position, which is earned in the *next* period (``t + 1``). The position earned
     in period ``t + 1`` therefore never depends on the return of period
     ``t + 1``, which is the part most easily got wrong.
 
@@ -294,6 +342,11 @@ def backtest_pairs(
     refit_every : int, default 0
         Refit cadence in periods. ``0`` refits every period; larger values are
         faster and make the position depend on a slightly staler model.
+    exit_band : float, default 0.5
+        Exit band passed to the :func:`pairs_signal` rule; in ``[0, 0.5]``.
+        The default closes every position after one period unless the entry
+        rule fires again; smaller values hold positions until the pair has
+        reverted.
 
     Returns
     -------
@@ -305,7 +358,8 @@ def backtest_pairs(
     Raises
     ------
     ValueError
-        If ``returns`` is not two-column, or has ``train + 1`` rows or fewer.
+        If ``returns`` is not two-column, has ``train + 1`` rows or fewer, or
+        ``entry`` / ``exit_band`` are out of range.
 
     Notes
     -----
@@ -336,6 +390,10 @@ def backtest_pairs(
     n = r.shape[0]
     if n <= train + 1:
         raise ValueError(f"need more than train+1 = {train + 1} observations, got {n}")
+    if not 0.0 < entry < 0.5:
+        raise ValueError(f"entry must lie in (0, 0.5), got {entry}")
+    if not 0.0 <= exit_band <= 0.5:
+        raise ValueError(f"exit_band must lie in [0, 0.5], got {exit_band}")
 
     positions = np.zeros(n, dtype=int)
     fitted: Copula | None = None
@@ -349,7 +407,10 @@ def backtest_pairs(
         # uses only information available at time t.
         window = r[t - train : t + 1]
         u_now = np.asarray(pseudo_obs(window))[-1:]
-        positions[t + 1] = int(pairs_signal(fitted, u_now, entry=entry)[0])
+        h1, h2 = mispricing_index(fitted, u_now)
+        positions[t + 1] = _next_position(
+            int(positions[t]), float(h1[0]), float(h2[0]), entry, exit_band
+        )
 
     # Long the spread means long asset 1 and short asset 2.
     strategy = positions * (r[:, 0] - r[:, 1])
@@ -357,15 +418,16 @@ def backtest_pairs(
 
     total = float(np.prod(1.0 + strategy) - 1.0)
     active = strategy[traded]
-    sharpe = (
-        float(active.mean() / active.std(ddof=1) * np.sqrt(periods_per_year))
-        if active.size > 1 and active.std(ddof=1) > 0
-        else 0.0
-    )
+    # Sharpe over every live period: flat days earn zero but still count.
+    live = strategy[train + 1 :]
+    sd = float(live.std(ddof=1)) if live.size > 1 else 0.0
+    sharpe = float(live.mean() / sd * np.sqrt(periods_per_year)) if sd > 0 else 0.0
+    # A trade is an opening: flat -> position, or a direct flip.
+    opened = (positions[1:] != 0) & (positions[1:] != positions[:-1])
     return BacktestResult(
         total_return=total,
         annualised_sharpe=sharpe,
-        n_trades=int(np.sum(np.diff(positions) != 0)),
+        n_trades=int(np.sum(opened)),
         hit_rate=float(np.mean(active > 0)) if active.size else 0.0,
         returns=strategy,
         positions=positions,
@@ -477,9 +539,10 @@ def mean_cvar_weights(
     scenarios. That makes it exact and fast -- no gradient descent, no local
     optima -- and it is why scenario-based CVaR optimisation is practical at all.
 
-    The program has one auxiliary variable per scenario, and its constraint
-    matrix is built densely, so memory grows with the square of ``n``. A few
-    thousand scenarios is comfortable; tens of thousands may not be.
+    The program has one auxiliary variable per scenario. Its constraint
+    matrix is built as a ``scipy.sparse`` matrix (``n * (d + 2)`` non-zeros)
+    and solved with HiGHS, so memory grows linearly in ``n``: tens of
+    thousands of scenarios are routine.
 
     Examples
     --------
@@ -506,16 +569,20 @@ def mean_cvar_weights(
     scale = 1.0 / ((1.0 - alpha) * n)
     cost = np.concatenate([np.zeros(d), [1.0], np.full(n, scale)])
 
-    # -r_i . w - z - s_i <= 0
-    a_ub = np.hstack([-r, -np.ones((n, 1)), -np.eye(n)])
+    # -r_i . w - z - s_i <= 0, built sparsely: a dense n x n identity would
+    # need 8 n^2 bytes (3.2 GB at n = 20,000).
+    a_ub = sparse.hstack(
+        [sparse.csr_matrix(-r), sparse.csr_matrix(-np.ones((n, 1))), -sparse.identity(n)],
+        format="csr",
+    )
     b_ub = np.zeros(n)
 
     if target_return is not None:
-        row = np.concatenate([-r.mean(axis=0), [0.0], np.zeros(n)])
-        a_ub = np.vstack([a_ub, row])
+        row = sparse.csr_matrix(np.concatenate([-r.mean(axis=0), [0.0], np.zeros(n)]))
+        a_ub = sparse.vstack([a_ub, row], format="csr")
         b_ub = np.append(b_ub, -float(target_return))
 
-    a_eq = np.concatenate([np.ones(d), [0.0], np.zeros(n)]).reshape(1, -1)
+    a_eq = sparse.csr_matrix(np.concatenate([np.ones(d), [0.0], np.zeros(n)]).reshape(1, -1))
     var_bounds = [bounds] * d + [(None, None)] + [(0.0, None)] * n
 
     result = optimize.linprog(
@@ -599,19 +666,45 @@ def min_variance_weights(
     return np.asarray(result.x, dtype=np.float64)
 
 
+class EfficientFrontier(NamedTuple):
+    """Points on the mean-CVaR frontier, as returned by :func:`efficient_frontier`.
+
+    A named tuple, so it unpacks like the plain 3-tuple returned by earlier
+    versions: ``mu, cvar, w = efficient_frontier(r)``.
+
+    Attributes
+    ----------
+    achieved_returns : numpy.ndarray of float, shape (m,)
+        Mean portfolio return **achieved** by the optimal weights at each
+        point, ``weights @ scenarios.mean(axis=0)``. It is at least the target
+        return that was asked for, and can exceed it where the return
+        constraint does not bind.
+    cvars : numpy.ndarray of float, shape (m,)
+        CVaR (expected shortfall of the portfolio loss) at each point, as a
+        positive loss.
+    weights : numpy.ndarray of float, shape (m, d)
+        Portfolio weights at each point; each row sums to one.
+    """
+
+    achieved_returns: NDArray[np.float64]
+    cvars: NDArray[np.float64]
+    weights: NDArray[np.float64]
+
+
 def efficient_frontier(
     scenarios: ArrayLike,
     alpha: float = 0.95,
     n_points: int = 20,
     bounds: tuple[float, float] = (0.0, 1.0),
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+) -> EfficientFrontier:
     """The best tail risk achievable at each level of expected return.
 
     Solves :func:`mean_cvar_weights` for a ladder of target returns, from the
     minimum-CVaR portfolio's mean up to the highest single-asset mean, and
-    reports the return, CVaR and weights at each point -- the mean-CVaR
-    efficient frontier. Plot ``cvars`` against ``returns`` to see how much
-    extra tail loss each step of extra return costs.
+    reports the **achieved** mean return, CVaR and weights at each point --
+    the mean-CVaR efficient frontier. Plot ``cvars`` against
+    ``achieved_returns`` to see how much extra tail loss each step of extra
+    return costs.
 
     Parameters
     ----------
@@ -628,16 +721,19 @@ def efficient_frontier(
 
     Returns
     -------
-    returns : numpy.ndarray of float, shape (m,)
-        Mean portfolio return achieved at each frontier point (at least the
-        target), in the units of ``scenarios``.
-    cvars : numpy.ndarray of float, shape (m,)
-        CVaR (expected shortfall of the portfolio loss) at each point, as a
-        positive loss.
-    weights : numpy.ndarray of float, shape (m, d)
-        Portfolio weights at each point; each row sums to one.
+    EfficientFrontier
+        Named tuple ``(achieved_returns, cvars, weights)``:
 
-    ``m <= n_points``: infeasible targets are dropped rather than raising.
+        ``achieved_returns`` : numpy.ndarray of float, shape (m,)
+            Mean portfolio return **achieved** at each point (not the target
+            that was requested; it is at least the target), in the units of
+            ``scenarios``.
+        ``cvars`` : numpy.ndarray of float, shape (m,)
+            CVaR at each point, as a positive loss.
+        ``weights`` : numpy.ndarray of float, shape (m, d)
+            Portfolio weights at each point; each row sums to one.
+
+        ``m <= n_points``: infeasible targets are dropped rather than raising.
 
     Raises
     ------
@@ -653,6 +749,9 @@ def efficient_frontier(
     ...                      rng.normal(0.0010, 0.02, 3000)])
     >>> mu, cvar, w = efficient_frontier(r, n_points=8)
     >>> bool(np.all(np.diff(cvar) >= -1e-9))     # more return costs more risk
+    True
+    >>> front = efficient_frontier(r, n_points=8)
+    >>> bool(np.allclose(front.achieved_returns, front.weights @ r.mean(axis=0)))
     True
     """
     r = np.atleast_2d(np.asarray(scenarios, dtype=np.float64))
@@ -670,4 +769,4 @@ def efficient_frontier(
         kept_cvar.append(expected_shortfall(-(r @ w), alpha))
         kept_w.append(w)
 
-    return np.array(kept_mu), np.array(kept_cvar), np.array(kept_w)
+    return EfficientFrontier(np.array(kept_mu), np.array(kept_cvar), np.array(kept_w))

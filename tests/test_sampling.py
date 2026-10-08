@@ -146,8 +146,8 @@ class TestAntithetic:
 
     def test_an_odd_size_still_returns_pairs(self) -> None:
         u = antithetic_rvs(rc.ClaytonCopula(2.0), 101, random_state=0)
-        assert u.shape[0] % 2 == 0
-        assert u.shape[0] >= 101
+        assert u.shape == (102, 2)  # documented: size + 1 rows for an odd size
+        np.testing.assert_allclose(u[:51, 0] + u[51:, 0], 1.0)
 
 
 class TestLatinHypercube:

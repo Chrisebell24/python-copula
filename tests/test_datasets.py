@@ -78,6 +78,20 @@ def isolated_cache(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
+@pytest.fixture
+def unpinned(monkeypatch) -> None:
+    """Drop the pinned digests, so the miniature files above can stand in for
+    the real downloads. (The cached copy is now checked against its digest, so
+    without this the synthetic bytes would be rejected -- correctly.)"""
+    import rcopula.datasets as ds
+
+    for name, spec in list(ds._REGISTRY.items()):
+        if spec.sha256 is not None:
+            monkeypatch.setitem(
+                ds._REGISTRY, name, DatasetSpec(**{**spec.__dict__, "sha256": None})
+            )
+
+
 class TestTheRegistryIsWellFormed:
     def test_every_spec_is_complete(self) -> None:
         for name, spec in available().items():
@@ -170,6 +184,57 @@ class TestDigestVerification:
         ds._verify(b"anything at all", available()["nwis_peaks"])
 
 
+class TestCachedDigest:
+    """The digest is checked on every read of the cache, not just on download."""
+
+    def _pin(self, monkeypatch, payload: bytes) -> DatasetSpec:
+        import rcopula.datasets as ds
+
+        spec = available()["uci_abalone"]
+        pinned = DatasetSpec(**{**spec.__dict__, "sha256": hashlib.sha256(payload).hexdigest()})
+        monkeypatch.setitem(ds._REGISTRY, "uci_abalone", pinned)
+        return pinned
+
+    def test_a_matching_cache_is_used_without_fetching(
+        self, isolated_cache: Path, monkeypatch
+    ) -> None:
+        import rcopula.datasets as ds
+
+        self._pin(monkeypatch, ABALONE)
+        monkeypatch.setattr(ds, "_fetch", lambda spec: pytest.fail("must not fetch"))
+        (isolated_cache / "uci_abalone.raw").write_bytes(ABALONE)
+        assert len(load("uci_abalone")) == 3
+
+    def test_a_corrupted_cache_is_downloaded_again(self, isolated_cache: Path, monkeypatch) -> None:
+        import rcopula.datasets as ds
+
+        self._pin(monkeypatch, ABALONE)
+        fetched: list[str] = []
+
+        def fake_fetch(spec: DatasetSpec) -> bytes:
+            fetched.append(spec.name)
+            return ABALONE
+
+        monkeypatch.setattr(ds, "_fetch", fake_fetch)
+        (isolated_cache / "uci_abalone.raw").write_bytes(ABALONE[:-10])
+        frame = load("uci_abalone")
+        assert fetched == ["uci_abalone"]
+        assert len(frame) == 3
+        assert (isolated_cache / "uci_abalone.raw").read_bytes() == ABALONE
+
+    def test_a_corrupted_cache_is_refused_offline(self, isolated_cache: Path, monkeypatch) -> None:
+        self._pin(monkeypatch, ABALONE)
+        (isolated_cache / "uci_abalone.raw").write_bytes(ABALONE[:-10])
+        with pytest.raises(OSError, match=r"cached copy .* does not match"):
+            load("uci_abalone", download=False)
+
+    def test_an_unpinned_file_missing_a_column_is_reported(self, isolated_cache: Path) -> None:
+        bad = RDB.replace(b"gage_ht", b"other")
+        (isolated_cache / "nwis_peaks.raw").write_bytes(bad)
+        with pytest.raises(OSError, match="gage_ht"):
+            load("nwis_peaks", download=False)
+
+
 class TestParsing:
     def test_usgs_rdb(self, isolated_cache: Path) -> None:
         (isolated_cache / "nwis_peaks.raw").write_bytes(RDB)
@@ -194,7 +259,7 @@ class TestParsing:
         assert frame["tmax"].tolist() == [21.0, 19.5, 23.0]
         assert frame["prcp"].tolist() == [0.0, 5.1, 0.0]
 
-    def test_abalone_has_no_header_to_discard(self, isolated_cache: Path) -> None:
+    def test_abalone_has_no_header_to_discard(self, isolated_cache: Path, unpinned: None) -> None:
         (isolated_cache / "uci_abalone.raw").write_bytes(ABALONE)
         frame = load("uci_abalone", download=False)
         assert list(frame.columns) == list(available()["uci_abalone"].columns)
@@ -203,7 +268,7 @@ class TestParsing:
         assert frame["sex"].tolist() == ["M", "F", "I"]
 
     def test_wine_is_semicolon_separated_and_its_header_is_replaced(
-        self, isolated_cache: Path
+        self, isolated_cache: Path, unpinned: None
     ) -> None:
         # Upstream writes 'fixed acidity' with a space and 'pH' with a capital;
         # the loader replaces the header so callers get stable snake_case.
@@ -215,7 +280,7 @@ class TestParsing:
         assert len(frame) == 2
         assert frame["alcohol"].tolist() == [9.4, 9.8]
 
-    def test_airfoil_is_whitespace_separated(self, isolated_cache: Path) -> None:
+    def test_airfoil_is_whitespace_separated(self, isolated_cache: Path, unpinned: None) -> None:
         (isolated_cache / "uci_airfoil.raw").write_bytes(AIRFOIL)
         frame = load("uci_airfoil", download=False)
         assert list(frame.columns) == list(available()["uci_airfoil"].columns)
@@ -223,7 +288,7 @@ class TestParsing:
         assert frame["sound_pressure_level"].tolist() == [126.201, 125.201, 125.951]
 
     def test_a_wrong_column_count_is_reported_rather_than_mislabelled(
-        self, isolated_cache: Path
+        self, isolated_cache: Path, unpinned: None
     ) -> None:
         # Silently naming seven columns with nine names would corrupt every
         # downstream result, so it raises instead.

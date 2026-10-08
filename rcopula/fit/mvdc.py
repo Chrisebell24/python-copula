@@ -111,6 +111,10 @@ class JointFitResult:
     n_at_boundary : int, default 0
         Number of observations whose fitted probability integral transform
         landed on 0 or 1.
+    margin_fixed : list of tuple of bool or None, default None
+        For each margin, which entries of ``margin_params`` were pinned
+        through ``margin_kwargs`` (``floc=0`` and the like) rather than
+        estimated. ``None`` means nothing was pinned.
     _x : ndarray of float, shape (n, d)
         The data that were fitted. Internal; leave at its default.
 
@@ -142,6 +146,9 @@ class JointFitResult:
         puts a margin's support boundary there; those values are nudged just
         inside ``(0, 1)`` before the copula density is evaluated, and this
         count reports how many were patched.
+    margin_fixed : list of tuple of bool or None
+        Per margin, ``True`` where the parameter was pinned rather than
+        estimated; ``None`` when nothing was pinned.
     """
 
     distribution: CopulaDistribution
@@ -154,6 +161,7 @@ class JointFitResult:
     message: str = ""
     marginal_loglik: float = 0.0
     n_at_boundary: int = 0
+    margin_fixed: list[tuple[bool, ...]] | None = None
     _x: NDArray[np.float64] = field(repr=False, default_factory=lambda: np.empty((0, 0)))
 
     @property
@@ -163,10 +171,15 @@ class JointFitResult:
         Returns
         -------
         int
-            Sum of the lengths of ``margin_params`` plus the number of free
-            copula parameters.
+            The number of estimated margin parameters -- the lengths of
+            ``margin_params`` minus any pinned through ``margin_kwargs`` (see
+            :attr:`margin_fixed`) -- plus the number of free copula
+            parameters. Pinned values were not estimated, so counting them
+            would overstate AIC and BIC.
         """
-        return sum(len(p) for p in self.margin_params) + int(np.sum(self.copula.free))
+        pinned = sum(sum(flags) for flags in self.margin_fixed) if self.margin_fixed else 0
+        estimated = sum(len(p) for p in self.margin_params) - pinned
+        return estimated + int(np.sum(self.copula.free))
 
     @property
     def aic(self) -> float:
@@ -265,14 +278,40 @@ class JointFitResult:
         return "\n".join(lines)
 
 
+def _pinned(family: Any, n_params: int, kwargs: dict[str, Any]) -> tuple[bool, ...]:
+    """Which of a scipy family's ``fit`` parameters ``kwargs`` holds fixed.
+
+    Follows scipy's own conventions: ``f0``, ``f1``, ... or ``f<name>`` /
+    ``fix_<name>`` for the shape parameters, in order, then ``floc`` and
+    ``fscale``. Anything else in ``kwargs`` (a starting guess, an optimiser) pins
+    nothing.
+    """
+    shapes_attr = getattr(family, "shapes", None) or ""
+    shapes = shapes_attr.replace(",", " ").split()
+    flags = [False] * n_params
+    for j, name in enumerate(shapes[:n_params]):
+        if any(key in kwargs for key in (f"f{j}", f"f{name}", f"fix_{name}")):
+            flags[j] = True
+    n_shapes = len(shapes)
+    if "floc" in kwargs and n_shapes < n_params:
+        flags[n_shapes] = True
+    if "fscale" in kwargs and n_shapes + 1 < n_params:
+        flags[n_shapes + 1] = True
+    return tuple(flags)
+
+
 def _fit_margins(
     distribution: CopulaDistribution,
     x: NDArray[np.float64],
     margin_kwargs: list[dict[str, Any]] | None,
-) -> tuple[list[tuple[float, ...]], list[Any]]:
-    """Maximum likelihood for each margin separately."""
+) -> tuple[list[tuple[float, ...]], list[Any], list[tuple[bool, ...]]]:
+    """Maximum likelihood for each margin separately.
+
+    Also returns, per margin, which parameters ``margin_kwargs`` pinned.
+    """
     fitted_params: list[tuple[float, ...]] = []
     frozen: list[Any] = []
+    pinned: list[tuple[bool, ...]] = []
     for j, margin in enumerate(distribution.margins):
         family: Any = getattr(margin, "dist", None)
         if family is None or not hasattr(family, "fit"):
@@ -286,7 +325,8 @@ def _fit_margins(
         estimate = tuple(float(p) for p in family.fit(x[:, j], **kwargs))
         fitted_params.append(estimate)
         frozen.append(family(*estimate))
-    return fitted_params, frozen
+        pinned.append(_pinned(family, len(estimate), kwargs))
+    return fitted_params, frozen, pinned
 
 
 def _joint_loglik(copula: Copula, margins: list[Any], x: NDArray[np.float64]) -> tuple[float, int]:
@@ -356,6 +396,9 @@ def fit_joint(
         One dict per margin (length ``d``) of extra arguments for ``scipy``'s
         ``fit`` -- most usefully ``{"floc": 0}`` to pin a location that the
         family requires to be zero. Use ``{}`` for margins that need nothing.
+        Parameters pinned this way (``f0``, ``f<shape>``, ``fix_<shape>``,
+        ``floc``, ``fscale``) stay pinned under ``method="ml"`` too, and are
+        not counted in :attr:`JointFitResult.n_params` (so not in AIC/BIC).
         Getting this wrong is the commonest cause of an implausible fit: a
         Gamma fitted with a free location will happily slide it to just below
         the sample minimum.
@@ -405,6 +448,9 @@ def fit_joint(
     """
     from rcopula.fit.api import fit as fit_copula
 
+    # Read a DataFrame the way CopulaDistribution does: by column name when the
+    # distribution has names, so a reordered frame is not silently mismatched.
+    x = np.atleast_2d(distribution._validate_x(x)) if hasattr(x, "columns") else x
     x = np.atleast_2d(np.asarray(x, dtype=float))
     if x.shape[1] != distribution.dim:
         raise ValueError(
@@ -417,7 +463,7 @@ def fit_joint(
             f"margin_kwargs must have {distribution.dim} entries, got {len(margin_kwargs)}"
         )
 
-    margin_params, frozen = _fit_margins(distribution, x, margin_kwargs)
+    margin_params, frozen, margin_fixed = _fit_margins(distribution, x, margin_kwargs)
     u = np.clip(
         np.column_stack([np.asarray(m.cdf(x[:, j])) for j, m in enumerate(frozen)]),
         1e-10,
@@ -433,24 +479,36 @@ def fit_joint(
 
     if method == "ml":
         free = np.asarray(copula.free, dtype=bool)
+        # Margin parameters pinned through margin_kwargs (floc=0, ...) stay
+        # pinned in the joint optimisation; only the estimated ones move.
+        marginal_values = np.concatenate([np.asarray(p, dtype=float) for p in margin_params])
+        marginal_free = ~np.concatenate([np.asarray(f, dtype=bool) for f in margin_fixed])
         sizes = [len(p) for p in margin_params]
-        marginal_start = np.concatenate([np.asarray(p) for p in margin_params])
-        start = np.concatenate([marginal_start, np.asarray(copula.params)[free]])
+        n_marginal_free = int(marginal_free.sum())
+        start = np.concatenate([marginal_values[marginal_free], np.asarray(copula.params)[free]])
+
+        def margin_vector(theta: NDArray[np.float64]) -> NDArray[np.float64]:
+            values = marginal_values.copy()
+            values[marginal_free] = theta[:n_marginal_free]
+            return values
 
         def unpack(theta: NDArray[np.float64]) -> CopulaDistribution | None:
+            values = margin_vector(theta)
             position = 0
             candidates = []
             for j, size in enumerate(sizes):
                 family = getattr(distribution.margins[j], "dist")  # noqa: B009
                 try:
-                    candidates.append(family(*theta[position : position + size]))
+                    candidates.append(family(*values[position : position + size]))
                 except (ValueError, TypeError):
                     return None
                 position += size
             params = np.array(copula.params, dtype=float)
-            params[free] = theta[position:]
+            params[free] = theta[n_marginal_free:]
             try:
-                return CopulaDistribution(copula.with_params(params), candidates)
+                return CopulaDistribution(
+                    copula.with_params(params), candidates, names=distribution.names
+                )
             except (ValueError, np.linalg.LinAlgError):
                 return None
 
@@ -467,10 +525,11 @@ def fit_joint(
         if best is not None and -result.fun > loglik:
             fitted = best
             copula = best.copula
+            values = margin_vector(np.asarray(result.x))
             position = 0
             margin_params = []
             for size in sizes:
-                margin_params.append(tuple(float(v) for v in result.x[position : position + size]))
+                margin_params.append(tuple(float(v) for v in values[position : position + size]))
                 position += size
             marginal = _marginal_loglik(list(best.margins), x)
             loglik, boundary = _joint_loglik(best.copula, list(best.margins), x)
@@ -487,5 +546,6 @@ def fit_joint(
         message=message,
         marginal_loglik=marginal,
         n_at_boundary=boundary,
+        margin_fixed=margin_fixed if any(any(f) for f in margin_fixed) else None,
         _x=x,
     )

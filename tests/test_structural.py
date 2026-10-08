@@ -20,6 +20,8 @@ import pytest
 from scipy import stats
 
 import rcopula as rc
+from rcopula.core.archimedean import ArchimedeanCopula
+from rcopula.core.base import Copula
 from rcopula.core.measures import rho_by_quadrature, tau_by_quadrature
 from rcopula.structural import KhoudrajiCopula, MixtureCopula, RotatedCopula, survival
 
@@ -770,6 +772,59 @@ class TestMarginalCopula:
         # is no third coordinate to drop.
         with pytest.raises(ValueError, match=r"\[0, 2\)"):
             rc.marginal_copula(rc.PlackettCopula(4.0), [0, 1, 2])
+
+
+class _TwoParameterClayton(ArchimedeanCopula):
+    """A minimal multi-parameter Archimedean subclass: Clayton plus an inert extra.
+
+    The library has no multi-parameter Archimedean family, but nothing stops a
+    user from writing one, and margins must not silently drop its parameters.
+    """
+
+    def __init__(
+        self, theta: float = np.nan, extra: float = 1.0, dim: int = 2, *, free=None
+    ) -> None:
+        self.generator = rc.ClaytonCopula.generator_instance
+        self.name = "TwoParameterClayton"
+        self.param_names = ("theta", "extra")
+        Copula.__init__(self, [theta, extra], dim, free=free)
+
+    @property
+    def param_bounds(self) -> list[tuple[float, float]]:
+        return [self.generator.bounds(self._dim), (0.0, np.inf)]
+
+    def _reconstruct(self, params, free) -> _TwoParameterClayton:
+        theta, extra = np.atleast_1d(params)
+        return _TwoParameterClayton(float(theta), float(extra), self._dim, free=free)
+
+
+class TestArchimedeanMarginsKeepEveryParameter:
+    """The margin used to be rebuilt as ``type(c)(float(c.params[0]), dim=k)``."""
+
+    def test_a_multi_parameter_subclass_keeps_all_its_parameters(self) -> None:
+        parent = _TwoParameterClayton(2.0, extra=3.5, dim=4, free=[True, False])
+        margin = rc.marginal_copula(parent, [0, 3])
+        assert type(margin) is _TwoParameterClayton
+        assert margin.dim == 2
+        assert margin.params.tolist() == [2.0, 3.5]
+        assert margin.free.tolist() == [True, False]
+
+    def test_a_user_supplied_generator_survives(self) -> None:
+        # ArchimedeanCopula(generator, theta, dim): calling type(c)(theta, dim=k)
+        # passed theta as the generator.
+        parent = ArchimedeanCopula(rc.ClaytonCopula.generator_instance, 2.0, dim=4)
+        margin = rc.marginal_copula(parent, [1, 2])
+        assert type(margin) is ArchimedeanCopula
+        assert margin.generator is parent.generator
+        assert margin.dim == 2 and float(margin.params[0]) == 2.0
+        point = np.array([[0.3, 0.6]])
+        full = np.array([[1.0, 0.3, 0.6, 1.0]])
+        assert margin.cdf(point)[0] == pytest.approx(parent.cdf(full)[0], abs=1e-12)
+
+    def test_a_fixed_parameter_stays_fixed(self) -> None:
+        margin = rc.marginal_copula(rc.GumbelCopula(2.0, dim=4, free=[False]), [0, 1])
+        assert type(margin) is rc.GumbelCopula
+        assert margin.free.tolist() == [False]
 
 
 class TestOuterPower:

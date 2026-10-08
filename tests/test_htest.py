@@ -410,3 +410,18 @@ class TestSerialIndependence:
 
         with pytest.raises(ValueError, match="more than 3 observations"):
             serial_indep_test(np.zeros(3), lags=3)
+
+
+class TestExtremeValueNegativeDependence:
+    def test_negative_tau_is_flagged_not_silently_clipped(self) -> None:
+        x = rc.FrankCopula(-6.0).rvs(200, random_state=0)
+        with pytest.warns(UserWarning, match="cannot be negatively dependent"):
+            rc.ev_test(x, n_rep=20, random_state=0)
+
+    def test_positive_tau_is_quiet(self) -> None:
+        import warnings
+
+        x = rc.GumbelCopula(2.0).rvs(200, random_state=0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            rc.ev_test(x, n_rep=20, random_state=0)
