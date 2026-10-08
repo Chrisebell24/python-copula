@@ -1538,12 +1538,13 @@ Joe, H. (2014). <em>Dependence Modeling with Copulas</em>. Chapman &amp; Hall/CR
 
     <div class="doc doc-contents ">
 
-        <p>Conditional distribution :math:<code>P(U_j \le u_j \mid U_{given} = u_{given})</code>.</p>
-<p>The h-function. For a bivariate copula, <code>given=1</code> returns
-:math:<code>h(u_1 \mid u_2) = \partial C/\partial u_2</code> and <code>given=0</code> returns
-the other conditional.</p>
-<p>Analytic for Archimedean, Gaussian and Student-t families; numerical
-differentiation elsewhere.</p>
+        <p>Probability that one variable is at most its value, given the other variable's value.</p>
+<p>This is the conditional distribution of a bivariate copula, often called
+the h-function: :math:<code>P(U_j \le u_j \mid U_{given} = u_{given})</code>. It
+answers "given where variable B is, how unusual is variable A?" -- a value
+near 0 means A is unusually low for that B, near 1 unusually high. It is
+also the building block of sampling, vine copulas and the Rosenblatt
+transform.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1566,7 +1567,9 @@ differentiation elsewhere.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Bivariate copula.</p>
+                <p>A bivariate (<code>dim=2</code>) copula with its parameters set. Archimedean,
+Gaussian and Student-t families use exact formulas; every other family
+uses numerical differentiation of its CDF.</p>
               </div>
             </td>
             <td>
@@ -1578,11 +1581,13 @@ differentiation elsewhere.</p>
                 <code>u</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (n, 2)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, 2)</code> points in the unit square.</p>
+                <p>Points in the unit square, one per row. A single point may be passed
+as a 1-D sequence of length 2. Values are clipped to
+<code>[1e-12, 1 - 1e-12]</code>.</p>
               </div>
             </td>
             <td>
@@ -1594,15 +1599,17 @@ differentiation elsewhere.</p>
                 <code>given</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code>(0, 1)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Which coordinate to condition on.</p>
+                <p>Index of the column to condition on. <code>given=1</code> returns
+:math:<code>h(u_1 \mid u_2) = \partial C/\partial u_2</code>; <code>given=0</code> returns
+the other conditional, :math:<code>P(U_2 \le u_2 \mid U_1 = u_1)</code>.</p>
               </div>
             </td>
             <td>
-                  <code>1</code>
+                  <code>0</code>
             </td>
           </tr>
       </tbody>
@@ -1620,12 +1627,35 @@ differentiation elsewhere.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>numpy.ndarray of float, shape (n,)</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Values in <code>[0, 1]</code>. Under the true copula these are <strong>uniform</strong>,
 which is what makes them usable as a standardised signal.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>u</code> does not have exactly two columns, or <code>given</code> is not 0 or 1.</p>
               </div>
             </td>
           </tr>
@@ -1676,12 +1706,149 @@ Rosenblatt transform and every h-function-based test rely on:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Invert the h-function: find <code>x</code> with :math:<code>h(x \mid \text{cond}) = w</code>.</p>
-<p>This is the conditional-distribution sampling method -- draw <code>w</code> uniform,
-invert, and the pair <code>(x, cond)</code> follows the copula. Solved by vectorised
-bisection, which handles every family uniformly and converges to 1e-15 in 50
-halvings.</p>
+        <p>Find the value of one variable that has a given conditional probability, given the other.</p>
+<p>The inverse of :func:<code>conditional_cdf</code> (the inverse h-function): returns
+<code>x</code> with :math:<code>h(x \mid \text{cond}) = w</code>. Its main use is simulation --
+draw <code>w</code> uniform, invert, and the pair <code>(x, cond)</code> follows the copula --
+including conditional scenarios where <code>cond</code> is fixed.</p>
 
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A bivariate (<code>dim=2</code>) copula with its parameters set.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>w</code>
+            </td>
+            <td>
+                  <code>float or array_like of float, shape (n,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Target conditional probabilities, each in :math:<code>[0, 1]</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cond</code>
+            </td>
+            <td>
+                  <code>float or array_like of float, shape (n,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Values of the conditioning variable, each in :math:<code>[0, 1]</code>. <code>w</code> and
+<code>cond</code> are broadcast against each other, so either may be a scalar.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>given</code>
+            </td>
+            <td>
+                  <code>(0, 1)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which coordinate <code>cond</code> occupies. <code>given=1</code> solves for the first
+coordinate given the second; <code>given=0</code> solves for the second given
+the first.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (n,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The solved values <code>x</code>, each in <code>(0, 1)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is not bivariate or <code>given</code> is not 0 or 1 (raised by
+:func:<code>conditional_cdf</code>).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Solved by 60 steps of vectorised bisection on <code>[1e-12, 1 - 1e-12]</code>, which
+handles every family uniformly and takes the bracket below double precision.
+Targets outside :math:<code>[0, 1]</code> are not rejected; they simply converge to the
+nearest end of the bracket.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>Round-trips against :func:<code>conditional_cdf</code>:</p>
@@ -1715,8 +1882,126 @@ halvings.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Rosenblatt transform (R's <code>cCopula</code>).</p>
-<p>Maps dependent uniforms to <strong>independent</strong> uniforms by conditioning
+        <p>Turn dependent copula data into independent uniform numbers, if the copula is right.</p>
+<p>This is the Rosenblatt transform (R's <code>cCopula</code>). Each column is replaced
+by its conditional probability given all the columns before it. If the
+data really came from <code>copula</code>, the output columns are independent and
+uniform on :math:<code>[0, 1]</code>; if not, they are visibly not. That turns a
+goodness-of-fit question into a simpler test of independence and
+uniformity.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The copula to test against, with its parameters set. Archimedean,
+Gaussian and Student-t families work in any dimension; other families
+only for <code>dim=2</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations on the copula scale (pseudo-observations), one row each.
+<code>d</code> must equal <code>copula.dim</code>. Values are clipped to
+<code>[1e-12, 1 - 1e-12]</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Transformed values in <code>[0, 1]</code>. The first column equals the (clipped)
+first column of <code>u</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the number of columns of <code>u</code> differs from <code>copula.dim</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="NotImplementedError">NotImplementedError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is neither Archimedean nor elliptical and <code>d &gt; 2</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Maps dependent uniforms to <strong>independent</strong> uniforms by conditioning
 successively:</p>
 <p>.. math::
     Z_1 = U_1,\quad Z_2 = C(U_2 \mid U_1),\quad
@@ -1727,7 +2012,7 @@ independence and uniformity -- the basis of the <code>SnB</code> and <code>SnC</
 statistics.</p>
 <p>Implemented analytically for Archimedean and elliptical families in any
 dimension, and for arbitrary bivariate copulas.</p>
-
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>The right copula gives independent uniforms; the wrong one does not:</p>
@@ -1766,12 +2051,12 @@ dimension, and for arbitrary bivariate copulas.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Inverse Rosenblatt transform: independent uniforms to copula draws.</p>
-<p>The other direction of :func:<code>rosenblatt</code>, and the reason it matters is
-sampling. <code>rvs</code> draws its own randomness; this takes randomness you supply,
-which is what lets a <strong>quasi-random</strong> point set be pushed through a copula --
-see :mod:<code>rcopula.sampling</code>. It is also how conditional simulation works:
-fix the first coordinates, vary the rest.</p>
+        <p>Turn independent uniform numbers into draws from a copula.</p>
+<p>The inverse Rosenblatt transform, the reverse of :func:<code>rosenblatt</code>. Unlike
+<code>copula.rvs</code>, which makes its own randomness, this takes randomness you
+supply. That lets you push a <strong>quasi-random</strong> point set through a copula
+(see :mod:<code>rcopula.sampling</code>) or do conditional simulation: fix the first
+coordinates and vary the rest.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1794,7 +2079,9 @@ fix the first coordinates, vary the rest.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The target copula, with its parameters set. Any family for which
+:func:<code>rosenblatt</code> works (Archimedean and elliptical in any dimension,
+others for <code>dim=2</code>).</p>
               </div>
             </td>
             <td>
@@ -1806,11 +2093,12 @@ fix the first coordinates, vary the rest.</p>
                 <code>z</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Independent uniforms.</p>
+                <p>Independent uniforms on :math:<code>[0, 1]</code>, one row per draw. <code>d</code> must
+equal <code>copula.dim</code>. Values are clipped to <code>[1e-12, 1 - 1e-12]</code>.</p>
               </div>
             </td>
             <td>
@@ -1832,11 +2120,45 @@ fix the first coordinates, vary the rest.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>numpy.ndarray of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Draws from <code>copula</code>.</p>
+                <p>Draws from <code>copula</code>, each in <code>(0, 1)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the number of columns of <code>z</code> differs from <code>copula.dim</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="NotImplementedError">NotImplementedError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If :func:<code>rosenblatt</code> does not support <code>copula</code> (non-Archimedean,
+non-elliptical with <code>d &gt; 2</code>).</p>
               </div>
             </td>
           </tr>
@@ -1889,17 +2211,13 @@ below double precision.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Split an Archimedean sample into its radial and angular parts.</p>
-<p>McNeil and Neslehova showed that :math:<code>U \sim C</code> for an Archimedean copula
-with generator :math:<code>\psi</code> if and only if</p>
-<p>.. math::  \bigl(\psi^{-1}(U_1), \dots, \psi^{-1}(U_d)\bigr) = R\,S,</p>
-<p>with :math:<code>S</code> <strong>uniform on the unit simplex</strong> and independent of the radial
-variable :math:<code>R = \sum_k \psi^{-1}(U_k)</code>. All the family-specific
-information sits in the distribution of :math:<code>R</code>; the angular part is the
-same for every Archimedean copula in every dimension.</p>
-<p>That is the whole basis for testing <em>Archimedeanity</em> rather than testing one
-particular family: if the angular part is not uniform on the simplex, no
-Archimedean copula fits, whatever generator is tried.</p>
+        <p>Split Archimedean copula data into a "size" part and a "direction" part.</p>
+<p>Every Archimedean copula sample can be written as a radial variable
+:math:<code>R</code> (one number per row, how far out the point is) times a direction
+:math:<code>S</code> that is uniform on the unit simplex. The direction part has the
+same distribution for every Archimedean copula, so if it does not look
+uniform, no Archimedean family fits the data. This is the decomposition of
+McNeil and Neslehova (2009).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1922,7 +2240,7 @@ Archimedean copula fits, whatever generator is tried.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Supplies the generator. Its parameter must be set.</p>
+                <p>Supplies the generator :math:<code>\psi</code>. Its parameter must be set.</p>
               </div>
             </td>
             <td>
@@ -1934,11 +2252,12 @@ Archimedean copula fits, whatever generator is tried.</p>
                 <code>u</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Observations on the copula scale, strictly inside :math:<code>(0, 1)</code>. <code>d</code>
+must equal <code>copula.dim</code>. A 1-D input is treated as a single row.</p>
               </div>
             </td>
             <td>
@@ -1960,27 +2279,74 @@ Archimedean copula fits, whatever generator is tried.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>radial</code></td>            <td>
-                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>))</code>
+                  <code>numpy.ndarray of float, shape (n,)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>:math:<code>R</code>.</p>
+                <p>:math:<code>R = \sum_k \psi^{-1}(u_k)</code>, non-negative.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
 <td><code>angular</code></td>            <td>
-                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>numpy.ndarray of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>:math:<code>S</code>, whose rows sum to one.</p>
+                <p>:math:<code>S</code>, whose rows sum to one. NaN in rows where :math:<code>R = 0</code>.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is not an :class:<code>ArchimedeanCopula</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the number of columns of <code>u</code> differs from <code>copula.dim</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>McNeil and Neslehova showed that :math:<code>U \sim C</code> for an Archimedean copula
+with generator :math:<code>\psi</code> if and only if</p>
+<p>.. math::  \bigl(\psi^{-1}(U_1), \dots, \psi^{-1}(U_d)\bigr) = R\,S,</p>
+<p>with :math:<code>S</code> <strong>uniform on the unit simplex</strong> and independent of the radial
+variable :math:<code>R = \sum_k \psi^{-1}(U_k)</code>. All the family-specific
+information sits in the distribution of :math:<code>R</code>; the angular part is the
+same for every Archimedean copula in every dimension.</p>
+<p>That is the whole basis for testing <em>Archimedeanity</em> rather than testing one
+particular family: if the angular part is not uniform on the simplex, no
+Archimedean copula fits, whatever generator is tried.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>The angular part is uniform on the simplex, so each of its coordinates has
@@ -2013,23 +2379,13 @@ mean :math:<code>1/d</code> -- and this does not depend on the family or the par
 
     <div class="doc doc-contents ">
 
-        <p>Hering-Hofert transform: Archimedean data to independent uniforms.</p>
-<p>The Rosenblatt transform (:func:<code>rosenblatt</code>) does the same job by
-conditioning one coordinate at a time, which needs :math:<code>d-1</code> derivatives
-of the generator and loses accuracy fast as :math:<code>d</code> grows. This transform
-goes through the simplex decomposition instead, so it needs no high-order
-derivatives at all and stays usable at :math:<code>d = 100</code> -- which is why it
-exists.</p>
-<p>Writing :math:<code>S_j = \sum_{k \le j} \psi^{-1}(U_k)</code>,</p>
-<p>.. math::</p>
-<pre><code>Y_j = \left(\frac{S_j}{S_{j+1}}\right)^{j}, \quad j = 1, \dots, d-1,
-\qquad Y_d = K\bigl(\psi(S_d)\bigr),
-</code></pre>
-<p>with :math:<code>K</code> the Kendall distribution function. Under the null that <code>u</code>
-came from this copula the :math:<code>Y_j</code> are independent and uniform, so any
-test of multivariate uniformity becomes a goodness-of-fit test.</p>
-<p>The first :math:<code>d-1</code> components come from the angular part and the last
-from the radial part; since those are independent, so are the two groups.</p>
+        <p>Turn Archimedean copula data into independent uniforms, even in high dimensions.</p>
+<p>This is the Hering-Hofert transform (R's <code>htrafo</code>). It does the same job
+as :func:<code>rosenblatt</code> -- if the data came from <code>copula</code>, the output is
+independent and uniform -- but it avoids high-order derivatives of the
+generator, so it stays accurate at :math:<code>d = 100</code> where the Rosenblatt
+transform breaks down. Use it for goodness-of-fit testing of Archimedean
+models with many variables.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2052,7 +2408,7 @@ from the radial part; since those are independent, so are the two groups.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The copula to test against, with its parameter set.</p>
               </div>
             </td>
             <td>
@@ -2064,11 +2420,12 @@ from the radial part; since those are independent, so are the two groups.</p>
                 <code>u</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Observations on the copula scale, strictly inside :math:<code>(0, 1)</code>. <code>d</code>
+must equal <code>copula.dim</code>.</p>
               </div>
             </td>
             <td>
@@ -2090,11 +2447,45 @@ from the radial part; since those are independent, so are the two groups.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>numpy.ndarray of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Transformed values in <code>[0, 1]</code>. Columns <code>0</code> to <code>d-2</code> come from
+the angular part, the last column from the radial part.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is not an :class:<code>ArchimedeanCopula</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the number of columns of <code>u</code> differs from <code>copula.dim</code>.</p>
               </div>
             </td>
           </tr>
@@ -2106,6 +2497,24 @@ from the radial part; since those are independent, so are the two groups.</p>
   <summary>See Also</summary>
   <p>rosenblatt : the conditioning-based alternative, exact but derivative-hungry.
 radial_simplex : the decomposition this is built on.</p>
+</details>
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>The Rosenblatt transform conditions one coordinate at a time, which needs
+:math:<code>d-1</code> derivatives of the generator and loses accuracy fast as :math:<code>d</code>
+grows. This transform goes through the simplex decomposition instead, so it
+needs no high-order derivatives at all -- which is why it exists.</p>
+<p>Writing :math:<code>S_j = \sum_{k \le j} \psi^{-1}(U_k)</code>,</p>
+<p>.. math::</p>
+<pre><code>Y_j = \left(\frac{S_j}{S_{j+1}}\right)^{j}, \quad j = 1, \dots, d-1,
+\qquad Y_d = K\bigl(\psi(S_d)\bigr),
+</code></pre>
+<p>with :math:<code>K</code> the Kendall distribution function. Under the null that <code>u</code>
+came from this copula the :math:<code>Y_j</code> are independent and uniform, so any
+test of multivariate uniformity becomes a goodness-of-fit test.</p>
+<p>The first :math:<code>d-1</code> components come from the angular part and the last
+from the radial part; since those are independent, so are the two groups.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2147,20 +2556,11 @@ does not:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Distribution function of the radial part (R's <code>pacR</code>).</p>
-<p>:func:<code>radial_simplex</code> splits an Archimedean sample into a radial variable
-:math:<code>R = \sum_j \psi^{-1}(U_j)</code> and a point uniform on the simplex. The
-angular half is the same for every Archimedean copula in every dimension,
-so <strong>all</strong> the family-specific information lives in the distribution of
-:math:<code>R</code> -- which is this.</p>
-<p>It needs no new machinery, because it is the Kendall distribution function
-in disguise. Since :math:<code>C(\mathbf U) = \psi(R)</code> and :math:<code>\psi</code> is
-decreasing,</p>
-<p>.. math::</p>
-<pre><code>K(t) = P\{\psi(R) \le t\} = P\{R \ge \psi^{-1}(t)\},
-\qquad\text{so}\qquad
-F_R(x) = 1 - K(\psi(x)).
-</code></pre>
+        <p>Probability that the radial ("size") part of an Archimedean sample is at most <code>x</code>.</p>
+<p>The distribution function of :math:<code>R</code> from :func:<code>radial_simplex</code> (R's
+<code>pacR</code>). Since the direction part is the same for every Archimedean
+copula, this curve carries <strong>all</strong> the family-specific information, which
+makes it the thing to compare between families or against data.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2183,7 +2583,7 @@ F_R(x) = 1 - K(\psi(x)).
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The copula, with its parameter set.</p>
               </div>
             </td>
             <td>
@@ -2195,11 +2595,11 @@ F_R(x) = 1 - K(\psi(x)).
                 <code>x</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>float or array_like of float, any shape</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Radii, non-negative.</p>
+                <p>Radii at which to evaluate, each non-negative.</p>
               </div>
             </td>
             <td>
@@ -2221,17 +2621,68 @@ F_R(x) = 1 - K(\psi(x)).
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>numpy.ndarray of float, shape (m,)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>:math:<code>F_R(x)</code> in :math:<code>[0, 1]</code>, one value per element of <code>x</code>
+(flattened to 1-D).</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is not an :class:<code>ArchimedeanCopula</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any element of <code>x</code> is negative.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>:func:<code>radial_simplex</code> splits an Archimedean sample into a radial variable
+:math:<code>R = \sum_j \psi^{-1}(U_j)</code> and a point uniform on the simplex. The
+angular half is the same for every Archimedean copula in every dimension,
+so <strong>all</strong> the family-specific information lives in the distribution of
+:math:<code>R</code> -- which is this.</p>
+<p>It needs no new machinery, because it is the Kendall distribution function
+in disguise. Since :math:<code>C(\mathbf U) = \psi(R)</code> and :math:<code>\psi</code> is
+decreasing,</p>
+<p>.. math::</p>
+<pre><code>K(t) = P\{\psi(R) \le t\} = P\{R \ge \psi^{-1}(t)\},
+\qquad\text{so}\qquad
+F_R(x) = 1 - K(\psi(x)).
+</code></pre>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
@@ -2266,11 +2717,9 @@ F_R(x) = 1 - K(\psi(x)).
 
     <div class="doc doc-contents ">
 
-        <p>Quantile function of the radial part (R's <code>qacR</code>).</p>
-<p>The inverse of :func:<code>radial_cdf</code>, by the same identity: since
-:math:<code>F_R(x) = 1 - K(\psi(x))</code>, the quantile is
-:math:<code>\psi^{-1}(K^{-1}(1 - q))</code>, so it reduces to the Kendall function's
-own quantile and needs no root-finding of its own.</p>
+        <p>Find the radius below which a given fraction of an Archimedean sample's radial part falls.</p>
+<p>The quantile (inverse) function of :func:<code>radial_cdf</code> (R's <code>qacR</code>):
+returns <code>x</code> with :math:<code>F_R(x) = q</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2293,7 +2742,7 @@ own quantile and needs no root-finding of its own.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The copula, with its parameter set.</p>
               </div>
             </td>
             <td>
@@ -2305,11 +2754,11 @@ own quantile and needs no root-finding of its own.</p>
                 <code>q</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>float or array_like of float, any shape</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Probabilities in :math:<code>[0, 1]</code>.</p>
+                <p>Probabilities, each in :math:<code>[0, 1]</code>.</p>
               </div>
             </td>
             <td>
@@ -2331,17 +2780,58 @@ own quantile and needs no root-finding of its own.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>numpy.ndarray of float, shape (m,)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Non-negative radii, one per element of <code>q</code> (flattened to 1-D).</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is not an :class:<code>ArchimedeanCopula</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any element of <code>q</code> lies outside :math:<code>[0, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>By the same identity as :func:<code>radial_cdf</code>: since
+:math:<code>F_R(x) = 1 - K(\psi(x))</code>, the quantile is
+:math:<code>\psi^{-1}(K^{-1}(1 - q))</code>, so it reduces to the Kendall function's
+own quantile and needs no root-finding of its own.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rc</span>
@@ -2454,8 +2944,119 @@ Nappo, G. and Spizzichino, F. (2009). Kendall distributions and level sets in
 
     <div class="doc doc-contents ">
 
-        <p>The Kendall distribution function :math:<code>K(t) = P(C(\mathbf U) \le t)</code>.</p>
-<p>For an Archimedean copula in :math:<code>d</code> dimensions (Barbe et al. 1996),</p>
+        <p>Probability that the copula, evaluated at a random draw from itself, is at most <code>t</code>.</p>
+<p>This is the Kendall distribution function
+:math:<code>K(t) = P(C(\mathbf U) \le t)</code> (R's <code>pK</code>). It squeezes a whole
+multivariate dependence structure into one curve on :math:<code>[0, 1]</code>: the
+value :math:<code>C(\mathbf u)</code> says how "jointly low" a point is, and :math:<code>K</code>
+says how often points are at least that jointly low. Use it to compute joint
+(Kendall) return periods, to compare a fitted family with data via
+:func:<code>kendall_empirical</code>, or to recover Kendall's tau.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The dependence model, with its parameters set. Archimedean families
+(Clayton, Gumbel, Frank, Joe, AMH, ...), :class:<code>IndependenceCopula</code> and
+:class:<code>FrechetUpperCopula</code> work in any dimension; every other family
+must be bivariate (<code>dim=2</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code>float or array_like of float, any shape</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Levels at which to evaluate :math:<code>K</code>. Values at or below 0 give 0 and
+values at or above 1 give 1.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>:math:<code>K(t)</code> for each level, in :math:<code>[0, 1]</code>, where <code>m</code> is the
+number of elements in <code>t</code> (the input is flattened to 1-D; a scalar
+gives shape <code>(1,)</code>). :math:<code>K(t) \ge t</code> for every copula.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="NotImplementedError">NotImplementedError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is neither Archimedean, independence nor comonotone and
+has <code>dim</code> other than 2.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>For an Archimedean copula in :math:<code>d</code> dimensions (Barbe et al. 1996),</p>
 <p>.. math::
     K(t) = \sum_{k=0}^{d-1} \frac{(-1)^k}{k!}\,
            s^k\,\psi^{(k)}(s), \qquad s = \psi^{-1}(t),</p>
@@ -2467,7 +3068,7 @@ reduces to the familiar :math:<code>K(t) = t - s\,\psi'(s)</code>.</p>
     K(t) = t + \int_t^1 \frac{\partial C}{\partial u}\bigl(u, v_t(u)\bigr)\,du,</p>
 <p>where :math:<code>v_t(u)</code> solves :math:<code>C(u, v_t) = t</code>. Below :math:<code>u = t</code> the
 event is certain, which is where the leading :math:<code>t</code> comes from.</p>
-
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>Independence has the closed form :math:<code>K(t) = t(1 - \log t)</code>:</p>
@@ -2516,16 +3117,122 @@ return period always exceeds the univariate one:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Density of the Kendall distribution function (R's <code>dK</code>).</p>
-<p>Differentiating the Archimedean sum telescopes -- every term cancels against
+        <p>Probability density of the Kendall distribution function (R's <code>dK</code>).</p>
+<p>The slope of :func:<code>kendall_cdf</code>: where it is large, many draws of the
+copula land at that joint level. Useful for plotting the Kendall
+distribution or building likelihoods on it.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The dependence model, with its parameters set. Same support as
+:func:<code>kendall_cdf</code>: Archimedean families in any dimension (closed
+form), other families bivariate only (numerical derivative).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code>float or array_like of float, any shape</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Levels at which to evaluate the density. Points outside the open
+interval :math:<code>(0, 1)</code> give 0.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Non-negative density values, one per element of <code>t</code> (flattened to
+1-D; a scalar gives shape <code>(1,)</code>).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="NotImplementedError">NotImplementedError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula</code> is not Archimedean and has <code>dim</code> other than 2 (raised
+by :func:<code>kendall_cdf</code>, which the numerical route calls). Independence
+and comonotone copulas use that numerical route.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Differentiating the Archimedean sum telescopes -- every term cancels against
 the next -- and only the last survives:</p>
 <p>.. math::
     K'(t) = \frac{s^{d-1}\,\bigl|\psi^{(d)}(s)\bigr|}
                  {(d-1)!\,\bigl|\psi'(s)\bigr|},
     \qquad s = \psi^{-1}(t),</p>
 <p>manifestly non-negative, as a density must be. Elsewhere it is a central
-difference of :func:<code>kendall_cdf</code>.</p>
-
+difference of :func:<code>kendall_cdf</code> with step <code>1e-6</code>.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>Integrates to one, and matches the derivative of <code>K</code>:</p>
@@ -2561,7 +3268,115 @@ difference of :func:<code>kendall_cdf</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Quantile function of :math:<code>K</code> (R's <code>qK</code>), by bisection.</p>
+        <p>Find the joint level <code>t</code> below which a given fraction of copula draws fall.</p>
+<p>The quantile (inverse) function of the Kendall distribution, R's <code>qK</code>:
+returns <code>t</code> with :math:<code>K(t) = p</code>. Solved by 60 steps of bisection, so it
+works for every family :func:<code>kendall_cdf</code> supports.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The dependence model, with its parameters set (see :func:<code>kendall_cdf</code>
+for which families and dimensions are supported).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p</code>
+            </td>
+            <td>
+                  <code>float or array_like of float, any shape</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Probabilities, each in :math:<code>[0, 1]</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Levels <code>t</code> in :math:<code>[0, 1]</code>, one per element of <code>p</code> (flattened to
+1-D). <code>p = 0</code> maps to 0 and <code>p = 1</code> maps to 1.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any element of <code>p</code> lies outside :math:<code>[0, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="NotImplementedError">NotImplementedError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If :func:<code>kendall_cdf</code> does not support <code>copula</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2592,10 +3407,103 @@ difference of :func:<code>kendall_cdf</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Draw from :math:<code>K</code> (R's <code>rK</code>), by evaluating :math:<code>C</code> at its own draws.</p>
-<p>Exact by construction -- :math:<code>K</code> <em>is</em> the law of :math:<code>C(\mathbf U)</code> --
-and cheaper than inverting :math:<code>K</code>.</p>
+        <p>Draw random values from the Kendall distribution of a copula (R's <code>rK</code>).</p>
+<p>It simulates points from the copula and evaluates the copula's CDF at each
+one, so the output is a sample of :math:<code>C(\mathbf U)</code>.</p>
 
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The dependence model, with its parameters set. Must support <code>rvs</code> and
+<code>cdf</code> (every family in the package does).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of draws; a positive integer.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed or generator for reproducibility. <code>None</code> uses fresh entropy.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (size,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Independent draws, each in :math:<code>[0, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Exact by construction -- :math:<code>K</code> <em>is</em> the law of :math:<code>C(\mathbf U)</code> --
+and cheaper than inverting :math:<code>K</code>.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>The draws reproduce the analytic <code>K</code>:</p>
@@ -2628,15 +3536,14 @@ and cheaper than inverting :math:<code>K</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The nonparametric Kendall function (R's <code>Kn</code>).</p>
-<p>Genest &amp; Rivest (1993) replace :math:<code>C(\mathbf X_i)</code> by the fraction of the
-sample it dominates,</p>
-<p>.. math::
-    W_i = \frac{1}{n-1}\,#{j \ne i : \mathbf X_j &lt; \mathbf X_i},</p>
-<p>and take the empirical distribution of the :math:<code>W_i</code>. Being rank-based it
-needs no margins and no fitted copula, which makes it the natural check on
-whether a family's :math:<code>K</code> matches the data -- and the basis of the
-<code>Sn^K</code> goodness-of-fit statistics.</p>
+        <p>Estimate the Kendall distribution function straight from data, with no model.</p>
+<p>This is the nonparametric estimator of Genest and Rivest (1993), R's
+<code>Kn</code>. For each observation it counts the fraction of the other
+observations that are smaller in every coordinate, then takes the empirical
+distribution of those fractions. It uses only ranks, so the margins do not
+matter and no copula has to be fitted. Compare it with :func:<code>kendall_cdf</code>
+of a fitted family to see whether the family's joint behaviour matches the
+data.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2655,11 +3562,13 @@ whether a family's :math:<code>K</code> matches the data -- and the basis of the
                 <code>data</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, d)</code> observations, on any scale.</p>
+                <p>Observations, one row per observation, on any scale (raw data or
+pseudo-observations). Needs <code>n &gt;= 2</code>. A 1-D input is treated as a
+single row.</p>
               </div>
             </td>
             <td>
@@ -2671,11 +3580,12 @@ whether a family's :math:<code>K</code> matches the data -- and the basis of the
                 <code>t</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>float, array_like of float or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Where to evaluate. Defaults to the sorted <code>W_i</code> themselves.</p>
+                <p>Levels at which to evaluate the estimate. <code>None</code> returns the sorted
+pseudo-values :math:<code>W_i</code> themselves instead.</p>
               </div>
             </td>
             <td>
@@ -2685,6 +3595,66 @@ whether a family's :math:<code>K</code> matches the data -- and the basis of the
       </tbody>
     </table>
 
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>t</code> is None: shape <code>(n,)</code>, the sorted :math:<code>W_i</code>, each in
+:math:<code>[0, 1]</code>. Otherwise: shape <code>(m,)</code> with <code>m</code> the number of
+elements in <code>t</code>, the estimated :math:<code>K</code> at each level.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>data</code> has fewer than two rows.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Genest &amp; Rivest (1993) replace :math:<code>C(\mathbf X_i)</code> by the fraction of the
+sample it dominates,</p>
+<p>.. math::
+    W_i = \frac{1}{n-1}\,#{j \ne i : \mathbf X_j &lt; \mathbf X_i},</p>
+<p>and take the empirical distribution of the :math:<code>W_i</code>. Being rank-based it
+needs no margins and no fitted copula, which makes it the natural check on
+whether a family's :math:<code>K</code> matches the data -- and the basis of the
+<code>Sn^K</code> goodness-of-fit statistics. Memory and time are :math:<code>O(n^2)</code>.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>It tracks the true <code>K</code> without knowing the family:</p>
@@ -2717,15 +3687,11 @@ whether a family's :math:<code>K</code> matches the data -- and the basis of the
 
     <div class="doc doc-contents ">
 
-        <p>Kendall return period :math:<code>\text{interval}/(1 - K(t))</code>.</p>
-<p>The multivariate answer to "how often is an event this severe". A univariate
-return period asks how often <em>one</em> variable is exceeded; the joint event
-:math:<code>\{C(\mathbf U) &gt; t\}</code> is a region, and every point on its boundary is
-equally extreme, so no single margin can express it.</p>
-<p>Because :math:<code>K(t) \ge t</code> for every copula, the Kendall return period is
-always <strong>longer</strong> than the univariate one at the same level. Reporting the
-univariate number for a compound event therefore overstates how often it
-happens.</p>
+        <p>How long, on average, until a joint event at least this severe happens again.</p>
+<p>This is the Kendall return period :math:<code>\text{interval}/(1 - K(t))</code>: the
+multivariate counterpart of "the 100-year flood". Use it when an event is
+dangerous because several variables are extreme together (for example
+river flow and rainfall, or losses on several assets).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2748,7 +3714,8 @@ happens.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The fitted dependence structure.</p>
+                <p>The fitted dependence structure, with its parameters set (see
+:func:<code>kendall_cdf</code> for supported families and dimensions).</p>
               </div>
             </td>
             <td>
@@ -2760,11 +3727,12 @@ happens.</p>
                 <code>t</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>float or array_like of float, any shape</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Critical level, in copula units.</p>
+                <p>Critical level, in copula units: the value of :math:<code>C(\mathbf u)</code> at
+the event of interest, between 0 and 1.</p>
               </div>
             </td>
             <td>
@@ -2781,7 +3749,7 @@ happens.</p>
             <td>
               <div class="doc-md-description">
                 <p>Mean time between observations, in whatever unit the answer should be
-in -- 1 for annual maxima.</p>
+in -- 1 for annual maxima. Must be positive.</p>
               </div>
             </td>
             <td>
@@ -2791,6 +3759,74 @@ in -- 1 for annual maxima.</p>
       </tbody>
     </table>
 
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Return periods in the units of <code>interval</code>, one per element of <code>t</code>
+(flattened to 1-D). Infinite where :math:<code>K(t) = 1</code>, e.g. at <code>t &gt;= 1</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>interval</code> is not positive.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="NotImplementedError">NotImplementedError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If :func:<code>kendall_cdf</code> does not support <code>copula</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>A univariate return period asks how often <em>one</em> variable is exceeded; the
+joint event :math:<code>\{C(\mathbf U) &gt; t\}</code> is a region, and every point on its
+boundary is equally extreme, so no single margin can express it.</p>
+<p>Because :math:<code>K(t) \ge t</code> for every copula, the Kendall return period is
+always <strong>longer</strong> than the univariate one at the same level. Reporting the
+univariate number for a compound event therefore overstates how often it
+happens.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>Comonotone variables move together exactly, so the joint event is the
@@ -2833,10 +3869,126 @@ does not determine the design life.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The critical level :math:<code>t</code> whose Kendall return period is <code>period</code>.</p>
-<p>The inverse of :func:<code>kendall_return_period</code>, and the quantity a design
-standard actually specifies -- "the 100-year event" is a return period, and
-what an engineer needs is the level that goes with it.</p>
+        <p>Find the joint severity level that corresponds to a chosen return period.</p>
+<p>The inverse of :func:<code>kendall_return_period</code>: given "the 100-year event",
+return the critical level :math:<code>t</code> (in copula units) whose Kendall return
+period is <code>period</code>. This is the quantity a design standard actually
+specifies -- the return period is fixed and the engineer needs the level
+that goes with it.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fitted dependence structure, with its parameters set (see
+:func:<code>kendall_cdf</code> for supported families and dimensions).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>period</code>
+            </td>
+            <td>
+                  <code>float or array_like of float, any shape</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Target return periods, in the units of <code>interval</code>. Each must be
+positive and at least <code>interval</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>interval</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Mean time between observations -- 1 for annual maxima.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1.0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Critical levels <code>t</code> in :math:<code>[0, 1]</code>, one per element of <code>period</code>
+(flattened to 1-D).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any <code>period</code> is not positive, or is shorter than <code>interval</code>
+(which would need a probability below zero; the message then reads
+"p must lie in [0, 1]").</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2931,9 +4083,109 @@ Takahasi, H. and Mori, M. (1974). Double exponential formulas for numerical
 
     <div class="doc doc-contents ">
 
-        <p>Spearman's rho as :math:<code>12\int\int C\,du\,dv - 3</code>.</p>
-<p>Needs only the CDF, so it works for every bivariate copula -- including
-those with no density at all.</p>
+        <p>Compute Spearman's rho of a two-variable copula by numerical integration.</p>
+<p>Spearman's rho is a rank correlation between -1 and 1: 0 means no
+monotone association, positive values mean the two variables tend to be
+large together. Use this for copulas that have no closed-form rho, such as
+rotations, mixtures and Khoudraji constructions.</p>
+<p>Technically, it evaluates :math:<code>\rho = 12\int\int C\,du\,dv - 3</code> with a
+tanh-sinh rule. It needs only the CDF, so it works for every bivariate
+copula -- including those with no density at all.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A fully specified copula with <code>dim == 2</code> (no NaN parameters).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>level</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Half-width of the tanh-sinh node index; larger means more nodes per
+axis and higher accuracy at more cost. The default gives roughly 150
+usable nodes per axis and about 1e-9 accuracy.</p>
+              </div>
+            </td>
+            <td>
+                  <code>140</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Spearman's rho, clipped to <code>[-1, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula.dim</code> is not 2, or the copula has unspecified parameters.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2964,10 +4216,111 @@ those with no density at all.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Kendall's tau as :math:<code>4\int\int C\,dC - 1 = 4\int\int C\,c\,du\,dv - 1</code>.</p>
-<p>Needs the density as well as the CDF. Unlike Spearman's rho, tau is <strong>not</strong>
+        <p>Compute Kendall's tau of a two-variable copula by numerical integration.</p>
+<p>Kendall's tau is a rank correlation between -1 and 1 based on how often
+pairs of observations move in the same direction. Use this for copulas
+with a density but no closed-form tau. If the copula has a singular part
+or very strong dependence, prefer :func:<code>tau_by_partials</code>.</p>
+<p>Technically, it evaluates
+:math:<code>\tau = 4\int\int C\,dC - 1 = 4\int\int C\,c\,du\,dv - 1</code> with a
+tanh-sinh rule. It needs the density as well as the CDF. Unlike Spearman's rho, tau is <strong>not</strong>
 linear in the copula -- which is exactly why mixtures and rotations cannot
 simply average their components' values and have to come here instead.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A fully specified copula with <code>dim == 2</code> that has a density
+(<code>pdf</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>level</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Half-width of the tanh-sinh node index; larger means more nodes per
+axis and higher accuracy at more cost.</p>
+              </div>
+            </td>
+            <td>
+                  <code>140</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Kendall's tau, clipped to <code>[-1, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula.dim</code> is not 2, or the copula has unspecified parameters.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2997,8 +4350,14 @@ simply average their components' values and have to come here instead.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Kendall's tau as :math:<code>1 - 4\int\int \partial_1 C\,\partial_2 C\,du\,dv</code>.</p>
-<p>The same quantity as :func:<code>tau_by_quadrature</code>, integrated a different way,
+        <p>Compute Kendall's tau of a two-variable copula using only its CDF.</p>
+<p>Kendall's tau is a rank correlation between -1 and 1. This is the most
+robust of the quadrature routines: use it when the copula has a singular
+part (no density everywhere) or very strong dependence.</p>
+<p>Technically, it evaluates
+:math:<code>\tau = 1 - 4\int\int \partial_1 C\,\partial_2 C\,du\,dv</code>, with the
+partial derivatives taken by central differences and a Gauss-Legendre rule.
+The same quantity as :func:<code>tau_by_quadrature</code>, integrated a different way,
 and better in two situations that matter.</p>
 <ul>
 <li><strong>It needs only the CDF.</strong> The :math:<code>\int\int C\,dC</code> form silently
@@ -3014,6 +4373,100 @@ and better in two situations that matter.</p>
 </ul>
 <p>The trade is a numerical derivative, so it carries about 4e-8 rather than
 1e-8 -- immaterial next to what it buys.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A fully specified copula with <code>dim == 2</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nodes</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Gauss-Legendre nodes per axis. The cost grows with <code>nodes**2</code> CDF
+evaluations (times four, for the differences).</p>
+              </div>
+            </td>
+            <td>
+                  <code>400</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Kendall's tau, clipped to <code>[-1, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>copula.dim</code> is not 2, or the copula has unspecified parameters.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -3151,10 +4604,13 @@ Glasserman, P. (2003). <em>Monte Carlo Methods in Financial Engineering</em>.
 
     <div class="doc doc-contents ">
 
-        <p>Draw from a copula using a low-discrepancy point set.</p>
-<p>Generates a Sobol or Halton set in :math:<code>[0,1]^d</code> and pushes it through the
-copula's inverse Rosenblatt transform (Cambou, Hofert and Lemieux 2017). The
-result has the right distribution and covers the space more evenly than
+        <p>Draw a sample from a copula whose points are spread more evenly than random ones.</p>
+<p>This is quasi-random (quasi-Monte Carlo) sampling. Use it in place of
+<code>copula.rvs</code> when you are averaging something over the sample -- a price,
+a risk measure -- and want a smaller error for the same number of draws.</p>
+<p>It generates a Sobol or Halton set in :math:<code>[0,1]^d</code> and pushes it through
+the copula's inverse Rosenblatt transform (Cambou, Hofert and Lemieux 2017).
+The result has the right distribution and covers the space more evenly than
 independent draws.</p>
 
 
@@ -3178,7 +4634,8 @@ independent draws.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Any fitted or constructed copula of dimension <code>d</code>; it must support
+the inverse Rosenblatt transform.</p>
               </div>
             </td>
             <td>
@@ -3194,9 +4651,9 @@ independent draws.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of points. For Sobol, a power of two preserves the balance
-properties the construction is built on; scipy warns otherwise, and so
-does the note below.</p>
+                <p>Number of points, at least 1. For Sobol, a power of two (512, 1024,
+...) preserves the balance properties the construction is built on;
+scipy warns otherwise, and so does the note below.</p>
               </div>
             </td>
             <td>
@@ -3212,8 +4669,9 @@ does the note below.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Sobol is the usual choice and better in moderate dimensions; Halton is
-simpler and degrades faster past about ten.</p>
+                <p>Which point set to use. Sobol is the usual choice and better in
+moderate dimensions; Halton is simpler and degrades faster past about
+ten.</p>
               </div>
             </td>
             <td>
@@ -3244,11 +4702,11 @@ discrepancy and restores the ability to replicate.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Seeds the scrambling.</p>
+                <p>Seeds the scrambling. Pass an int for reproducible output.</p>
               </div>
             </td>
             <td>
@@ -3270,11 +4728,35 @@ discrepancy and restores the ability to replicate.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="size">size</span>, <span title="d">d</span>))</code>
+                  <code>numpy.ndarray of float, shape (size, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Draws from the copula, every value strictly between 0 and 1.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>size</code> is less than 1, or <code>sequence</code> is not <code>"sobol"</code> or
+<code>"halton"</code>.</p>
               </div>
             </td>
           </tr>
@@ -3326,7 +4808,10 @@ values in a margin is smaller than for independent draws:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Draw from a copula in antithetic pairs.</p>
+        <p>Draw a sample from a copula in mirror-image pairs, to reduce Monte Carlo error.</p>
+<p>This is antithetic sampling. It is free and helps when the quantity you
+average goes up (or down) steadily as the draws go up, such as a call
+option payoff; it can hurt for symmetric payoffs (see the warning below).</p>
 <p>Each independent uniform vector :math:<code>z</code> is used twice, as :math:<code>z</code> and
 :math:<code>1-z</code>, before the inverse Rosenblatt transform. The two resulting
 draws are negatively associated, so a Monte Carlo average over them has
@@ -3353,7 +4838,8 @@ lower variance <strong>when the integrand is monotone in the uniforms</strong>.<
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Any copula of dimension <code>d</code> that supports the inverse Rosenblatt
+transform.</p>
               </div>
             </td>
             <td>
@@ -3369,9 +4855,10 @@ lower variance <strong>when the integrand is monotone in the uniforms</strong>.<
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Total number of draws. Rounded up to an even number, since they come in
-pairs; the first half and second half are the partners of each other, so
-<code>u[i]</code> pairs with <code>u[size // 2 + i]</code>.</p>
+                <p>Total number of draws, at least 1. Rounded up to an even number, since
+they come in pairs; the first half and second half are the partners of
+each other, so with <code>m = len(u) // 2</code> row <code>u[i]</code> pairs with
+<code>u[m + i]</code>.</p>
               </div>
             </td>
             <td>
@@ -3383,11 +4870,11 @@ pairs; the first half and second half are the partners of each other, so
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Seed for the underlying uniforms. Pass an int for reproducible output.</p>
               </div>
             </td>
             <td>
@@ -3409,11 +4896,35 @@ pairs; the first half and second half are the partners of each other, so
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="size">size</span>, <span title="d">d</span>))</code>
+                  <code>numpy.ndarray of float, shape (size, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Draws from the copula. When <code>size</code> is odd the array has <code>size + 1</code>
+rows, so that every draw keeps its partner.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>size</code> is less than 1.</p>
               </div>
             </td>
           </tr>
@@ -3461,13 +4972,126 @@ alone:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Draw from a copula using a Latin hypercube design.</p>
+        <p>Draw a sample from a copula whose margins are spread evenly by construction.</p>
+<p>This is Latin hypercube sampling. Use it when the answer you are computing
+depends mostly on the individual margins rather than on how they move
+together.</p>
 <p>Each of the :math:<code>d</code> uniform coordinates is stratified into <code>size</code> equal
 bins with exactly one point per bin, then the columns are permuted
 independently. The marginal coverage is therefore guaranteed rather than
 random, which is worth having when the answer depends mostly on the margins.</p>
 <p>It says nothing about the <em>joint</em> structure -- that comes from the inverse
 Rosenblatt transform, as usual.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Any copula of dimension <code>d</code> that supports the inverse Rosenblatt
+transform.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of draws, at least 1. Also the number of bins per margin.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed for the design. Pass an int for reproducible output.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (size, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Draws from the copula, every value strictly between 0 and 1.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>size</code> is less than 1.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -3500,7 +5124,10 @@ uniform coordinate is almost exactly one half:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Measure what a variance-reduction method actually bought.</p>
+        <p>Measure how much a variance-reduction sampler shrinks the Monte Carlo error for your payoff.</p>
+<p>Use it before adopting :func:<code>quasi_rvs</code>, :func:<code>antithetic_rvs</code> or
+:func:<code>latin_hypercube_rvs</code>: it tells you, for your copula and your
+payoff, whether the method helps and by how much.</p>
 <p>Runs the estimator <code>replicates</code> times under plain Monte Carlo and again
 under <code>method</code>, and compares the spread of the answers. This is the honest
 way to report a quasi-Monte Carlo gain: the theory gives a rate, not a
@@ -3527,7 +5154,7 @@ number, and the number depends on the payoff.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The copula to sample from, of dimension <code>d</code>.</p>
               </div>
             </td>
             <td>
@@ -3543,8 +5170,9 @@ number, and the number depends on the payoff.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Takes an <code>(n, d)</code> array of copula draws and returns a value per row.
-The quantity estimated is its mean.</p>
+                <p>Function <code>payoff(u)</code> taking a <code>numpy.ndarray</code> of shape <code>(n, d)</code>
+of copula draws and returning an array_like of float, shape <code>(n,)</code>:
+one value per row. The quantity estimated is its mean.</p>
               </div>
             </td>
             <td>
@@ -3560,7 +5188,7 @@ The quantity estimated is its mean.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Draws per replicate.</p>
+                <p>Draws per replicate, at least 1.</p>
               </div>
             </td>
             <td>
@@ -3576,7 +5204,9 @@ The quantity estimated is its mean.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The sampler to compare against plain <code>copula.rvs</code>: :func:<code>quasi_rvs</code>
+with a Sobol or Halton set, :func:<code>antithetic_rvs</code>, or
+:func:<code>latin_hypercube_rvs</code>.</p>
               </div>
             </td>
             <td>
@@ -3592,9 +5222,10 @@ The quantity estimated is its mean.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Independent repetitions. Each uses a different scramble or seed, which
-is what makes a spread measurable at all -- an unscrambled quasi-random
-set would give the same answer every time and no error estimate.</p>
+                <p>Independent repetitions, at least 2. Each uses a different scramble or
+seed, which is what makes a spread measurable at all -- an unscrambled
+quasi-random set would give the same answer every time and no error
+estimate.</p>
               </div>
             </td>
             <td>
@@ -3606,11 +5237,11 @@ set would give the same answer every time and no error estimate.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Seed from which every replicate's seed is drawn.</p>
               </div>
             </td>
             <td>
@@ -3632,14 +5263,50 @@ set would give the same answer every time and no error estimate.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="dict">dict</span></code>
+                  <code>dict of str to float</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>"plain_se"</code>, <code>"reduced_se"</code>, <code>"ratio"</code> (plain over reduced;
-above 1 means the method helped), <code>"equivalent_sample_factor"</code> (how
-many times more plain draws would be needed to match), and the two mean
-estimates, which should agree.</p>
+                <p><code>"plain_mean"</code>
+    Average of the plain Monte Carlo estimates.
+<code>"reduced_mean"</code>
+    Average of the estimates under <code>method</code>; should agree with
+    <code>"plain_mean"</code> up to noise.
+<code>"plain_se"</code>
+    Standard deviation of the plain estimates across replicates, i.e.
+    the standard error of one plain estimate of <code>size</code> draws.
+<code>"reduced_se"</code>
+    The same under <code>method</code>.
+<code>"ratio"</code>
+    <code>plain_se / reduced_se</code>. Above 1 means the method helped;
+    <code>inf</code> if <code>reduced_se</code> is zero.
+<code>"equivalent_sample_factor"</code>
+    <code>ratio ** 2</code>: how many times more plain draws would be needed to
+    match the method's error.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>replicates</code> is less than 2, or <code>method</code> is not one of the four
+names above.</p>
               </div>
             </td>
           </tr>

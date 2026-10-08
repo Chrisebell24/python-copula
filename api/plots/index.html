@@ -1141,7 +1141,7 @@ a goodness-of-fit p-value tell you <em>whether</em> a family fits; these tell yo
 <strong>where</strong> it does not, which is the part that decides whether the failure
 matters. A copula that misses the middle of the distribution is usually
 harmless; one that misses the corner is not.</p>
-<p>The five here are chosen because each answers a question the others cannot.</p>
+<p>Each one answers a question the others cannot.</p>
 <p>=============================  ===============================================
 :func:<code>contour</code>                What the density or CDF actually looks like.
 :func:<code>surface</code>                The same in three dimensions (R's <code>persp</code>).
@@ -1152,15 +1152,19 @@ harmless; one that misses the corner is not.</p>
 :func:<code>vine_trees</code>             A vine's trees, edge by edge.
 :func:<code>nested_tree</code>            A nested copula's hierarchy.
 :func:<code>dependence_heatmap</code>     A pairwise matrix, when one number will not do.
+:func:<code>dependogram_plot</code>       Which subsets of variables are dependent.
+:func:<code>pairs_rosenblatt</code>       Where a fitted model fails, pair by pair.
 =============================  ===============================================</p>
 <p>:func:<code>tail_concentration</code> is the one to reach for after fitting. Two families
 calibrated to the same Kendall's tau agree almost everywhere and separate
 exactly where the risk is, so a plot that puts the empirical corner behaviour
 next to the fitted one shows the disagreement that a single summary statistic
 averages away.</p>
-<p>Every function takes an optional <code>ax</code> and returns the axes it drew on, so the
-plots compose into whatever figure you are building. Nothing is shown or saved
-automatically.</p>
+<p>Every function takes an optional <code>ax</code> (or <code>axes</code> for the multi-panel ones)
+and returns the axes it drew on, so the plots compose into whatever figure you
+are building. Nothing is shown or saved automatically: call
+<code>matplotlib.pyplot.show()</code> or <code>ax.figure.savefig(...)</code> yourself.
+matplotlib is imported only when a plot is drawn.</p>
 
 
 <details class="references" open>
@@ -1206,7 +1210,10 @@ Fisher, N. I. and Switzer, P. (2001). Graphical assessment of dependence: is a
 
     <div class="doc doc-contents ">
 
-        <p>Contour plot of a bivariate copula's density or distribution function.</p>
+        <p>Draw a contour map of a two-variable copula, like the height lines on a terrain map.</p>
+<p>Shows where the copula puts its probability: tight contours in a corner
+mean the two variables tend to be extreme together there. Use it to see
+the shape of a family or of a fitted model at a glance.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1229,7 +1236,7 @@ Fisher, N. I. and Switzer, P. (2001). Graphical assessment of dependence: is a
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Bivariate, with parameters specified.</p>
+                <p>Bivariate (<code>dim == 2</code>), with parameters specified.</p>
               </div>
             </td>
             <td>
@@ -1245,9 +1252,10 @@ Fisher, N. I. and Switzer, P. (2001). Graphical assessment of dependence: is a
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>"logpdf"</code> is usually the readable one for a tail-dependent family,
-whose density spans many orders of magnitude and whose linear contours
-therefore all crowd into one corner.</p>
+                <p>What to draw: the density, its logarithm, or the distribution
+function. <code>"logpdf"</code> is usually the readable one for a
+tail-dependent family, whose density spans many orders of magnitude
+and whose linear contours therefore all crowd into one corner.</p>
               </div>
             </td>
             <td>
@@ -1267,7 +1275,7 @@ therefore all crowd into one corner.</p>
               </div>
             </td>
             <td>
-                  <code><span title="rcopula.plots._GRID">_GRID</span></code>
+                  <code>60</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -1280,11 +1288,90 @@ therefore all crowd into one corner.</p>
             <td>
               <div class="doc-md-description">
                 <p>How far to stay off the boundary, where a tail-dependent density
-diverges.</p>
+diverges. The grid spans <code>[margin, 1 - margin]</code> on each axis.</p>
               </div>
             </td>
             <td>
                   <code>0.01</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ax</code>
+            </td>
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Axes to draw on. <code>None</code> creates a new figure and axes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.contour</code>. <code>levels</code> defaults to 14.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The axes drawn on, labelled <code>u1</code> and <code>u2</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the copula is not bivariate or <code>kind</code> is not one of the three
+options.</p>
+              </div>
             </td>
           </tr>
       </tbody>
@@ -1319,7 +1406,170 @@ diverges.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Three-dimensional surface of the density or CDF (R's <code>persp</code>).</p>
+        <p>Draw a two-variable copula's density or CDF as a 3-D surface (R's <code>persp</code>).</p>
+<p>The same information as :func:<code>contour</code>, shown as a landscape whose height
+is the density (or CDF) above each point of the unit square.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bivariate (<code>dim == 2</code>), with parameters specified.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>kind</code>
+            </td>
+            <td>
+                  <code>(&#39;pdf&#39;, &#39;logpdf&#39;, &#39;cdf&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>What to draw: the density, its logarithm, or the distribution function.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;pdf&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid points per axis.</p>
+              </div>
+            </td>
+            <td>
+                  <code>60</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>margin</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How far to stay off the boundary, where a tail-dependent density
+diverges.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.02</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ax</code>
+            </td>
+            <td>
+                  <code><span title="mpl_toolkits.mplot3d.axes3d.Axes3D">Axes3D</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A 3-D axes to draw on (created with <code>projection="3d"</code>). <code>None</code>
+creates a new figure with one.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>Axes3D.plot_surface</code>. <code>cmap</code> defaults to <code>"viridis"</code>
+and <code>linewidth</code> to 0.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="mpl_toolkits.mplot3d.axes3d.Axes3D">Axes3D</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 3-D axes drawn on; the z-axis is labelled with <code>kind</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the copula is not bivariate or <code>kind</code> is not one of the three
+options.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -1350,11 +1600,140 @@ diverges.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Pairwise scatter plots on the copula scale, annotated with Kendall's tau.</p>
-<p>Ranks are taken first, so the panels show <em>dependence</em> and nothing else --
-the marginal shapes that dominate a raw scatter plot are removed. Two
-variables whose raw plot is an uninformative smear can show a clean pattern
-here.</p>
+        <p>Plot every pair of variables against each other after converting them to ranks.</p>
+<p>A grid of panels: scatter plots below the diagonal, histograms on it, and
+the pair's Kendall's tau above it. Ranks are taken first, so the panels
+show <em>dependence</em> and nothing else -- the marginal shapes that dominate a
+raw scatter plot are removed. Two variables whose raw plot is an
+uninformative smear can show a clean pattern here.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations on any scale; they are converted to pseudo-observations
+(ranks scaled into <code>(0, 1)</code>) first.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>names</code>
+            </td>
+            <td>
+                  <code>list of str or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One label per column. <code>None</code> uses <code>"u1", "u2", ...</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>axes</code>
+            </td>
+            <td>
+                  <code>array_like of matplotlib.axes.Axes, shape (d, d), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid of axes to draw into, indexed <code>axes[i][j]</code>. <code>None</code> creates a
+new figure.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.scatter</code> for the lower-triangle
+panels. <code>s</code> defaults to 4 and <code>alpha</code> to 0.4.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of matplotlib.axes.Axes, shape (d, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The grid of axes (or the <code>axes</code> you passed in).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>names</code> does not have one entry per column.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -1386,8 +1765,11 @@ here.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Tail concentration functions, empirical against fitted.</p>
-<p>The two branches are</p>
+        <p>Compare how often data and fitted copulas are jointly extreme, out to each corner.</p>
+<p>Draws the tail concentration function for the data (solid black) and for
+each copula (dashed). The left half of the plot describes the lower tail
+(both variables small), the right half the upper tail (both large). This
+is the plot to look at after fitting. The two branches are</p>
 <p>.. math::
     L(q) = \frac{C(q, q)}{q}\ \ (q \le \tfrac12), \qquad
     R(q) = \frac{1 - 2q + C(q, q)}{1 - q}\ \ (q &gt; \tfrac12),</p>
@@ -1413,11 +1795,12 @@ separate in the corners, and the corners are where the money is.</p>
                 <code>data</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (n, 2), or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Observations, plotted as the empirical curve.</p>
+                <p>Observations on any scale (converted to ranks), plotted as the
+empirical curve.</p>
               </div>
             </td>
             <td>
@@ -1429,15 +1812,111 @@ separate in the corners, and the corners are where the money is.</p>
                 <code>copula</code>
             </td>
             <td>
-                  <code>Copula or list of Copula</code>
+                  <code>Copula, list of Copula, or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>One or more fitted copulas, plotted as reference curves.</p>
+                <p>One or more bivariate copulas, plotted as reference curves. At least
+one of <code>data</code> and <code>copula</code> must be given.</p>
               </div>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of evaluation points <code>q</code>, equally spaced in <code>(0, 1)</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>99</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ax</code>
+            </td>
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Axes to draw on. <code>None</code> creates a new figure and axes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.plot</code> for the empirical curve only.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The axes drawn on, with a legend.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If neither <code>data</code> nor <code>copula</code> is given, or if the data or any
+copula is not bivariate.</p>
+              </div>
             </td>
           </tr>
       </tbody>
@@ -1474,7 +1953,9 @@ separate in the corners, and the corners are where the money is.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Kendall plot (K-plot), a dependence diagnostic with no fitted model.</p>
+        <p>Draw a Kendall plot (K-plot): a quick visual test of whether two variables are dependent.</p>
+<p>Points on the diagonal mean independence; points above it mean positive
+dependence, below it negative. No model has to be fitted first.</p>
 <p>Genest &amp; Boies (2003) plot the ordered statistics :math:<code>W_{i}</code> of the
 empirical Kendall function against their expected values <em>under
 independence</em>. Points on the diagonal mean independence; bowing above it
@@ -1483,6 +1964,93 @@ departure carries information a scalar correlation does not.</p>
 <p>Its appeal is that it needs neither margins nor a fitted family: it is a
 function of the ranks alone, so it can be looked at before any modelling
 decision has been made.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations on any scale; only ranks are used.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ax</code>
+            </td>
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Axes to draw on. <code>None</code> creates a new figure and axes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.scatter</code>. <code>s</code> defaults to 8.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The axes drawn on: expected values under independence on the x-axis,
+ordered empirical Kendall values <code>W</code> on the y-axis.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -1514,12 +2082,140 @@ decision has been made.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The Pickands dependence function inside its admissible triangle.</p>
-<p>Every extreme-value copula is determined by a convex :math:<code>A</code> with
+        <p>Plot the Pickands function of extreme-value copulas, showing their strength and symmetry.</p>
+<p>The Pickands function :math:<code>A(t)</code> is the curve that fully describes an
+extreme-value copula. Every extreme-value copula is determined by a convex :math:<code>A</code> with
 :math:<code>\max(t, 1-t) \le A(t) \le 1</code>. The upper edge is independence and the
 lower one comonotonicity, so the plot places a family between those two
 extremes and shows at a glance how much dependence it carries and whether it
 is symmetric -- which is the property Khoudraji's device exists to break.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code>Copula or list of Copula</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One or more bivariate extreme-value copulas: an
+:class:<code>~rcopula.core.extreme_value.ExtremeValueCopula</code>, a Gumbel
+copula, or an extreme-value :class:<code>~rcopula.structural.KhoudrajiCopula</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of points <code>t</code> in <code>[0, 1]</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>201</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ax</code>
+            </td>
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Axes to draw on. <code>None</code> creates a new figure and axes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.plot</code> for each copula's curve.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The axes drawn on, with the admissible bounds in grey and a legend.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a copula is not extreme-value.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -1550,7 +2246,8 @@ is symmetric -- which is the property Khoudraji's device exists to break.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Draw a vine's trees, edge labels annotated with each pair-copula.</p>
+        <p>Draw each tree of a vine copula, labelling every edge with its pair-copula.</p>
+<p>Each edge label shows the pair-copula's family name and parameters.</p>
 <p>A vine is a sequence of trees, and the thing a reader needs to see is which
 pairs each tree joins, what it conditions on, and which family was selected
 there. Tree 1 carries most of the dependence and is where a misspecified
@@ -1590,20 +2287,83 @@ parameters on noise, which this makes visible at a glance.</p>
                 <code>max_trees</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Draw only the first few trees. Defaults to all of them.</p>
+                <p>Draw only the first <code>max_trees</code> trees. <code>None</code> draws all of them.</p>
               </div>
             </td>
             <td>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>axes</code>
+            </td>
+            <td>
+                  <code>sequence of matplotlib.axes.Axes or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One axes per tree to draw. <code>None</code> creates a new figure with one
+panel per tree in a row.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.plot</code> for the edges.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of matplotlib.axes.Axes, shape (n_trees,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One axes per drawn tree (or the <code>axes</code> you passed in).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Nodes are placed on a circle. In trees after the first, node labels are
+abbreviated to <code>"&lt;variable&gt;|·"</code> to signal conditioning; the edge labels
+carry the family and parameters.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span>
@@ -1637,11 +2397,98 @@ parameters on noise, which this makes visible at a glance.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Draw a nested Archimedean copula's hierarchy.</p>
+        <p>Draw a nested Archimedean copula as a tree diagram, with each node's parameter and tau.</p>
 <p>The whole point of nesting is that dependence varies by branch, so the
 picture worth drawing is the tree with each node's parameter and Kendall's
 tau on it -- from which the pairwise tau of any two leaves can be read off
 directly, since two variables meet at exactly one node.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>node</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="NestedArchimedean (rcopula.structural.NestedArchimedean)" href="../structural/#rcopula.structural.nested.NestedArchimedean">NestedArchimedean</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The root of the tree, with every parameter specified.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ax</code>
+            </td>
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Axes to draw on. <code>None</code> creates a new figure and axes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.scatter</code> for the internal nodes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The axes drawn on (axis lines hidden). Leaves are the variable
+indices; each internal node shows <code>theta</code> and its Kendall's tau.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -1680,10 +2527,153 @@ directly, since two variables meet at exactly one node.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Heat map of a pairwise dependence matrix, annotated with the numbers.</p>
+        <p>Draw a colour-coded grid of a pairwise dependence matrix, with the numbers written in.</p>
 <p>Useful precisely for the constructions whose whole point is that dependence
 is <em>not</em> one number: a nested copula's :meth:<code>tau_matrix</code>, or the empirical
 matrix from a sample.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>values</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (d, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Square matrix to show, e.g. <code>cop.tau_matrix()</code> or
+<code>rcopula.cor_kendall(data)</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>names</code>
+            </td>
+            <td>
+                  <code>list of str or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Tick labels, one per row/column. <code>None</code> uses <code>"0", "1", ...</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>label</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Title of the plot.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;Kendall&#39;s tau&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ax</code>
+            </td>
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Axes to draw on. <code>None</code> creates a new figure and axes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Passed to <code>matplotlib.axes.Axes.imshow</code>. <code>cmap</code> defaults to
+<code>"RdBu_r"</code> with <code>vmin=-1</code> and <code>vmax=1</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="matplotlib.axes.Axes">Axes</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The axes drawn on.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>values</code> is not square.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -1722,9 +2712,10 @@ matrix from a sample.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Plot a :func:<code>~rcopula.htest.dependogram</code>.</p>
-<p>One bar per subset, tallest first, with the subsets that reject independence
-marked. The point of the picture over the table is that it shows <em>where</em> the
+        <p>Draw a bar chart of which groups of variables show dependence, from a dependogram test.</p>
+<p>Plots the result of :func:<code>~rcopula.htest.dependogram</code>. One bar per
+subset, tallest first, with the subsets that reject independence marked.
+The point of the picture over the table is that it shows <em>where</em> the
 dependence lives at a glance: three variables can be pairwise independent
 and jointly dependent, and the bar for the triple stands alone.</p>
 
@@ -1770,7 +2761,8 @@ and jointly dependent, and the bar for the triple stands alone.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Significance level for the marking.</p>
+                <p>Keyword-only. Significance level: subsets with p-value below it are
+drawn in red.</p>
               </div>
             </td>
             <td>
@@ -1782,11 +2774,11 @@ and jointly dependent, and the bar for the triple stands alone.</p>
                 <code>ax</code>
             </td>
             <td>
-                  <code><span title="matplotlib.axes.Axes">Axes</span></code>
+                  <code><span title="matplotlib.axes.Axes">Axes</span> or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Keyword-only. Axes to draw on. <code>None</code> creates a new figure and axes.</p>
               </div>
             </td>
             <td>
@@ -1812,7 +2804,8 @@ and jointly dependent, and the bar for the triple stands alone.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The axes drawn on: one bar per subset, height = Cramer-von Mises
+statistic, annotated with its p-value.</p>
               </div>
             </td>
           </tr>
@@ -1852,9 +2845,9 @@ and jointly dependent, and the bar for the triple stands alone.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Pairwise scatter of Rosenblatt-transformed data (R's <code>pairsRosenblatt</code>).</p>
-<p>A goodness-of-fit test says <em>whether</em> a copula fits. This says <strong>where</strong> it
-does not.</p>
+        <p>Show, pair by pair, where a fitted copula fails to describe the data.</p>
+<p>This is R's <code>pairsRosenblatt</code>. A goodness-of-fit test says <em>whether</em> a
+copula fits. This says <strong>where</strong> it does not.</p>
 <p>Under the fitted copula the Rosenblatt transform produces independent
 uniforms, so every panel below should look like structureless noise on the
 unit square. Any panel that does not is a pair the model has failed to
@@ -1886,7 +2879,7 @@ permutation test run :math:<code>\binom{d}{2}</code> times.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The fitted model to be judged.</p>
+                <p>The fitted model to be judged, of dimension <code>d</code>.</p>
               </div>
             </td>
             <td>
@@ -1898,11 +2891,12 @@ permutation test run :math:<code>\binom{d}{2}</code> times.</p>
                 <code>u</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Pseudo-observations.</p>
+                <p>Pseudo-observations (values in <code>(0, 1)</code>, e.g. from
+:func:<code>~rcopula.pseudo_obs</code>).</p>
               </div>
             </td>
             <td>
@@ -1918,7 +2912,8 @@ permutation test run :math:<code>\binom{d}{2}</code> times.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Panels below this p-value are shaded.</p>
+                <p>Keyword-only. Panels whose independence p-value is below this are
+shaded red.</p>
               </div>
             </td>
             <td>
@@ -1930,11 +2925,11 @@ permutation test run :math:<code>\binom{d}{2}</code> times.</p>
                 <code>axes</code>
             </td>
             <td>
-                  <code>ndarray of Axes</code>
+                  <code>array_like of matplotlib.axes.Axes, shape (d, d), or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A <code>(d, d)</code> grid to draw into.</p>
+                <p>Keyword-only. Grid to draw into. <code>None</code> creates a new figure.</p>
               </div>
             </td>
             <td>
@@ -1956,11 +2951,12 @@ permutation test run :math:<code>\binom{d}{2}</code> times.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>ndarray of Axes</code>
+                  <code>numpy.ndarray of matplotlib.axes.Axes, shape (d, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Scatter plots below the diagonal, p-value and tau text above it. The
+figure also gets a title and <code>tight_layout</code>.</p>
               </div>
             </td>
           </tr>

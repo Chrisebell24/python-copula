@@ -1032,6 +1032,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="FamilySpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.select.FamilySpec.admissible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        admissible
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1841,6 +1858,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="FamilySpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.select.FamilySpec.admissible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        admissible
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -2176,12 +2210,109 @@ Higham, N. J. (2002). Computing the nearest correlation matrix -- a problem
 
     <div class="doc doc-contents ">
 
-        <p>Nearest positive-definite correlation matrix, by alternating projections.</p>
-<p>Inverting pairwise dependence measures gives a symmetric matrix with unit
+        <p>Repair a "correlation matrix" that is not a valid one, changing it as little as possible.</p>
+<p>Returns the nearest positive-definite matrix with ones on the diagonal,
+found by alternating projections (Higham, 2002). Use it when a matrix
+assembled entry by entry -- for example from pairwise Kendall's tau --
+cannot be used as a correlation matrix because it has a negative
+eigenvalue.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>matrix</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (d, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Square matrix to repair. It is symmetrised first, as
+<code>(matrix + matrix.T) / 2</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>tol</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Small positive number: the smallest eigenvalue allowed in the result,
+and the convergence tolerance.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1e-10</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_iter</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum number of projection rounds (a positive integer).</p>
+              </div>
+            </td>
+            <td>
+                  <code>200</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (d, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Symmetric, positive-definite matrix with unit diagonal.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Inverting pairwise dependence measures gives a symmetric matrix with unit
 diagonal, but nothing guarantees it is positive definite -- each entry is
 estimated separately. R applies the same repair (<code>Matrix::nearPD</code>) after
 <code>itau</code> and <code>irho</code> fits.</p>
-
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -2214,7 +2345,11 @@ estimated separately. R applies the same repair (<code>Matrix::nearPD</code>) af
 
     <div class="doc doc-contents ">
 
-        <p>Log-likelihood of a copula at given parameters (R's <code>loglikCopula</code>).</p>
+        <p>Score how well a copula with the given parameters explains the data (higher is better).</p>
+<p>Returns the copula log-likelihood: the sum of the log-density over all
+rows of <code>u</code>. This is R's <code>loglikCopula</code>. Use it to compare parameter
+values by hand or to build your own optimiser; :func:<code>fit</code> uses it
+internally.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2233,11 +2368,12 @@ estimated separately. R applies the same repair (<code>Matrix::nearPD</code>) af
                 <code>params</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (p,)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parameter vector to evaluate at.</p>
+                <p>Full parameter vector to evaluate at, in the order of
+<code>copula.param_names</code>.</p>
               </div>
             </td>
             <td>
@@ -2249,11 +2385,12 @@ estimated separately. R applies the same repair (<code>Matrix::nearPD</code>) af
                 <code>u</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, d)</code> observations in the unit cube.</p>
+                <p>Observations strictly inside the unit cube (pseudo-observations or
+copula samples). A 1-D input is treated as a single row.</p>
               </div>
             </td>
             <td>
@@ -2285,11 +2422,61 @@ estimated separately. R applies the same repair (<code>Matrix::nearPD</code>) af
             </td>
             <td>
               <div class="doc-md-description">
-                <p>What to do when the parameters are inadmissible.</p>
+                <p>What to do when the parameters are inadmissible (outside the family's
+range, or giving a non-finite density): <code>"-inf"</code> returns
+<code>-inf</code>; <code>"raise"</code> re-raises the underlying error.</p>
               </div>
             </td>
             <td>
                   <code>&#34;-inf&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The log-likelihood, or <code>-inf</code> for inadmissible parameters when
+<code>error="-inf"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>(<span title="ValueError">ValueError</span>, <span title="numpy.linalg.LinAlgError">LinAlgError</span> or <span title="NotImplementedError">NotImplementedError</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Only with <code>error="raise"</code>, when the parameters are inadmissible or
+the family has no density.</p>
+              </div>
             </td>
           </tr>
       </tbody>
@@ -2329,7 +2516,12 @@ can walk into them safely:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Fit a copula to data.</p>
+        <p>Estimate a copula's parameters from data.</p>
+<p>Give it a copula family (for example <code>ClaytonCopula()</code>) and a table of
+observations; it returns the best-fitting parameters together with
+standard errors, a log-likelihood and AIC/BIC. Your data can be raw
+values or already-uniform pseudo-observations -- raw values are turned
+into ranks first, so the margins do not matter.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2353,7 +2545,8 @@ can walk into them safely:</p>
             <td>
               <div class="doc-md-description">
                 <p>Family to fit. Its parameter values are used only as a starting point;
-pass e.g. <code>ClaytonCopula()</code> with unspecified parameters.</p>
+pass e.g. <code>ClaytonCopula()</code> with unspecified parameters. Parameters
+pinned with <code>fix_params</code> are held fixed.</p>
               </div>
             </td>
             <td>
@@ -2365,12 +2558,15 @@ pass e.g. <code>ClaytonCopula()</code> with unspecified parameters.</p>
                 <code>data</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float or pandas.DataFrame, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, d)</code> observations. Values already in <code>(0, 1)</code> are taken to be
-pseudo-observations; anything else is rank-transformed first.</p>
+                <p>Observations, one row per observation and one column per variable;
+<code>d</code> must equal <code>copula.dim</code>. If every value is strictly inside
+<code>(0, 1)</code> the data are taken to be pseudo-observations as they are;
+otherwise each column is rank-transformed first. A 1-D input is
+treated as a single column.</p>
               </div>
             </td>
             <td>
@@ -2386,7 +2582,17 @@ pseudo-observations; anything else is rank-transformed first.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Estimation method. See the module docstring.</p>
+                <p>Estimation method:</p>
+<ul>
+<li><code>"mpl"</code> -- maximum pseudo-likelihood; the usual choice.</li>
+<li><code>"ml"</code> -- same estimate, standard errors that assume the margins
+  are known.</li>
+<li><code>"itau"</code> / <code>"irho"</code> -- invert Kendall's tau / Spearman's rho;
+  fast, no optimiser.</li>
+<li><code>"itau.mpl"</code> -- Student-t copula only: correlations from tau,
+  degrees of freedom by pseudo-likelihood.</li>
+</ul>
+<p>See the module docstring for details.</p>
               </div>
             </td>
             <td>
@@ -2398,12 +2604,13 @@ pseudo-observations; anything else is rank-transformed first.</p>
                 <code>start</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (p,), or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Starting parameters for the likelihood methods. Defaults to the
-inversion-of-tau estimate, as in R.</p>
+                <p>Starting parameters for <code>"mpl"</code> and <code>"ml"</code> (full vector, in the
+order of <code>copula.param_names</code>). <code>None</code> uses the inversion-of-tau
+estimate, as in R. Ignored by the other methods.</p>
               </div>
             </td>
             <td>
@@ -2415,12 +2622,13 @@ inversion-of-tau estimate, as in R.</p>
                 <code>optim_method</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="str">str</span> or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A <code>scipy.optimize.minimize</code> method name. Defaults to <code>L-BFGS-B</code> for
-multi-parameter problems and <code>Nelder-Mead</code> for one.</p>
+                <p>A <code>scipy.optimize.minimize</code> method name, e.g. <code>"BFGS"</code>. <code>None</code>
+uses <code>L-BFGS-B</code> for multi-parameter problems and <code>Nelder-Mead</code>
+for one. Used by <code>"mpl"</code> and <code>"ml"</code> only.</p>
               </div>
             </td>
             <td>
@@ -2436,7 +2644,8 @@ multi-parameter problems and <code>Nelder-Mead</code> for one.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Whether to compute the asymptotic covariance matrix.</p>
+                <p>Whether to compute the asymptotic covariance matrix (and therefore
+standard errors). Set to <code>False</code> to save time.</p>
               </div>
             </td>
             <td>
@@ -2448,15 +2657,16 @@ multi-parameter problems and <code>Nelder-Mead</code> for one.</p>
                 <code>ties_method</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code>(&#39;average&#39;, &#39;min&#39;, &#39;max&#39;, &#39;dense&#39;, &#39;ordinal&#39;, &#39;random&#39;)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to :func:<code>~rcopula.dependence.pseudo_obs</code> when transforming.</p>
+                <p>How tied values are ranked; passed to
+:func:<code>~rcopula.dependence.pseudo_obs</code> when transforming raw data.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;average&#39;</code>
+                  <code>&#34;average&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -2478,13 +2688,56 @@ multi-parameter problems and <code>Nelder-Mead</code> for one.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Fitted copula, estimates of the free parameters, standard errors
+(<code>bse</code>), log-likelihood, AIC/BIC and a printable <code>summary()</code>.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>method</code> is not one of the five listed; if the number of data
+columns differs from <code>copula.dim</code>; if <code>"itau"</code>/<code>"irho"</code> cannot
+invert the sample measure for this family (e.g. negative tau for a
+Gumbel copula); or if <code>"itau.mpl"</code> is used with anything other than
+a Student-t copula with <code>dispstr="un"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="see-also" open>
+  <summary>See Also</summary>
+  <p>rcopula.fit_joint : Fit the margins and the copula together.
+rcopula.select_copula : Fit several families and rank them.</p>
+</details>
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p><code>"mpl"</code> and <code>"ml"</code> produce the same point estimate and differ only
+in the variance. <code>"itau.mpl"</code> does not compute a covariance matrix,
+whatever <code>estimate_variance</code> says. A copula with no free parameters is
+not optimised; its log-likelihood is still reported so it can take part
+in AIC/BIC comparisons.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -2629,7 +2882,203 @@ Genest, C., Ghoudi, K. and Rivest, L.-P. (1995). A semiparametric estimation
 
 
 
-        <p>A fitted joint distribution.</p>
+        <p>The result of fitting both the margins and the copula: a complete, usable distribution.</p>
+<p>Returned by :func:<code>fit_joint</code>; you do not normally build one yourself.
+The fitted :attr:<code>distribution</code> can be sampled or evaluated straight
+away, and :meth:<code>summary</code> prints a report.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>distribution</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.distribution.CopulaDistribution" href="../families/#rcopula.distribution.CopulaDistribution">CopulaDistribution</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Margins and copula, both fitted.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fitted dependence part alone.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>margin_params</code>
+            </td>
+            <td>
+                  <code>list of tuple of float, length d</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fitted parameters of each margin, in <code>scipy</code> order.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loglik</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Joint log-likelihood, margins included.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code>(&#39;ifm&#39;, &#39;ml&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimation method used.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;ifm&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_obs</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of observations (rows) fitted.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>converged</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether the optimiser reported success (always <code>True</code> for
+<code>"ifm"</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optimiser message (empty for <code>"ifm"</code>).</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>marginal_loglik</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The margins' share of <code>loglik</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_at_boundary</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of observations whose fitted probability integral transform
+landed on 0 or 1.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>_x</code>
+            </td>
+            <td>
+                  <code>ndarray of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The data that were fitted. Internal; leave at its default.</p>
+              </div>
+            </td>
+            <td>
+                  <code>(lambda: <span title="numpy.empty">empty</span>((0, 0)))()</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -2667,7 +3116,7 @@ Genest, C., Ghoudi, K. and Rivest, L.-P. (1995). A semiparametric estimation
           <tr class="doc-section-item">
             <td><code><span title="rcopula.fit.mvdc.JointFitResult.margin_params">margin_params</span></code></td>
             <td>
-                  <code>list of tuple</code>
+                  <code>list of tuple of float, length d</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2695,7 +3144,7 @@ with a copula-only log-likelihood from :func:<code>~rcopula.fit</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p><code>"ifm"</code> or <code>"ml"</code>.</p>
               </div>
             </td>
           </tr>
@@ -2706,7 +3155,7 @@ with a copula-only log-likelihood from :func:<code>~rcopula.fit</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Number of observations.</p>
               </div>
             </td>
           </tr>
@@ -2717,7 +3166,29 @@ with a copula-only log-likelihood from :func:<code>~rcopula.fit</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Whether the optimiser reported success.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.fit.mvdc.JointFitResult.message">message</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optimiser message, empty for <code>"ifm"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.fit.mvdc.JointFitResult.marginal_loglik">marginal_loglik</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Sum of the margins' log-densities at the fitted parameters.</p>
               </div>
             </td>
           </tr>
@@ -2730,7 +3201,9 @@ with a copula-only log-likelihood from :func:<code>~rcopula.fit</code>.</p>
               <div class="doc-md-description">
                 <p>Observations whose fitted probability integral transform landed exactly
 on 0 or 1. Almost always the sample extremes, because maximum likelihood
-puts a margin's support boundary there; see :func:<code>_joint_loglik</code>.</p>
+puts a margin's support boundary there; those values are nudged just
+inside <code>(0, 1)</code> before the copula density is evaluated, and this
+count reports how many were patched.</p>
               </div>
             </td>
           </tr>
@@ -2773,7 +3246,31 @@ puts a margin's support boundary there; see :func:<code>_joint_loglik</code>.</p
 
     <div class="doc doc-contents ">
 
-        <p>Every parameter estimated, marginal and dependence.</p>
+        <p>How many parameters were estimated in total, margins plus copula.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Sum of the lengths of <code>margin_params</code> plus the number of free
+copula parameters.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -2797,7 +3294,32 @@ puts a margin's support boundary there; see :func:<code>_joint_loglik</code>.</p
 
     <div class="doc doc-contents ">
 
-        <p>Akaike information criterion for the joint model.</p>
+        <p>A fit score for the whole model that penalises extra parameters; lower is better (AIC).</p>
+<p>Akaike information criterion, <code>2 k - 2 loglik</code> with <code>k =</code>
+:attr:<code>n_params</code>.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -2821,7 +3343,32 @@ puts a margin's support boundary there; see :func:<code>_joint_loglik</code>.</p
 
     <div class="doc doc-contents ">
 
-        <p>Bayesian information criterion for the joint model.</p>
+        <p>A fit score for the whole model with a stronger penalty than AIC; lower is better (BIC).</p>
+<p>Bayesian information criterion, <code>k log n - 2 loglik</code> with <code>k =</code>
+:attr:<code>n_params</code>.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -2845,10 +3392,38 @@ puts a margin's support boundary there; see :func:<code>_joint_loglik</code>.</p
 
     <div class="doc doc-contents ">
 
-        <p>The copula's contribution: joint log-likelihood minus the margins'.</p>
-<p>This <em>is</em> comparable across copula families fitted to the same margins,
-which the joint figure is not.</p>
+        <p>The part of the log-likelihood due to the copula alone (joint minus margins).</p>
+<p>Use this, not :attr:<code>loglik</code>, to compare copula families.</p>
 
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>loglik - marginal_loglik</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>This <em>is</em> comparable across copula families fitted to the same margins,
+which the joint figure is not.</p>
+</details>
     </div>
 
 </div>
@@ -2869,7 +3444,34 @@ which the joint figure is not.</p>
 
     <div class="doc doc-contents ">
 
-        <p>A printable report.</p>
+        <p>A human-readable text report of the fit, ready to print.</p>
+<p>Lists each margin's fitted parameters, the copula, the joint,
+marginal and dependence log-likelihoods, AIC/BIC, the parameter count
+and the number of boundary observations, plus a warning if the
+optimiser did not converge.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Multi-line text; pass it to <code>print</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2910,7 +3512,12 @@ which the joint figure is not.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Fit a copula and its margins to data (R's <code>fitMvdc</code>).</p>
+        <p>Fit a full joint distribution: each variable's own distribution plus the copula linking them.</p>
+<p>Use this when you want a complete model on the original scale -- to
+simulate realistic data, compute probabilities, or report fitted
+margins -- rather than the dependence alone. This is R's <code>fitMvdc</code>.
+If you only care about the dependence, :func:<code>~rcopula.fit</code> on ranks is
+safer, because it makes no assumption about the margins.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2934,7 +3541,8 @@ which the joint figure is not.</p>
             <td>
               <div class="doc-md-description">
                 <p>Supplies the <em>shapes</em>: which copula family and which marginal families.
-Its current parameter values are only a starting point.</p>
+Its current parameter values are only a starting point. Each margin
+must be a frozen <code>scipy.stats</code> distribution, so it can be refitted.</p>
               </div>
             </td>
             <td>
@@ -2946,11 +3554,12 @@ Its current parameter values are only a starting point.</p>
                 <code>x</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Data on the original scale, <strong>not</strong> pseudo-observations.</p>
+                <p>Data on the original scale, <strong>not</strong> pseudo-observations; <code>d</code> must
+equal <code>distribution.dim</code>. A 1-D input is treated as a single row.</p>
               </div>
             </td>
             <td>
@@ -2966,7 +3575,9 @@ Its current parameter values are only a starting point.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Two-step or joint. See the module docstring.</p>
+                <p><code>"ifm"</code> fits each margin first, then the copula (two steps, the
+standard choice). <code>"ml"</code> then optimises everything jointly, starting
+from the IFM answer. See the module docstring.</p>
               </div>
             </td>
             <td>
@@ -2978,12 +3589,13 @@ Its current parameter values are only a starting point.</p>
                 <code>margin_kwargs</code>
             </td>
             <td>
-                  <code>list of dict</code>
+                  <code>list of dict or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Extra arguments per margin for <code>scipy</code>'s <code>fit</code> -- most usefully
-<code>{"floc": 0}</code> to pin a location that the family requires to be zero.
+                <p>One dict per margin (length <code>d</code>) of extra arguments for <code>scipy</code>'s
+<code>fit</code> -- most usefully <code>{"floc": 0}</code> to pin a location that the
+family requires to be zero. Use <code>{}</code> for margins that need nothing.
 Getting this wrong is the commonest cause of an implausible fit: a
 Gamma fitted with a free location will happily slide it to just below
 the sample minimum.</p>
@@ -2998,7 +3610,7 @@ the sample minimum.</p>
                 <code>copula_method</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code>(&#39;mpl&#39;, &#39;ml&#39;, &#39;itau&#39;, &#39;irho&#39;, &#39;itau.mpl&#39;)</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3006,7 +3618,7 @@ the sample minimum.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;mpl&#39;</code>
+                  <code>&#34;mpl&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -3033,7 +3645,8 @@ the sample minimum.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The fitted distribution, the copula, each margin's parameters, the
+log-likelihoods and AIC/BIC.</p>
               </div>
             </td>
           </tr>
@@ -3050,6 +3663,17 @@ the sample minimum.</p>
         </tr>
       </thead>
       <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>x</code> does not have <code>distribution.dim</code> columns, <code>method</code> is not
+<code>"ifm"</code> or <code>"ml"</code>, or <code>margin_kwargs</code> has the wrong length.</p>
+              </div>
+            </td>
+          </tr>
           <tr class="doc-section-item">
             <td>
                   <code><span title="TypeError">TypeError</span></code>
@@ -3159,7 +3783,173 @@ provides at all.</p>
 
 
 
-        <p>Result of fitting a copula.</p>
+        <p>Everything you get back after fitting a copula: estimates, uncertainty and fit quality.</p>
+<p>You normally do not build this yourself -- :func:<code>rcopula.fit</code> returns
+one. It holds the fitted copula, the estimated parameters, their standard
+errors and confidence intervals, the log-likelihood with AIC/BIC for
+comparing models, and a printable :meth:<code>summary</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fitted copula, with the estimated parameters already set.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>params</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (k,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimated free (non-fixed) parameters. A scalar is turned into a
+length-1 array.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>param_names</code>
+            </td>
+            <td>
+                  <code>sequence of str, length k</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Names matching <code>params</code>, in the same order.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loglik</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximised log-likelihood (the pseudo-log-likelihood for <code>"mpl"</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_obs</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of observations (rows) the copula was fitted to.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimation method used, e.g. <code>"mpl"</code>, <code>"ml"</code>, <code>"itau"</code>,
+<code>"irho"</code> or <code>"itau.mpl"</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cov_params</code>
+            </td>
+            <td>
+                  <code>ndarray of float, shape (k, k), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Asymptotic covariance matrix of <code>params</code>; <code>None</code> when it was not
+computed.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>converged</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether the optimiser reported success.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optimiser message, or a note for closed-form estimators.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -3186,7 +3976,7 @@ provides at all.</p>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.fit.results.CopulaFitResult.params">params</span></code></td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>ndarray of float, shape (k,)</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3197,7 +3987,7 @@ provides at all.</p>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.fit.results.CopulaFitResult.param_names">param_names</span></code></td>
             <td>
-                  <code>tuple of str</code>
+                  <code>tuple of str, length k</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3208,7 +3998,7 @@ provides at all.</p>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.fit.results.CopulaFitResult.cov_params">cov_params</span></code></td>
             <td>
-                  <code><span title="ndarray">ndarray</span> or None</code>
+                  <code>ndarray of float, shape (k, k), or None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3275,6 +4065,28 @@ provides at all.</p>
     </table>
 
 
+<details class="see-also" open>
+  <summary>See Also</summary>
+  <p>rcopula.fit : The function that produces this object.</p>
+</details>
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Follows the <code>statsmodels</code> Model/Results split: the copula you passed in
+is not modified, and the fitted one lives in :attr:<code>copula</code>.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">fit</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">res</span> <span class="o">=</span> <span class="n">fit</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(),</span> <span class="n">u</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">res</span><span class="o">.</span><span class="n">n_params</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">res</span><span class="o">.</span><span class="n">conf_int</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(1, 2)</span>
+</code></pre></div>
+
+
 
 
 
@@ -3310,7 +4122,30 @@ provides at all.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Number of estimated parameters.</p>
+        <p>How many parameters were estimated.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of free parameters, <code>k</code> (fixed parameters are not counted).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -3334,9 +4169,38 @@ provides at all.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Asymptotic standard errors, or <code>None</code> if unavailable.</p>
-<p>This is what no other Python copula package offers.</p>
+        <p>Standard error of each estimate: roughly how far it could be from the true value.</p>
+<p>Computed as the square root of the diagonal of :attr:<code>cov_params</code>.</p>
 
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (k,), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Asymptotic standard errors, or <code>None</code> if the covariance matrix
+was not computed.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>This is what no other Python copula package offers.</p>
+</details>
     </div>
 
 </div>
@@ -3359,7 +4223,30 @@ provides at all.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Estimate divided by standard error.</p>
+        <p>Each estimate divided by its standard error (the z-statistic).</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (k,), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>params / bse</code>, or <code>None</code> without standard errors.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -3383,11 +4270,39 @@ provides at all.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Two-sided p-values against a zero parameter.</p>
-<p>Interpret with care: for most families zero is not a meaningful null
+        <p>P-value per parameter: how surprising its estimate would be if the true value were zero.</p>
+<p>Two-sided p-values from the normal approximation, <code>2 * P(Z &gt; |z|)</code>.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (k,), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Values in <code>[0, 1]</code>, or <code>None</code> without standard errors.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Interpret with care: for most families zero is not a meaningful null
 (Gumbel's parameter space starts at 1), so these are informative only
 where zero really means independence.</p>
-
+</details>
     </div>
 
 </div>
@@ -3410,7 +4325,32 @@ where zero really means independence.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Akaike information criterion, <code>-2 loglik + 2 k</code>.</p>
+        <p>A fit score that penalises extra parameters; lower is better (AIC).</p>
+<p>Akaike information criterion, <code>-2 loglik + 2 k</code>. Use it to compare
+models fitted to the same data.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -3434,7 +4374,32 @@ where zero really means independence.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Bayesian information criterion, <code>-2 loglik + k log n</code>.</p>
+        <p>A fit score that penalises extra parameters more than AIC does; lower is better (BIC).</p>
+<p>Bayesian information criterion, <code>-2 loglik + k log n</code>. Use it to
+compare models fitted to the same data.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -3456,9 +4421,65 @@ where zero really means independence.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Wald confidence intervals at level <code>1 - alpha</code>.</p>
-<p>Returns an <code>(n_params, 2)</code> array, or <code>None</code> without a covariance
-matrix.</p>
+        <p>A plausible range (lower, upper) for each parameter.</p>
+<p>Wald confidence intervals at level <code>1 - alpha</code>: estimate plus or
+minus a normal quantile times the standard error.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>alpha</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One minus the confidence level, strictly between 0 and 1;
+<code>0.05</code> gives 95% intervals.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.05</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (k, 2), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column 0 holds the lower bounds and column 1 the upper bounds, or
+<code>None</code> without a covariance matrix.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -3478,7 +4499,34 @@ matrix.</p>
 
     <div class="doc doc-contents ">
 
-        <p>A printable summary table, in the spirit of R's <code>summary.fitCopula</code>.</p>
+        <p>A human-readable text table of the fit, ready to print.</p>
+<p>Shows the family, method, sample size, log-likelihood, AIC/BIC and a
+row per parameter (estimate, standard error, z and p-value), in the
+spirit of R's <code>summary.fitCopula</code>. A warning line is added when the
+optimiser did not converge.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Multi-line text; pass it to <code>print</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -3592,17 +4640,11 @@ Borkowf, C. B. (2002). Computing the nonnull asymptotic variance and the
 
     <div class="doc doc-contents ">
 
-        <p>Observed-information covariance for maximum likelihood.</p>
-<p>Assumes the supplied data <em>are</em> copula observations -- margins known rather
-than estimated -- so the information equality holds and
-:math:<code>\mathrm{Cov}(\hat\theta) = H^{-1}/n</code> with :math:<code>H</code> the averaged
-negative Hessian of the log-density.</p>
-<p>The robust sandwich :math:<code>H^{-1}\Sigma H^{-1}/n</code> was tried first and
-rejected. It is valid under misspecification, but here it merely adds noise:
-on a Clayton sample of 1000 it gave 0.0932 against the information form's
-0.089144, which reproduces R to six decimal places, while a Monte-Carlo
-sampling SD put the truth near 0.090. Correct specification is exactly the
-assumption <code>method="ml"</code> already makes.</p>
+        <p>Estimate how uncertain maximum-likelihood copula parameters are (their covariance matrix).</p>
+<p>This is the observed-information covariance used by
+<code>fit(..., method="ml")</code>. Most users never call it directly: read
+<code>CopulaFitResult.cov_params</code> or <code>.bse</code> instead. Call it yourself only
+when you have written your own likelihood maximiser.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3625,7 +4667,8 @@ assumption <code>method="ml"</code> already makes.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Maps a parameter vector to the vector of per-observation log densities.</p>
+                <p>Function <code>logpdf(theta) -&gt; ndarray of float, shape (n,)</code> mapping a
+parameter vector to the per-observation log densities.</p>
               </div>
             </td>
             <td>
@@ -3637,11 +4680,11 @@ assumption <code>method="ml"</code> already makes.</p>
                 <code>theta</code>
             </td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>ndarray of float, shape (p,)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The estimate to evaluate at.</p>
+                <p>The estimate to evaluate at (ideally the maximiser).</p>
               </div>
             </td>
             <td>
@@ -3657,7 +4700,7 @@ assumption <code>method="ml"</code> already makes.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of observations.</p>
+                <p>Number of observations (positive).</p>
               </div>
             </td>
             <td>
@@ -3666,6 +4709,58 @@ assumption <code>method="ml"</code> already makes.</p>
           </tr>
       </tbody>
     </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (p, p), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimated covariance matrix of <code>theta</code>, or <code>None</code> when the
+negative Hessian is not positive definite or the result is not
+finite.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Assumes the supplied data <em>are</em> copula observations -- margins known rather
+than estimated -- so the information equality holds and
+:math:<code>\mathrm{Cov}(\hat\theta) = H^{-1}/n</code> with :math:<code>H</code> the averaged
+negative Hessian of the log-density.</p>
+<p>The robust sandwich :math:<code>H^{-1}\Sigma H^{-1}/n</code> was tried first and
+rejected. It is valid under misspecification, but here it merely adds noise:
+on a Clayton sample of 1000 it gave 0.0932 against the information form's
+0.089144, which reproduces R to six decimal places, while a Monte-Carlo
+sampling SD put the truth near 0.090. Correct specification is exactly the
+assumption <code>method="ml"</code> already makes.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.fit</span><span class="w"> </span><span class="kn">import</span> <span class="n">var_ml</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cov</span> <span class="o">=</span> <span class="n">var_ml</span><span class="p">(</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">u</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">]),</span> <span class="mi">1000</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cov</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(1, 1)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
 
 
     </div>
@@ -3685,78 +4780,11 @@ assumption <code>method="ml"</code> already makes.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Per-observation influence :math:<code>W_i</code> and the averaged negative Hessian.</p>
-<p>Split out from :func:<code>var_mpl</code> because the multiplier goodness-of-fit
-bootstrap needs exactly the same quantity: it replicates
-:math:<code>\sqrt n(\hat\theta - \theta)</code> as
-:math:<code>H^{-1} n^{-1/2}\sum_i Z_i W_i</code> for random multipliers :math:<code>Z_i</code>,
-which is what lets it avoid refitting the copula on every bootstrap draw.</p>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-<th>Name</th>          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-<td><code>w</code></td>            <td>
-                  <code><span title="ndarray">ndarray</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p><code>(n, p)</code> influence contributions.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-<td><code>hessian</code></td>            <td>
-                  <code><span title="ndarray">ndarray</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p><code>(p, p)</code> averaged negative Hessian of the log-density.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="rcopula.fit.variance.var_mpl" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">var_mpl</span>
-
-
-<a href="#rcopula.fit.variance.var_mpl" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">var_mpl</span><span class="p">(</span><span class="n">logpdf_at</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]],</span> <span class="n">u</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="n">theta</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Genest-Ghoudi-Rivest covariance for maximum pseudo-likelihood.</p>
-<p>Adds the rank-estimation correction that plain maximum-likelihood standard
-errors omit. Concretely, alongside the score :math:<code>\dot\ell(U_i)</code> each
-observation contributes</p>
-<p>.. math::
-    W_k(U_{ik}) = \frac{1}{n}\sum_j \dot\ell_{,k}(U_j)
-                  \bigl(\mathbf{1}{U_{ik} \le U_{jk}} - U_{jk}\bigr)</p>
-<p>for every margin <code>k</code>, and the covariance is the sandwich built from
-:math:<code>W_i = \dot\ell(U_i) + \sum_k W_k(U_{ik})</code>.</p>
-<p>Calibrated against its own sampling distribution: over 250 Clayton samples
-of size 1000 the mean estimate was 0.1238 against an empirical SD of
-0.1234, a ratio of 1.004. Against R on 40 shared datasets the mean ratio is
-1.013 (paired range 0.91-1.12), the spread reflecting that R has analytic
-derivatives for Clayton while these are numerical.</p>
+        <p>Measure how much each observation pushes a pseudo-likelihood estimate around.</p>
+<p>Returns the per-observation influence :math:<code>W_i</code> (score plus the
+rank-estimation correction) and the averaged negative Hessian. These are
+the building blocks of :func:<code>var_mpl</code>; you only need them directly to
+build a bootstrap or your own variance estimate.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3779,7 +4807,9 @@ derivatives for Clayton while these are numerical.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(u, theta) -&gt; per-observation log densities</code>.</p>
+                <p>Function <code>logpdf_at(u, theta) -&gt; ndarray of float, shape (n,)</code>
+giving per-observation log densities at data <code>u</code> and parameters
+<code>theta</code>.</p>
               </div>
             </td>
             <td>
@@ -3791,11 +4821,11 @@ derivatives for Clayton while these are numerical.</p>
                 <code>u</code>
             </td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>ndarray of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The <code>(n, d)</code> pseudo-observations the fit used.</p>
+                <p>Pseudo-observations strictly inside the unit cube.</p>
               </div>
             </td>
             <td>
@@ -3807,7 +4837,140 @@ derivatives for Clayton while these are numerical.</p>
                 <code>theta</code>
             </td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>ndarray of float, shape (p,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The estimate to evaluate at.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>w</code></td>            <td>
+                  <code>ndarray of float, shape (n, p)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Influence contributions, one row per observation. All <code>nan</code> when
+more than 2% of observations had to be discarded because their
+derivatives were not finite (typically a family with a moving support
+boundary).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+<td><code>hessian</code></td>            <td>
+                  <code>ndarray of float, shape (p, p)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Averaged negative Hessian of the log-density.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Split out from :func:<code>var_mpl</code> because the multiplier goodness-of-fit
+bootstrap needs exactly the same quantity: it replicates
+:math:<code>\sqrt n(\hat\theta - \theta)</code> as
+:math:<code>H^{-1} n^{-1/2}\sum_i Z_i W_i</code> for random multipliers :math:<code>Z_i</code>,
+which is what lets it avoid refitting the copula on every bootstrap draw.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.fit.variance.var_mpl" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">var_mpl</span>
+
+
+<a href="#rcopula.fit.variance.var_mpl" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">var_mpl</span><span class="p">(</span><span class="n">logpdf_at</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]],</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">]],</span> <span class="n">u</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="n">theta</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">float64</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate how uncertain pseudo-likelihood copula parameters are (their covariance matrix).</p>
+<p>This is the Genest-Ghoudi-Rivest covariance used by
+<code>fit(..., method="mpl")</code>, the default. It accounts for the margins
+having been replaced by ranks, which plain likelihood standard errors
+ignore. Most users read <code>CopulaFitResult.bse</code> instead of calling this.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>logpdf_at</code>
+            </td>
+            <td>
+                  <code><span title="callable">callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function <code>logpdf_at(u, theta) -&gt; ndarray of float, shape (n,)</code>
+giving per-observation log densities.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>ndarray of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The pseudo-observations the fit used, strictly inside the unit cube.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>theta</code>
+            </td>
+            <td>
+                  <code>ndarray of float, shape (p,)</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3820,6 +4983,59 @@ derivatives for Clayton while these are numerical.</p>
           </tr>
       </tbody>
     </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (p, p), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimated covariance matrix of <code>theta</code>, or <code>None</code> when the
+negative Hessian is not positive definite, too many observations sit
+on a support boundary, or the result is not finite.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Adds the rank-estimation correction that plain maximum-likelihood standard
+errors omit. Concretely, alongside the score :math:<code>\dot\ell(U_i)</code> each
+observation contributes</p>
+<p>.. math::
+    W_k(U_{ik}) = \frac{1}{n}\sum_j \dot\ell_{,k}(U_j)
+                  \bigl(\mathbf{1}{U_{ik} \le U_{jk}} - U_{jk}\bigr)</p>
+<p>for every margin <code>k</code>, and the covariance is the sandwich built from
+:math:<code>W_i = \dot\ell(U_i) + \sum_k W_k(U_{ik})</code>.</p>
+<p>Calibrated against its own sampling distribution: over 250 Clayton samples
+of size 1000 the mean estimate was 0.1238 against an empirical SD of
+0.1234, a ratio of 1.004. Against R on 40 shared datasets the mean ratio is
+1.013 (paired range 0.91-1.12), the spread reflecting that R has analytic
+derivatives for Clayton while these are numerical.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">pseudo_obs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.fit</span><span class="w"> </span><span class="kn">import</span> <span class="n">var_mpl</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">pseudo_obs</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cov</span> <span class="o">=</span> <span class="n">var_mpl</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">logpdf</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">u</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">]))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">True</span>
+</code></pre></div>
 
 
     </div>
@@ -3839,8 +5055,71 @@ derivatives for Clayton while these are numerical.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Empirical influence function of Kendall's tau for a bivariate sample.</p>
-<p>Kendall's tau is a U-statistic of degree two, so by Hoeffding's projection
+        <p>For each observation, the share of other observations that move in the same direction.</p>
+<p>This is the empirical influence function of Kendall's tau for a bivariate
+sample: the fraction of other points that are concordant with point
+<code>i</code>. It is used to compute the standard error of tau-based estimates.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>ndarray of float, shape (n, 2)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bivariate sample (pseudo-observations or raw values; only the
+ordering matters). <code>n</code> must be at least 2.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (n,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Values in <code>[0, 1]</code>. <code>2 * mean - 1</code> approximately equals the
+sample Kendall's tau.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Kendall's tau is a U-statistic of degree two, so by Hoeffding's projection
 its first-order behaviour is governed by</p>
 <p>.. math::
     h(u, v) = \Pr(U &lt; u, V &lt; v) + \Pr(U &gt; u, V &gt; v),</p>
@@ -3851,7 +5130,7 @@ giving :math:<code>\mathrm{Var}(\hat\tau) \approx 16\,\mathrm{Var}(h)/n</code>.<
 <p>(Measured against 800 Gaussian samples of size 1500, the implied constant is
 17.9 rather than 16 -- the usual finite-sample gap in a first-order
 projection, and small next to the delta-method step that follows.)</p>
-
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>The scaled mean reproduces the sample tau:</p>
@@ -3883,14 +5162,84 @@ projection, and small next to the delta-method step that follows.)</p>
 
     <div class="doc doc-contents ">
 
-        <p>Empirical influence function of Spearman's rho for a bivariate sample.</p>
-<p>With :math:<code>\hat\rho \approx 12\,\overline{U_1 U_2} - 3</code>, the influence
+        <p>For each observation, how much it contributes to Spearman's rank correlation.</p>
+<p>This is the empirical influence function of Spearman's rho for a
+bivariate sample, used to compute the standard error of rho-based
+estimates.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>ndarray of float, shape (n, 2)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bivariate pseudo-observations in <code>(0, 1)</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (n,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Influence contribution of each observation.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>With :math:<code>\hat\rho \approx 12\,\overline{U_1 U_2} - 3</code>, the influence
 contribution of observation <code>i</code> is</p>
 <p>.. math::
     12\Bigl(U_{i1}U_{i2}
       + \overline{U_{j2}\mathbf{1}{U_{j1} \ge U_{i1}}}
       + \overline{U_{j1}\mathbf{1}{U_{j2} \ge U_{i2}}}\Bigr) - 9,</p>
 <p>the two averages accounting for the ranks being estimated rather than known.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span><span class="p">,</span> <span class="n">pseudo_obs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.fit.variance</span><span class="w"> </span><span class="kn">import</span> <span class="n">spearman_influence</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">pseudo_obs</span><span class="p">(</span><span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spearman_influence</span><span class="p">(</span><span class="n">u</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(200,)</span>
+</code></pre></div>
 
 
     </div>
@@ -3910,13 +5259,10 @@ contribution of observation <code>i</code> is</p>
 
     <div class="doc doc-contents ">
 
-        <p>Delta-method covariance for a multi-parameter inversion estimator.</p>
-<p>Each correlation is inverted from its own pairwise statistic, so the
-covariance follows from the joint covariance of those statistics:
-:math:<code>\mathrm{Cov}(\hat\theta) = J\,\mathrm{Cov}(\hat{\boldsymbol\tau})\,J^{\top}</code>.
-The pairwise statistics are <em>not</em> independent -- they share observations --
-which is why the full covariance is estimated from the joint influence
-vectors rather than pair by pair.</p>
+        <p>Estimate the uncertainty of several correlations, each obtained from a pairwise tau or rho.</p>
+<p>Delta-method covariance for a multi-parameter inversion estimator, as
+used by <code>fit(..., method="itau")</code> and <code>"irho"</code> for elliptical copulas
+with an unstructured correlation matrix.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3935,11 +5281,11 @@ vectors rather than pair by pair.</p>
                 <code>u</code>
             </td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>ndarray of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The <code>(n, d)</code> pseudo-observations.</p>
+                <p>The pseudo-observations, <code>d &gt;= 2</code>.</p>
               </div>
             </td>
             <td>
@@ -3951,13 +5297,15 @@ vectors rather than pair by pair.</p>
                 <code>jacobian</code>
             </td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>ndarray of float, shape (p, p)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(p, p)</code> derivative of the parameter vector with respect to the
-statistic vector. Diagonal for elliptical copulas, where each
-correlation depends only on its own pair.</p>
+                <p>Derivative of the parameter vector with respect to the statistic
+vector, where <code>p = d * (d - 1) / 2</code> is the number of column pairs
+(ordered column by column down the lower triangle). Diagonal for
+elliptical copulas, where each correlation depends only on its own
+pair.</p>
               </div>
             </td>
             <td>
@@ -3973,7 +5321,8 @@ correlation depends only on its own pair.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Which pairwise statistic was inverted: Kendall's tau or Spearman's
+rho.</p>
               </div>
             </td>
             <td>
@@ -3983,6 +5332,40 @@ correlation depends only on its own pair.</p>
       </tbody>
     </table>
 
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (p, p), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimated covariance matrix, or <code>None</code> if it is not finite or has a
+negative diagonal entry.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Each correlation is inverted from its own pairwise statistic, so the
+covariance follows from the joint covariance of those statistics:
+:math:<code>\mathrm{Cov}(\hat\theta) = J\,\mathrm{Cov}(\hat{\boldsymbol\tau})\,J^{\top}</code>.
+The pairwise statistics are <em>not</em> independent -- they share observations --
+which is why the full covariance is estimated from the joint influence
+vectors rather than pair by pair.</p>
+</details>
 
     </div>
 
@@ -4001,10 +5384,10 @@ correlation depends only on its own pair.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Delta-method covariance for a one-parameter inversion estimator.</p>
-<p>:math:<code>\hat\theta = g(\hat\tau)</code> gives
-:math:<code>\mathrm{Var}(\hat\theta) \approx g'(\tau)^2\,\mathrm{Var}(\hat\tau)</code>,
-with the variance of the rank statistic taken from its influence function.</p>
+        <p>Estimate the uncertainty of a one-parameter estimate obtained by inverting tau or rho.</p>
+<p>Delta-method variance for a one-parameter inversion estimator, as used
+by <code>fit(..., method="itau")</code> and <code>"irho"</code>. Most users read
+<code>CopulaFitResult.bse</code> instead of calling this.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4023,11 +5406,12 @@ with the variance of the rank statistic taken from its influence function.</p>
                 <code>u</code>
             </td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>ndarray of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The <code>(n, 2)</code> pseudo-observations.</p>
+                <p>The pseudo-observations. For <code>d &gt; 2</code> the estimate is assumed to come
+from the <em>average</em> of the pairwise statistics, as :func:<code>fit</code> does.</p>
               </div>
             </td>
             <td>
@@ -4043,7 +5427,8 @@ with the variance of the rank statistic taken from its influence function.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>:math:<code>g'</code>, the derivative of the inverse map at the estimate.</p>
+                <p>:math:<code>g'</code>, the derivative of the inverse map (parameter as a function
+of tau or rho) at the estimate.</p>
               </div>
             </td>
             <td>
@@ -4068,6 +5453,75 @@ with the variance of the rank statistic taken from its influence function.</p>
           </tr>
       </tbody>
     </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>ndarray of float, shape (1, 1), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The estimated variance, or <code>None</code> if <code>d &lt; 2</code> or the value is not
+finite.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>measure</code> is neither <code>"tau"</code> nor <code>"rho"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>:math:<code>\hat\theta = g(\hat\tau)</code> gives
+:math:<code>\mathrm{Var}(\hat\theta) \approx g'(\tau)^2\,\mathrm{Var}(\hat\tau)</code>,
+with the variance of the rank statistic taken from its influence function.</p>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>For Clayton, :math:<code>\theta = 2\tau/(1-\tau)</code>, so
+:math:<code>g'(\tau) = 2/(1-\tau)^2</code>:</p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClaytonCopula</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.fit</span><span class="w"> </span><span class="kn">import</span> <span class="n">var_itau</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">ClaytonCopula</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tau</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">kendalltau</span><span class="p">(</span><span class="n">u</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">u</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">statistic</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">var</span> <span class="o">=</span> <span class="n">var_itau</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">tau</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">var</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(1, 1)</span>
+</code></pre></div>
 
 
     </div>
@@ -4182,7 +5636,91 @@ Genest, C., Remillard, B. and Beaudoin, D. (2009). Goodness-of-fit tests for
 
 
 
-        <p>One candidate family, with the dimensions it is valid in.</p>
+        <p>A registry entry describing one candidate copula family for :func:<code>select_copula</code>.</p>
+<p>Each entry knows how to build an unfitted copula of a given dimension,
+the largest dimension the family supports, and which groups (such as
+<code>"archimedean"</code>) it belongs to. The built-in entries live in
+:data:<code>FAMILIES</code>; you rarely need to create one yourself.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Key in :data:<code>FAMILIES</code>, e.g. <code>"clayton"</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>factory</code>
+            </td>
+            <td>
+                  <code><span title="callable">callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function <code>factory(dim: int) -&gt; Copula</code> returning an unfitted
+instance of the family in dimension <code>dim</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_dim</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Largest supported dimension; <code>None</code> means any dimension.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>groups</code>
+            </td>
+            <td>
+                  <code>frozenset of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Group labels accepted by <code>select_copula(families=...)</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -4243,6 +5781,14 @@ Genest, C., Remillard, B. and Beaudoin, D. (2009). Goodness-of-fit tests for
     </table>
 
 
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">rcopula.select</span><span class="w"> </span><span class="kn">import</span> <span class="n">FAMILIES</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spec</span> <span class="o">=</span> <span class="n">FAMILIES</span><span class="p">[</span><span class="s2">"tawn"</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spec</span><span class="o">.</span><span class="n">max_dim</span><span class="p">,</span> <span class="n">spec</span><span class="o">.</span><span class="n">admissible</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">spec</span><span class="o">.</span><span class="n">admissible</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="go">(2, True, False)</span>
+</code></pre></div>
+
+
 
 
 
@@ -4262,6 +5808,80 @@ Genest, C., Remillard, B. and Beaudoin, D. (2009). Goodness-of-fit tests for
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="rcopula.select.FamilySpec.admissible" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">admissible</span>
+
+
+<a href="#rcopula.select.FamilySpec.admissible" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">admissible</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check whether this family can be used for data with <code>dim</code> columns.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dim</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of variables (columns) in the data, at least 2.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>True</code> if <code>max_dim</code> is <code>None</code> or <code>dim &lt;= max_dim</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
 
 
 
@@ -4291,7 +5911,72 @@ Genest, C., Remillard, B. and Beaudoin, D. (2009). Goodness-of-fit tests for
 
 
 
-        <p>Outcome of :func:<code>select_copula</code>.</p>
+        <p>The ranking from :func:<code>select_copula</code>: a comparison table plus the winning fitted copula.</p>
+<p>Print it to see the table; use :attr:<code>best</code> to get the winning copula,
+already fitted, and :attr:<code>results</code> for every candidate's full fit.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>table</code>
+            </td>
+            <td>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Ranked comparison table (see Attributes).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>results</code>
+            </td>
+            <td>
+                  <code>dict of str to CopulaFitResult</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fit result per family name.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>criterion</code>
+            </td>
+            <td>
+                  <code>(&#39;aic&#39;, &#39;bic&#39;, &#39;loglik&#39;, &#39;xv&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column that decided the ranking.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;aic&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -4307,26 +5992,27 @@ Genest, C., Remillard, B. and Beaudoin, D. (2009). Goodness-of-fit tests for
           <tr class="doc-section-item">
             <td><code><span title="rcopula.select.SelectionResult.table">table</span></code></td>
             <td>
-                  <code><span title="DataFrame">DataFrame</span></code>
+                  <code><span title="pandas.DataFrame">DataFrame</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>One row per candidate, sorted best-first. Columns: <code>n_params</code>,
-<code>loglik</code>, <code>aic</code>, <code>bic</code>, <code>tau</code>, <code>lambda_lower</code>,
-<code>lambda_upper</code>, <code>converged</code>, <code>message</code>, plus <code>xv</code> and the
-goodness-of-fit columns when those were requested.</p>
+                <p>One row per candidate, indexed by family name and sorted best-first.
+Columns: <code>n_params</code>, <code>loglik</code>, <code>aic</code>, <code>bic</code>, <code>tau</code>,
+<code>lambda_lower</code>, <code>lambda_upper</code>, <code>converged</code>, <code>n_obs</code>,
+<code>message</code>, plus <code>xv</code> and the goodness-of-fit columns
+(<code>gof_statistic</code>, <code>gof_pvalue</code>) when those were requested.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.select.SelectionResult.results">results</span></code></td>
             <td>
-                  <code><span title="dict">dict</span></code>
+                  <code>dict of str to CopulaFitResult</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Family name to :class:<code>~rcopula.fit.results.CopulaFitResult</code>, including
-the ones that failed (absent if the fit raised).</p>
+the ones that did not converge (absent if the fit raised).</p>
               </div>
             </td>
           </tr>
@@ -4380,7 +6066,53 @@ the ones that failed (absent if the fit raised).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Name of the winning family.</p>
+        <p>The name of the family that ranked first, e.g. <code>"clayton"</code>.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the table is empty.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -4404,7 +6136,64 @@ the ones that failed (absent if the fit raised).</p>
 
     <div class="doc doc-contents ">
 
-        <p>The winning :class:<code>~rcopula.fit.results.CopulaFitResult</code>.</p>
+        <p>The full fit result (estimates, log-likelihood, ...) of the winning family.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="CopulaFitResult (rcopula.fit.results.CopulaFitResult)" href="#rcopula.fit.results.CopulaFitResult">CopulaFitResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the table is empty.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="KeyError">KeyError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the top-ranked family has no fit result because its fit
+raised (possible only when every candidate failed).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -4428,7 +6217,30 @@ the ones that failed (absent if the fit raised).</p>
 
     <div class="doc doc-contents ">
 
-        <p>The winning copula, fitted and ready to use.</p>
+        <p>The winning copula, with its fitted parameters, ready to sample from or evaluate.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
     </div>
 
@@ -4450,7 +6262,33 @@ the ones that failed (absent if the fit raised).</p>
 
     <div class="doc doc-contents ">
 
-        <p>A printable ranking table.</p>
+        <p>The ranking as a human-readable text table, ready to print.</p>
+<p>Includes a header with the sample size and criterion; the <code>n_obs</code>
+and <code>message</code> columns are left out for width. <code>repr</code> of the
+result shows the same text.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Multi-line text; pass it to <code>print</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -4479,16 +6317,11 @@ the ones that failed (absent if the fit raised).</p>
 
     <div class="doc doc-contents ">
 
-        <p>k-fold cross-validated log-likelihood (R's <code>xvCopula</code>).</p>
-<p>Fits on <code>k-1</code> folds and scores the held-out one, summed over folds and
-<strong>multiplied by</strong> :math:<code>n/(n - n/k)</code> so the result is on the scale of a
-full-sample log-likelihood and comparable across families -- the same
-convention R uses.</p>
-<p>This is the honest answer to a real problem: the ordinary AIC is biased for
-copulas, because the pseudo-observations are themselves estimated from the
-data and the usual "one penalty unit per parameter" accounting no longer
-holds (Gronneberg &amp; Hjort 2014). Cross-validation sidesteps the bias by
-scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
+        <p>Score a copula family by how well it predicts data it was not fitted on (higher is better).</p>
+<p>Splits the data into <code>k</code> parts, fits on all but one part and scores
+the left-out part, rotating through every part. Use it to compare
+families more honestly than with AIC, at the cost of <code>k</code> fits per
+family. This is R's <code>xvCopula</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4511,7 +6344,7 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Family to score.</p>
+                <p>Family to score; its parameter values are only a starting point.</p>
               </div>
             </td>
             <td>
@@ -4523,11 +6356,12 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
                 <code>data</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float or pandas.DataFrame, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, d)</code> observations; rank-transformed internally.</p>
+                <p>Observations, one row per observation; <code>d</code> must equal
+<code>copula.dim</code>. Rank-transformed internally, so raw data is fine.</p>
               </div>
             </td>
             <td>
@@ -4543,7 +6377,7 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of folds.</p>
+                <p>Number of folds, between 2 and <code>n</code>.</p>
               </div>
             </td>
             <td>
@@ -4555,15 +6389,15 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
                 <code>method</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code>(&#39;mpl&#39;, &#39;ml&#39;, &#39;itau&#39;, &#39;irho&#39;, &#39;itau.mpl&#39;)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Estimation method for each training fit.</p>
+                <p>Estimation method for each training fit; see :func:<code>~rcopula.fit</code>.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;mpl&#39;</code>
+                  <code>&#34;mpl&#34;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -4571,15 +6405,33 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(<span title="Generator">Generator</span>, <span title="int">int</span> or None)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Controls the fold assignment.</p>
+                <p>Controls the random fold assignment. Pass an int for reproducible
+results.</p>
               </div>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code>(&#39;average&#39;, &#39;min&#39;, &#39;max&#39;, &#39;dense&#39;, &#39;ordinal&#39;, &#39;random&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How tied values are ranked when <code>data</code> is turned into
+pseudo-observations.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;average&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -4601,13 +6453,52 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Cross-validated log-likelihood; higher is better.</p>
+                <p>Cross-validated log-likelihood, rescaled to a full-sample scale;
+higher is better.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>k</code> is not between 2 and the number of observations, or if a
+training fit fails (for example, the data have the wrong number of
+columns).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Fits on <code>k-1</code> folds and scores the held-out one, summed over folds and
+<strong>multiplied by</strong> :math:<code>n/(n - n/k)</code> so the result is on the scale of a
+full-sample log-likelihood and comparable across families -- the same
+convention R uses.</p>
+<p>This is the honest answer to a real problem: the ordinary AIC is biased for
+copulas, because the pseudo-observations are themselves estimated from the
+data and the usual "one penalty unit per parameter" accounting no longer
+holds (Gronneberg &amp; Hjort 2014). Cross-validation sidesteps the bias by
+scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>The generating family wins on data it generated:</p>
@@ -4638,7 +6529,11 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Fit every admissible family and rank them.</p>
+        <p>Try many copula families on your data and rank them from best to worst fit.</p>
+<p>Fits every candidate family that supports your data's dimension, scores
+each one (by AIC unless you choose otherwise), and returns a sorted
+table along with the winning copula, already fitted. Use it when you do
+not know which family to pick.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4657,12 +6552,12 @@ scoring on data the fit never saw. It costs <code>k</code> fits per family.</p>
                 <code>data</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span> or <span title="DataFrame">DataFrame</span></code>
+                  <code>array_like of float or pandas.DataFrame, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, d)</code> observations. Rank-transformed internally, so raw data is
-fine.</p>
+                <p>Observations, one row per observation and one column per variable.
+Rank-transformed internally, so raw data is fine.</p>
               </div>
             </td>
             <td>
@@ -4674,19 +6569,21 @@ fine.</p>
                 <code>families</code>
             </td>
             <td>
-                  <code><span title="str">str</span> or <span title="sequence">sequence</span></code>
+                  <code>str, sequence of str or sequence of Copula</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A group name (<code>"all"</code>, <code>"elliptical"</code>, <code>"archimedean"</code>,
-<code>"extreme"</code>, <code>"other"</code>, <code>"baseline"</code>), a list of family names from
-:data:<code>FAMILIES</code>, or a list of unfitted :class:<code>~rcopula.core.base.Copula</code>
-instances when you want full control (a fixed <code>df</code>, a particular
-<code>dispstr</code>, a rotated family, ...).</p>
+                <p>Which candidates to try: a group name (<code>"all"</code>, <code>"elliptical"</code>,
+<code>"archimedean"</code>, <code>"extreme"</code>, <code>"other"</code>, <code>"baseline"</code>), a list
+of family names from :data:<code>FAMILIES</code>, or a list of unfitted
+:class:<code>~rcopula.core.base.Copula</code> instances when you want full control
+(a fixed <code>df</code>, a particular <code>dispstr</code>, a rotated family, ...).
+Families limited to two dimensions are skipped automatically for a
+group name.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;all&#39;</code>
+                  <code>&#34;all&#34;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -4698,8 +6595,9 @@ instances when you want full control (a fixed <code>df</code>, a particular
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Ranking column. <code>"xv"</code> triggers a k-fold cross-validation per family
-and is <code>k</code> times slower.</p>
+                <p>Ranking column. <code>"aic"</code> and <code>"bic"</code> rank lowest first; <code>"loglik"</code>
+and <code>"xv"</code> rank highest first. <code>"xv"</code> triggers a k-fold
+cross-validation per family and is <code>k</code> times slower.</p>
               </div>
             </td>
             <td>
@@ -4711,7 +6609,7 @@ and is <code>k</code> times slower.</p>
                 <code>method</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code>(&#39;mpl&#39;, &#39;ml&#39;, &#39;itau&#39;, &#39;irho&#39;, &#39;itau.mpl&#39;)</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4719,7 +6617,7 @@ and is <code>k</code> times slower.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;mpl&#39;</code>
+                  <code>&#34;mpl&#34;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -4727,7 +6625,7 @@ and is <code>k</code> times slower.</p>
                 <code>gof</code>
             </td>
             <td>
-                  <code><span title="bool">bool</span> or <span title="str">str</span></code>
+                  <code><span title="bool">bool</span> or {&#39;pb&#39;, &#39;mult&#39;}</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4749,7 +6647,7 @@ faster. Adds <code>gof_statistic</code> and <code>gof_pvalue</code> columns.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Folds, when <code>criterion="xv"</code>.</p>
+                <p>Number of folds (2 to <code>n</code>), used only when <code>criterion="xv"</code>.</p>
               </div>
             </td>
             <td>
@@ -4765,11 +6663,45 @@ faster. Adds <code>gof_statistic</code> and <code>gof_pvalue</code> columns.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Bootstrap replicates, when <code>gof</code> is requested.</p>
+                <p>Bootstrap replicates (positive), used only when <code>gof</code> is requested.</p>
               </div>
             </td>
             <td>
                   <code>200</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed for the cross-validation folds and the goodness-of-fit bootstrap.
+Pass an int for reproducible results.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code>(&#39;average&#39;, &#39;min&#39;, &#39;max&#39;, &#39;dense&#39;, &#39;ordinal&#39;, &#39;random&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How tied values are ranked when <code>data</code> is turned into
+pseudo-observations.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;average&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -4796,7 +6728,45 @@ faster. Adds <code>gof_statistic</code> and <code>gof_pvalue</code> columns.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The ranked table (<code>.table</code>), the winner (<code>.best</code>,
+<code>.best_name</code>) and every fit (<code>.results</code>).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>criterion</code> or <code>gof</code> is not one of the listed values, a family
+name or group is unknown, a named family does not support the data's
+dimension, <code>families</code> is empty, or a supplied copula's <code>dim</code> does
+not match the data.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>families</code> mixes names and copula objects, or contains something
+that is neither.</p>
               </div>
             </td>
           </tr>
@@ -4806,9 +6776,11 @@ faster. Adds <code>gof_statistic</code> and <code>gof_pvalue</code> columns.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>A family that fails to converge is <strong>reported, not raised</strong>: its row carries
-the error message and <code>converged=False</code>, and it is ranked last. Silently
-dropping it would misrepresent the comparison.</p>
+  <p>A family whose fit <strong>raises</strong> is reported, not raised: its row carries
+the error message, <code>NaN</code> scores and <code>converged=False</code>, and it is
+ranked last. A fit that runs but whose optimiser reports non-convergence
+keeps its score and is ranked by it, with <code>converged=False</code> in its
+row. Silently dropping either would misrepresent the comparison.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -4979,7 +6951,12 @@ Genest, C., Ghoudi, K. and Rivest, L.-P. (1995). A semiparametric estimation
 
 
 
-        <p>The outcome of a bootstrap.</p>
+        <p>The answer from a bootstrap: the estimate, its confidence interval and every replicate.</p>
+<p>You normally get one of these from :func:<code>bootstrap</code>,
+:func:<code>bootstrap_measure</code> or :func:<code>bootstrap_fit</code> rather than building it
+yourself. Read <code>confidence_interval</code> for the interval, call
+:meth:<code>summary</code> for a printable table, or plot <code>replicates</code> to see the
+whole sampling distribution.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -4995,29 +6972,31 @@ Genest, C., Ghoudi, K. and Rivest, L.-P. (1995). A semiparametric estimation
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.estimate">estimate</span></code></td>
             <td>
-                  <code><span title="float">float</span> or <span title="ndarray">ndarray</span></code>
+                  <code>float or numpy.ndarray of float, shape (k,)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The statistic on the original data.</p>
+                <p>The statistic on the original data. A float for a scalar statistic,
+an array of the statistic's <code>k</code> values otherwise.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.confidence_interval">confidence_interval</span></code></td>
             <td>
-                  <code><span title="tuple">tuple</span></code>
+                  <code>tuple of (float, float) or tuple of (numpy.ndarray, numpy.ndarray)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(lower, upper)</code>. Scalars for a scalar statistic, arrays otherwise.</p>
+                <p><code>(lower, upper)</code>. Scalars for a scalar statistic, arrays of shape
+<code>(k,)</code> otherwise.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.standard_error">standard_error</span></code></td>
             <td>
-                  <code><span title="float">float</span> or <span title="ndarray">ndarray</span></code>
+                  <code>float or numpy.ndarray of float, shape (k,)</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5029,23 +7008,24 @@ of the standard error, not the asymptotic one.</p>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.replicates">replicates</span></code></td>
             <td>
-                  <code>(<span title="ndarray">ndarray</span>, <span title="shape">shape</span>(<span title="n_resamples">n_resamples</span>, ...))</code>
+                  <code>numpy.ndarray of float, shape (n_kept,) or (n_kept, k)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Every replicate, kept so the distribution can be plotted -- which is
-usually more informative than the interval.</p>
+                <p>Every replicate that succeeded (<code>n_kept = n_resamples - n_failed</code>),
+kept so the distribution can be plotted -- which is usually more
+informative than the interval.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.method">method</span></code></td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code>{&#39;bca&#39;, &#39;percentile&#39;, &#39;basic&#39;}</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The interval type used.</p>
               </div>
             </td>
           </tr>
@@ -5056,18 +7036,19 @@ usually more informative than the interval.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Coverage of the interval, between 0 and 1 (e.g. 0.95).</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.bootstrap.BootstrapResult.n_failed">n_failed</span></code></td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code>int, default 0</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Resamples the statistic refused.</p>
+                <p>Resamples the statistic refused (raised an error or returned a
+non-finite value).</p>
               </div>
             </td>
           </tr>
@@ -5110,7 +7091,9 @@ usually more informative than the interval.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Bootstrap estimate of bias: mean of the replicates minus the estimate.</p>
+        <p>How far the resampled values sit from the original estimate, on average.</p>
+<p>Returns <code>mean(replicates) - estimate</code>: the bootstrap estimate of
+bias, a float for a scalar statistic or an array of shape <code>(k,)</code>.</p>
 <p>A bias comparable to the standard error is a warning that the statistic
 is not well behaved at this sample size, whatever the interval says.</p>
 
@@ -5134,7 +7117,32 @@ is not well behaved at this sample size, whatever the interval says.</p>
 
     <div class="doc doc-contents ">
 
-        <p>A printable report.</p>
+        <p>Return a printable table of the estimate, standard error, bias and interval.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One row per component of the statistic, with columns estimate,
+SE, bias and the lower and upper interval limits, followed by a
+note of how many resamples were refused, if any.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -5163,7 +7171,12 @@ is not well behaved at this sample size, whatever the interval says.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Bootstrap any statistic of a data matrix, resampling whole rows.</p>
+        <p>Get a confidence interval for any number computed from a data table, by resampling rows.</p>
+<p>The bootstrap redraws the rows of <code>x</code> at random (with replacement) many
+times, recomputes <code>statistic</code> on each redraw, and uses the spread of
+those values to build an interval. It makes no assumption about the
+statistic's distribution. Whole rows are resampled so the dependence
+between columns is kept.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5182,11 +7195,11 @@ is not well behaved at this sample size, whatever the interval says.</p>
                 <code>x</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The data. Rows are observations.</p>
+                <p>The data. Rows are observations; at least 2 rows.</p>
               </div>
             </td>
             <td>
@@ -5202,7 +7215,8 @@ is not well behaved at this sample size, whatever the interval says.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Takes an <code>(n, d)</code> array and returns a float or an array of floats.
+                <p>Function <code>statistic(sample)</code> taking a <code>numpy.ndarray</code> of shape
+<code>(n, d)</code> and returning a float or a 1-D array of floats.
 Raising is allowed and is treated as refusing that resample.</p>
               </div>
             </td>
@@ -5219,9 +7233,9 @@ Raising is allowed and is treated as refusing that resample.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of bootstrap replicates. 999 rather than 1000 by convention: the
-percentile of <code>B</code> replicates is exact when <code>(B+1)*alpha</code> is an
-integer.</p>
+                <p>Number of bootstrap replicates, at least 2. 999 rather than 1000 by
+convention: the percentile of <code>B</code> replicates is exact when
+<code>(B+1)*alpha</code> is an integer.</p>
               </div>
             </td>
             <td>
@@ -5237,7 +7251,7 @@ integer.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Coverage, e.g. 0.95.</p>
+                <p>Coverage, strictly between 0 and 1, e.g. 0.95 for a 95% interval.</p>
               </div>
             </td>
             <td>
@@ -5253,8 +7267,8 @@ integer.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>See the module docstring. BCa additionally runs an <code>n</code>-point
-jackknife, so it costs one extra pass over the data.</p>
+                <p>Interval type; see the module docstring. BCa additionally runs an
+<code>n</code>-point jackknife, so it costs one extra pass over the data.</p>
               </div>
             </td>
             <td>
@@ -5266,11 +7280,11 @@ jackknife, so it costs one extra pass over the data.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Seed for the resampling. Pass an int for reproducible output.</p>
               </div>
             </td>
             <td>
@@ -5287,7 +7301,8 @@ jackknife, so it costs one extra pass over the data.</p>
             <td>
               <div class="doc-md-description">
                 <p>Processes to spread the resamples over. <code>1</code> stays in this process;
-anything else needs <code>statistic</code> to be picklable, which rules out
+a negative value uses all cores. Anything other than <code>1</code> needs
+<code>statistic</code> to be picklable, which rules out
 lambdas and closures -- use a module-level function or
 :func:<code>functools.partial</code>.</p>
 <p>The seeds are drawn up front, so results do not depend on <code>n_jobs</code>:
@@ -5328,7 +7343,42 @@ Kendall's tau the process startup costs more than it saves.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Estimate, interval, standard error and the replicates themselves.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>x</code> has fewer than 2 rows, <code>level</code> is not strictly between 0
+and 1, <code>n_resamples</code> is below 2, <code>method</code> is not one of the three
+names, or <code>statistic</code> fails on the original data.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="RuntimeError">RuntimeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If more than 10% of the resamples are refused by <code>statistic</code>.</p>
               </div>
             </td>
           </tr>
@@ -5367,7 +7417,9 @@ Kendall's tau the process startup costs more than it saves.</p>
 
     <div class="doc doc-contents ">
 
-        <p>A confidence interval for a bivariate dependence measure.</p>
+        <p>Get a confidence interval for how strongly two variables move together.</p>
+<p>A one-call wrapper around :func:<code>bootstrap</code> for the standard rank-based
+dependence measures of a two-column dataset.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5386,11 +7438,12 @@ Kendall's tau the process startup costs more than it saves.</p>
                 <code>x</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, 2))</code>
+                  <code>array_like of float, shape (n, 2)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The data: two columns, at least 2 rows. Raw data or
+pseudo-observations both work, since every measure uses ranks.</p>
               </div>
             </td>
             <td>
@@ -5406,7 +7459,9 @@ Kendall's tau the process startup costs more than it saves.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Which measure: Kendall's tau, Spearman's rho, Blomqvist's beta, or a
+nonparametric upper / lower tail-dependence estimate (the share of
+points with both ranks above 0.95, resp. below 0.05, divided by 0.05).</p>
               </div>
             </td>
             <td>
@@ -5422,7 +7477,7 @@ Kendall's tau the process startup costs more than it saves.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Number of bootstrap replicates, at least 2.</p>
               </div>
             </td>
             <td>
@@ -5434,15 +7489,15 @@ Kendall's tau the process startup costs more than it saves.</p>
                 <code>level</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Coverage, strictly between 0 and 1.</p>
               </div>
             </td>
             <td>
-                  <code>999</code>
+                  <code>0.95</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5450,15 +7505,15 @@ Kendall's tau the process startup costs more than it saves.</p>
                 <code>method</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code>(&#39;bca&#39;, &#39;percentile&#39;, &#39;basic&#39;)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Interval type; see :func:<code>bootstrap</code>.</p>
               </div>
             </td>
             <td>
-                  <code>999</code>
+                  <code>&#34;bca&#34;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5466,15 +7521,15 @@ Kendall's tau the process startup costs more than it saves.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Seed for the resampling. Pass an int for reproducible output.</p>
               </div>
             </td>
             <td>
-                  <code>999</code>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5486,11 +7541,12 @@ Kendall's tau the process startup costs more than it saves.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Number of worker processes. <code>1</code> stays in this process; a negative
+value uses all cores. See :func:<code>bootstrap</code> for when parallelism pays.</p>
               </div>
             </td>
             <td>
-                  <code>999</code>
+                  <code>1</code>
             </td>
           </tr>
       </tbody>
@@ -5517,7 +7573,31 @@ Kendall's tau the process startup costs more than it saves.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>With a float <code>estimate</code> and a <code>(lower, upper)</code> tuple of floats.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>measure</code> is unknown, <code>x</code> does not have exactly 2 columns, or
+for any reason listed in :func:<code>bootstrap</code>.</p>
               </div>
             </td>
           </tr>
@@ -5556,7 +7636,7 @@ symmetric asymptotic interval would show.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Confidence intervals for a fitted copula's parameters.</p>
+        <p>Get confidence intervals for a copula's fitted parameters by refitting it on resampled data.</p>
 <p>The nonparametric complement to the asymptotic standard errors from
 :func:<code>~rcopula.fit</code>: the whole estimation is redone on each resample, so
 the interval reflects the estimator actually used rather than its limiting
@@ -5601,7 +7681,7 @@ over from the original sample.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The family to fit.</p>
+                <p>The family to fit; its current parameters are only a starting point.</p>
               </div>
             </td>
             <td>
@@ -5613,15 +7693,16 @@ over from the original sample.</p>
                 <code>fit_method</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code>(&#39;mpl&#39;, &#39;ml&#39;, &#39;itau&#39;, &#39;irho&#39;, &#39;itau.mpl&#39;)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to :func:<code>~rcopula.fit</code>.</p>
+                <p>Estimation method passed to :func:<code>~rcopula.fit</code> (<code>"mpl"</code> is
+maximum pseudo-likelihood, <code>"itau"</code> inverts Kendall's tau).</p>
               </div>
             </td>
             <td>
-                  <code>&#39;mpl&#39;</code>
+                  <code>&#34;mpl&#34;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5633,7 +7714,8 @@ over from the original sample.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Fewer than for a cheap statistic, because each one is a full fit.</p>
+                <p>Number of bootstrap replicates, at least 2. Fewer than for a cheap
+statistic, because each one is a full fit.</p>
               </div>
             </td>
             <td>
@@ -5649,7 +7731,7 @@ over from the original sample.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Coverage, strictly between 0 and 1.</p>
               </div>
             </td>
             <td>
@@ -5661,15 +7743,15 @@ over from the original sample.</p>
                 <code>method</code>
             </td>
             <td>
-                  <code><span title="float">float</span></code>
+                  <code>(&#39;bca&#39;, &#39;percentile&#39;, &#39;basic&#39;)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Interval type; see :func:<code>bootstrap</code>.</p>
               </div>
             </td>
             <td>
-                  <code>0.95</code>
+                  <code>&#34;bca&#34;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5677,15 +7759,15 @@ over from the original sample.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code><span title="float">float</span></code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Seed for the resampling. Pass an int for reproducible output.</p>
               </div>
             </td>
             <td>
-                  <code>0.95</code>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5693,15 +7775,16 @@ over from the original sample.</p>
                 <code>n_jobs</code>
             </td>
             <td>
-                  <code><span title="float">float</span></code>
+                  <code><span title="int">int</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>As for :func:<code>bootstrap</code>.</p>
+                <p>Number of worker processes. <code>1</code> stays in this process; a negative
+value uses all cores. See :func:<code>bootstrap</code> for when parallelism pays.</p>
               </div>
             </td>
             <td>
-                  <code>0.95</code>
+                  <code>1</code>
             </td>
           </tr>
       </tbody>
@@ -5728,7 +7811,42 @@ over from the original sample.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>One entry per free parameter of <code>copula</code>: a float <code>estimate</code> for
+a one-parameter family, arrays of shape <code>(k,)</code> otherwise.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>For any reason listed in :func:<code>bootstrap</code>, including the fit failing
+on the original data.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="RuntimeError">RuntimeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If more than 10% of the refits fail.</p>
               </div>
             </td>
           </tr>
@@ -5863,7 +7981,102 @@ consequences that carries. Save the data yourself and rebuild it.</p>
 
     <div class="doc doc-contents ">
 
-        <p>A copula as a plain dictionary, ready for JSON, YAML or a database.</p>
+        <p>Convert a copula into a plain Python dictionary you can store or send anywhere.</p>
+<p>The dictionary holds only strings, numbers, booleans, lists and nested
+dictionaries, so it can go into JSON, YAML or a database as-is. Use
+:func:<code>to_json</code> if you just want a JSON string, and :func:<code>from_dict</code> to
+turn the dictionary back into a copula.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>copula</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The copula to save: any parametric family, or a structural
+construction (rotated, outer power, Khoudraji, mixture, nested
+Archimedean, vine) built from them. Not an
+:class:<code>~rcopula.core.empirical.EmpiricalCopula</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>dict of str to Any</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>"rcopula"</code> : str
+    Version of rcopula that wrote the document.
+<code>"schema"</code> : int
+    Layout version of the document (currently 2).
+<code>"copula"</code> : dict
+    The copula itself. Every node has a <code>"kind"</code> (the class name).
+    A plain family also has <code>"dim"</code> (int), <code>"params"</code> (list of
+    float) and <code>"free"</code> (list of bool), plus <code>"dispstr"</code> for the
+    elliptical families and <code>"df_fixed"</code> for the Student t. A
+    structural copula instead holds its components as nested nodes.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the copula is (or contains) an
+:class:<code>~rcopula.core.empirical.EmpiricalCopula</code>, which is
+deliberately not serialisable.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -5892,7 +8105,9 @@ consequences that carries. Save the data yourself and rebuild it.</p>
 
     <div class="doc doc-contents ">
 
-        <p>A copula as a JSON string.</p>
+        <p>Save a copula as a JSON text string, so it can be written to a file and reloaded exactly.</p>
+<p>The string is the JSON form of :func:<code>to_dict</code>'s output. Read it back
+with :func:<code>from_json</code>; the reloaded copula is bit-identical.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5915,7 +8130,7 @@ consequences that carries. Save the data yourself and rebuild it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>The copula to save; see :func:<code>to_dict</code> for what is accepted.</p>
               </div>
             </td>
             <td>
@@ -5931,11 +8146,59 @@ consequences that carries. Save the data yourself and rebuild it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to :func:<code>json.dumps</code>. <code>None</code> gives the compact form.</p>
+                <p>Spaces of indentation, passed to :func:<code>json.dumps</code>. <code>None</code> gives
+the compact single-line form.</p>
               </div>
             </td>
             <td>
                   <code>2</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The JSON document.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the copula is (or contains) an
+:class:<code>~rcopula.core.empirical.EmpiricalCopula</code>.</p>
+              </div>
             </td>
           </tr>
       </tbody>
@@ -5967,7 +8230,65 @@ consequences that carries. Save the data yourself and rebuild it.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Rebuild a copula from :func:<code>to_dict</code>'s output.</p>
+        <p>Turn a dictionary made by :func:<code>to_dict</code> back into a working copula.</p>
+<p>Documents written by older versions of rcopula (schema 1) are upgraded
+automatically on the way in.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>document</code>
+            </td>
+            <td>
+                  <code>dict of str to Any</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A dictionary as returned by :func:<code>to_dict</code>, with at least the keys
+<code>"schema"</code> and <code>"copula"</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The rebuilt copula, of the same class and with the same parameters
+(and fixed/free flags) as the one that was saved.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -5985,9 +8306,10 @@ consequences that carries. Save the data yourself and rebuild it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If the document was written by a newer schema, or names a copula this
-version does not know. Refusing is deliberate: silently mis-reading a
-model is worse than not reading it.</p>
+                <p>If the dictionary has no <code>"schema"</code> or <code>"copula"</code> field, was
+written by a newer schema, or names a copula this version does not
+know. Refusing is deliberate: silently mis-reading a model is worse
+than not reading it.</p>
               </div>
             </td>
           </tr>
@@ -6020,7 +8342,95 @@ model is worse than not reading it.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Rebuild a copula from :func:<code>to_json</code>'s output.</p>
+        <p>Load a copula back from a JSON string made by :func:<code>to_json</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>text</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The JSON document, for example the contents of a file written from
+:func:<code>to_json</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The rebuilt copula.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="json.JSONDecodeError">JSONDecodeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>text</code> is not valid JSON.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>For the same reasons as :func:<code>from_dict</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>

@@ -1371,9 +1371,99 @@ Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
 
 
 
-        <p>Outcome of a goodness-of-fit test.</p>
-<p>Follows the <code>scipy.stats</code> convention of exposing <code>statistic</code> and
-<code>pvalue</code>, so it unpacks like any other test result.</p>
+        <p>The result of a goodness-of-fit test: the score, its p-value, and how it was computed.</p>
+<p>Returned by :func:<code>gof_test</code> and :func:<code>gof_two_sample</code>; you do not
+normally build one yourself. A small <code>pvalue</code> (say below 0.05) means the
+data are unlikely under the tested copula (or, for the two-sample test,
+that the two samples have different copulas).</p>
+<p>It is a <code>NamedTuple</code> following the <code>scipy.stats</code> convention of exposing
+<code>statistic</code> and <code>pvalue</code>, so it unpacks like any other test result:
+<code>stat, p, *rest = result</code>. The constructor takes the attributes below,
+in order, as its arguments; <code>copula</code> defaults to <code>None</code>.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.gof.api.GofResult.statistic">statistic</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The observed test statistic, zero or positive; larger means a worse fit.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.gof.api.GofResult.pvalue">pvalue</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bootstrap or permutation p-value, strictly between 0 and 1.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.gof.api.GofResult.method">method</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the statistic used: <code>"Sn"</code>, <code>"Tn"</code>, <code>"AnChisq"</code>,
+<code>"AnGamma"</code> or, for the two-sample test, <code>"two-sample Sn"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.gof.api.GofResult.simulation">simulation</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How the null distribution was generated: <code>"pb"</code> (parametric
+bootstrap), <code>"mult"</code> (multiplier bootstrap) or <code>"permutation"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.gof.api.GofResult.n_rep">n_rep</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of bootstrap replicates or permutations used.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.gof.api.GofResult.copula">copula</span></code></td>
+            <td>
+                  <code>Copula or None, default None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fitted copula the data was tested against. <code>None</code> for a two-sample
+test, which compares two samples to each other with no model between
+them.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 
@@ -1418,7 +1508,12 @@ Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Test whether a copula family fits the data (R's <code>gofCopula</code>).</p>
+        <p>Check whether a copula family is a plausible model for your data, and get a p-value.</p>
+<p>The family's parameters are first fitted to the data; the test then asks
+whether the gap between that fitted copula and the data's own empirical
+copula is bigger than chance alone would produce (R's <code>gofCopula</code>). Use
+it after choosing a family, to see whether the data clearly contradict it.
+A small p-value (say below 0.05) means "this family does not fit".</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1441,7 +1536,8 @@ Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The family to test. Parameters are estimated from the data.</p>
+                <p>The family to test, e.g. <code>ClaytonCopula()</code>. Its current parameter
+values are only a template; parameters are re-estimated from the data.</p>
               </div>
             </td>
             <td>
@@ -1453,11 +1549,13 @@ Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
                 <code>data</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, d)</code> observations. Always rank-transformed, whatever the scale.</p>
+                <p>Observations, one row per observation and one column per variable, on
+any scale. They are always converted to ranks (pseudo-observations)
+first, so even data already in <code>[0, 1]</code> is re-ranked.</p>
               </div>
             </td>
             <td>
@@ -1473,7 +1571,8 @@ Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Which statistic to use. <code>Sn</code> is the default and the recommended one.</p>
+                <p>Which statistic to use (see :mod:<code>rcopula.gof.statistics</code>). <code>"Sn"</code> is
+the default and the recommended one.</p>
               </div>
             </td>
             <td>
@@ -1489,8 +1588,9 @@ Pesarin, F. (2001). <em>Multivariate Permutation Tests</em>. Wiley.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>"pb"</code> refits on every replicate; <code>"mult"</code> reweights instead and is
-far faster. <code>"mult"</code> supports <code>Sn</code> only.</p>
+                <p>How the p-value is computed. <code>"pb"</code> (parametric bootstrap) simulates
+and refits on every replicate; <code>"mult"</code> (multiplier bootstrap)
+reweights instead and is far faster. <code>"mult"</code> supports <code>"Sn"</code> only.</p>
               </div>
             </td>
             <td>
@@ -1506,11 +1606,12 @@ far faster. <code>"mult"</code> supports <code>Sn</code> only.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Estimation method passed to :func:<code>~rcopula.fit</code>.</p>
+                <p>Estimation method passed to :func:<code>~rcopula.fit</code>, e.g. <code>"mpl"</code>,
+<code>"itau"</code> or <code>"irho"</code>.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;mpl&#39;</code>
+                  <code>&#34;mpl&#34;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -1522,7 +1623,8 @@ far faster. <code>"mult"</code> supports <code>Sn</code> only.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of bootstrap replicates.</p>
+                <p>Number of bootstrap replicates, a positive integer. More replicates give
+a more precise p-value at proportionally more cost.</p>
               </div>
             </td>
             <td>
@@ -1534,15 +1636,33 @@ far faster. <code>"mult"</code> supports <code>Sn</code> only.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(<span title="Generator">Generator</span>, <span title="int">int</span> or None)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Seed or generator.</p>
+                <p>Seed or generator, for reproducible p-values.</p>
               </div>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code>.
+One of <code>"average"</code>, <code>"min"</code>, <code>"max"</code>, <code>"dense"</code>, <code>"ordinal"</code>,
+<code>"random"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;average&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -1564,7 +1684,33 @@ far faster. <code>"mult"</code> supports <code>Sn</code> only.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>With <code>statistic</code> and <code>pvalue</code>, as in <code>scipy.stats</code>.</p>
+                <p>With <code>statistic</code> and <code>pvalue</code>, as in <code>scipy.stats</code>, plus the
+fitted copula in <code>copula</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>simulation</code> is not <code>"pb"</code> or <code>"mult"</code>, if
+<code>simulation="mult"</code> is combined with a <code>method</code> other than <code>"Sn"</code>,
+or if <code>method</code> is not a recognised statistic.</p>
               </div>
             </td>
           </tr>
@@ -1576,6 +1722,8 @@ far faster. <code>"mult"</code> supports <code>Sn</code> only.</p>
   <summary>Notes</summary>
   <p>A large p-value is <em>not</em> evidence that the family is correct -- only that
 this test could not reject it at this sample size.</p>
+<p>The <code>"pb"</code> cost is <code>n_rep</code> full model fits, which can be slow for large
+<code>n</code> or many parameters; <code>"mult"</code> needs one fit in total.</p>
 </details>
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -1614,7 +1762,10 @@ this test could not reject it at this sample size.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Test whether two samples share a copula (R's <code>gofT2stat</code>).</p>
+        <p>Check whether two datasets have the same dependence structure, ignoring their scales.</p>
+<p>This is a two-sample copula test (R's <code>gofT2stat</code>). A small p-value (say
+below 0.05) means the way the variables move together differs between the
+two samples.</p>
 <p>Every other test here compares one sample against a <em>model</em>. This compares
 two samples against <strong>each other</strong>, with no model in between -- which is the
 right question for "did the dependence change after the crisis?", "does this
@@ -1645,12 +1796,11 @@ randomisation test, valid at any sample size rather than asymptotically.</p>
                 <code>x</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>) and (<span title="m">m</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The two samples. They need the same number of columns, not the same
-number of rows.</p>
+                <p>The first sample, on any scale. At least 2 rows.</p>
               </div>
             </td>
             <td>
@@ -1662,12 +1812,12 @@ number of rows.</p>
                 <code>y</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>) and (<span title="m">m</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (m, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The two samples. They need the same number of columns, not the same
-number of rows.</p>
+                <p>The second sample, on any scale. At least 2 rows. It needs the same
+number of columns as <code>x</code>, not the same number of rows.</p>
               </div>
             </td>
             <td>
@@ -1683,7 +1833,8 @@ number of rows.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Permutations.</p>
+                <p>Number of random relabellings (permutations) used to build the null
+distribution, a positive integer.</p>
               </div>
             </td>
             <td>
@@ -1695,11 +1846,11 @@ number of rows.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Seed or generator, for reproducible p-values.</p>
               </div>
             </td>
             <td>
@@ -1715,11 +1866,12 @@ number of rows.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+                <p>How tied values are ranked when computing the observed statistic;
+passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;average&#39;</code>
+                  <code>&#34;average&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -1741,7 +1893,32 @@ number of rows.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>With <code>method="two-sample Sn"</code>, <code>simulation="permutation"</code> and
+<code>copula=None</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>x</code> and <code>y</code> have different numbers of columns, or either has
+fewer than 2 rows.</p>
               </div>
             </td>
           </tr>
@@ -1871,10 +2048,94 @@ Genest, C. and Remillard, B. (2008). Validity of the parametric bootstrap for
 
     <div class="doc doc-contents ">
 
-        <p>Empirical copula :math:<code>C_n</code> evaluated at each row of <code>at</code>.</p>
-<p>Uses the <code>1/n</code> scaling of Genest-Remillard-Beaudoin, matching R's
-<code>C.n</code> with <code>offset = 0</code>.</p>
+        <p>Compute, for each point, the share of observations that lie below it in every coordinate.</p>
+<p>This is the <em>empirical copula</em> :math:<code>C_n</code>: the data's own, model-free
+estimate of the copula. Goodness-of-fit statistics compare it with a fitted
+parametric copula, and you can use it directly to see what the dependence in
+a sample looks like without assuming any family.</p>
 
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>u</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The observations defining the empirical copula, normally
+pseudo-observations in <code>[0, 1]</code> (see :func:<code>~rcopula.pseudo_obs</code>).
+A 1-D input is treated as a single row.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>at</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (m, d), or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The points at which to evaluate it. <code>None</code> evaluates at the rows of
+<code>u</code> themselves, so <code>m = n</code>. Must have the same number of columns as
+<code>u</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>numpy.ndarray of float, shape (m,)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>For each point, the fraction of rows of <code>u</code> that are less than or
+equal to it in every coordinate; values lie in <code>[0, 1]</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Formally :math:<code>C_n(\mathbf x) = \frac1n \sum_i \mathbf 1\{\mathbf U_i \le \mathbf x\}</code>.
+Uses the <code>1/n</code> scaling of Genest-Remillard-Beaudoin, matching R's
+<code>C.n</code> with <code>offset = 0</code>. Memory and time grow as <code>m * n * d</code>.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -1902,7 +2163,11 @@ Genest, C. and Remillard, B. (2008). Validity of the parametric bootstrap for
 
     <div class="doc doc-contents ">
 
-        <p>Evaluate a goodness-of-fit statistic (R's <code>gofTstat</code>).</p>
+        <p>Score how far a fitted copula is from the data, where a bigger number means a worse fit.</p>
+<p>This computes one goodness-of-fit statistic (R's <code>gofTstat</code>) and nothing
+else -- no p-value. Use it to compare candidate families on the same data,
+or as a building block; for a formal test with a p-value use
+:func:<code>~rcopula.gof_test</code>, which calibrates this number by bootstrap.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1921,12 +2186,14 @@ Genest, C. and Remillard, B. (2008). Validity of the parametric bootstrap for
                 <code>u</code>
             </td>
             <td>
-                  <code><span title="array_like">array_like</span></code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(n, d)</code> pseudo-observations. For <code>AnChisq</code>/<code>AnGamma</code> these should
-already be Rosenblatt-transformed, as in R.</p>
+                <p>Pseudo-observations, values in <code>[0, 1]</code> (see :func:<code>~rcopula.pseudo_obs</code>).
+For <code>"AnChisq"</code>/<code>"AnGamma"</code> these should already be
+Rosenblatt-transformed with the fitted copula, as in R; this function
+does not do that transform for you.</p>
               </div>
             </td>
             <td>
@@ -1938,11 +2205,12 @@ already be Rosenblatt-transformed, as in R.</p>
                 <code>copula</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a></code>
+                  <code><a class="autorefs autorefs-internal" title="rcopula.core.base.Copula" href="../families/#rcopula.core.base.Copula">Copula</a> or None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The fitted copula, required for <code>Sn</code> and <code>Tn</code>.</p>
+                <p>The fitted copula to compare against. Required for <code>"Sn"</code> and
+<code>"Tn"</code>; ignored by <code>"AnChisq"</code> and <code>"AnGamma"</code>.</p>
               </div>
             </td>
             <td>
@@ -1958,7 +2226,8 @@ already be Rosenblatt-transformed, as in R.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Which statistic to compute; see the module notes. <code>"Sn"</code> is the
+recommended all-round choice.</p>
               </div>
             </td>
             <td>
@@ -1984,13 +2253,49 @@ already be Rosenblatt-transformed, as in R.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The statistic. Larger values indicate worse fit.</p>
+                <p>The statistic, zero or positive. Larger values indicate worse fit.
+Values are only comparable between fits made with the same <code>method</code>
+and the same data size.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>method</code> is not one of the four names above, or if <code>method</code> is
+<code>"Sn"</code> or <code>"Tn"</code> and <code>copula</code> is <code>None</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p><code>Sn</code> is :math:<code>\sum_i \{C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)\}^2</code>.
+<code>Tn</code> is computed as :math:<code>n \max_i |C_n(\hat U_i) - C_{\hat\theta}(\hat U_i)|</code>.
+<code>AnChisq</code> and <code>AnGamma</code> collapse each row to one number (a sum of
+squared normal quantiles, or a sum of :math:<code>-\log u</code>), map it to
+<code>(0, 1)</code> with the chi-squared or gamma distribution function, and apply
+the Anderson-Darling uniformity statistic.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>A well-specified model gives a small <code>Sn</code>; a misspecified one does not:</p>
@@ -2106,8 +2411,75 @@ Kojadinovic, I. (2014). Some copula inference procedures adapted to the
 
 
 
-        <p>Outcome of a specification test.</p>
-<p>Exposes <code>statistic</code> and <code>pvalue</code>, as <code>scipy.stats</code> tests do.</p>
+        <p>The result of a specification test: the score, its p-value, and what was tested.</p>
+<p>Returned by :func:<code>exch_test</code>, :func:<code>rad_sym_test</code>, :func:<code>indep_test</code>
+and :func:<code>ev_test</code>; you do not normally build one yourself. A small
+<code>pvalue</code> (say below 0.05) is evidence against the property named in
+<code>null</code>.</p>
+<p>It is a <code>NamedTuple</code> exposing <code>statistic</code> and <code>pvalue</code>, as
+<code>scipy.stats</code> tests do, so <code>stat, p, *rest = result</code> works. The
+constructor takes the attributes below, in order, as its arguments.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.TestResult.statistic">statistic</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The observed test statistic, zero or positive; larger means further
+from the null hypothesis.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.TestResult.pvalue">pvalue</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Randomisation or bootstrap p-value, strictly between 0 and 1.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.TestResult.null">null</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Plain name of the null hypothesis tested, e.g. <code>"independence"</code>,
+<code>"exchangeability"</code>, <code>"radial symmetry"</code> or
+<code>"extreme-value dependence"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="rcopula.htest.api.TestResult.n_rep">n_rep</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of randomisation or bootstrap replicates used.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 
@@ -2158,7 +2530,13 @@ Kojadinovic, I. (2014). Some copula inference procedures adapted to the
 
 
 
-        <p>Independence tested on every subset of the coordinates.</p>
+        <p>Independence test results for every group of two or more variables, plus one overall p-value.</p>
+<p>Returned by :func:<code>dependogram</code> and :func:<code>serial_indep_test</code>; you do not
+normally build one yourself. Read <code>global_pvalue</code> for "is anything
+dependent?", then :meth:<code>significant</code> or :meth:<code>summary</code> for "which
+groups?". The constructor takes the attributes below as keyword or
+positional arguments, in order. The object is immutable (a frozen
+dataclass).</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -2174,34 +2552,37 @@ Kojadinovic, I. (2014). Some copula inference procedures adapted to the
           <tr class="doc-section-item">
             <td><code><span title="rcopula.htest.api.DependogramResult.subsets">subsets</span></code></td>
             <td>
-                  <code>list of tuple</code>
+                  <code>list of tuple of int</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Every subset of size two or more, in the order the statistics are
-given -- :math:<code>2^d - d - 1</code> of them.</p>
+                <p>Every subset of column indices (0-based) of size two or more, in the
+order the statistics are given -- :math:<code>2^d - d - 1</code> of them for <code>d</code>
+columns. For example <code>(0, 2)</code> is the pair of columns 0 and 2.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.htest.api.DependogramResult.statistics">statistics</span></code></td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>numpy.ndarray of float, shape (len(subsets),)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The Cramer-von Mises statistic for each subset.</p>
+                <p>The Cramer-von Mises statistic for each subset; larger means more
+dependence.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="rcopula.htest.api.DependogramResult.pvalues">pvalues</span></code></td>
             <td>
-                  <code><span title="ndarray">ndarray</span></code>
+                  <code>numpy.ndarray of float, shape (len(subsets),)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Permutation p-values, one per subset.</p>
+                <p>Permutation p-values, one per subset, strictly between 0 and 1. These
+are not corrected for testing many subsets at once.</p>
               </div>
             </td>
           </tr>
@@ -2225,7 +2606,7 @@ it is exact rather than conservative.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Number of permutations used.</p>
               </div>
             </td>
           </tr>
@@ -2266,7 +2647,64 @@ it is exact rather than conservative.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Subsets whose p-value falls below <code>level</code>.</p>
+        <p>List the groups of variables whose individual p-value is below <code>level</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>level</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Significance threshold, between 0 and 1. A subset is reported when
+its p-value is strictly below it. No multiple-testing correction is
+applied; use <code>global_pvalue</code> for a single corrected answer.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.05</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>list of tuple of int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The significant subsets, in the same order as <code>subsets</code>. Empty if
+none is significant.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -2286,7 +2724,62 @@ it is exact rather than conservative.</p>
 
     <div class="doc doc-contents ">
 
-        <p>A printable report, most significant subset first.</p>
+        <p>Build a plain-text table of every subset's statistic and p-value, most significant first.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>level</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Subsets with a p-value strictly below this are marked with <code>*</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.05</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A multi-line report ending with the global p-value; pass it to
+<code>print</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -2315,14 +2808,151 @@ it is exact rather than conservative.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Test whether the copula is exchangeable (R's <code>exchTest</code>).</p>
-<p>:math:<code>H_0: C(u,v) = C(v,u)</code>, tested with
-:math:<code>S_n = \sum_i \{C_n(U_i, V_i) - C_n(V_i, U_i)\}^2</code>.</p>
+        <p>Check whether swapping the two variables leaves their dependence unchanged.</p>
+<p>This is a test of <em>exchangeability</em> (R's <code>exchTest</code>): does the pair
+<code>(X, Y)</code> depend on each other in the same way as <code>(Y, X)</code>? A small
+p-value (say below 0.05) means the dependence is lopsided, which rules out
+most standard copula families at once.</p>
 <p>Rejecting is informative out of proportion to its cost: <strong>every Archimedean
 and every elliptical copula is exchangeable</strong>, so a rejection eliminates all
 of them and directs you to asymmetric constructions such as the Khoudraji
 device.</p>
 
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, 2)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bivariate observations on any scale; they are converted to ranks first.
+Exactly two columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rep</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of random replicates used to build the null distribution, a
+positive integer.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed or generator, for reproducible p-values.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;average&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TestResult (rcopula.htest.api.TestResult)" href="#rcopula.htest.api.TestResult">TestResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>With <code>null="exchangeability"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>data</code> does not have exactly two columns.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>:math:<code>H_0: C(u,v) = C(v,u)</code>, tested with
+:math:<code>S_n = \sum_i \{C_n(U_i, V_i) - C_n(V_i, U_i)\}^2</code>. The null is
+generated by swapping the coordinates of a random half of the observations,
+which is an exact draw from the null when it holds.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>An exchangeable copula is not rejected:</p>
@@ -2358,15 +2988,151 @@ device.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Test whether the copula is radially symmetric (R's <code>radSymTest</code>).</p>
-<p>:math:<code>H_0</code>: :math:<code>(U,V)</code> and :math:<code>(1-U,1-V)</code> have the same distribution,
-equivalently :math:<code>C</code> equals its own survival copula.</p>
+        <p>Check whether two variables are as strongly linked in joint crashes as in joint booms.</p>
+<p>This is a test of <em>radial symmetry</em> (R's <code>radSymTest</code>): does the
+dependence look the same if you flip both variables upside down? A small
+p-value (say below 0.05) means the lower and upper tails behave
+differently.</p>
 <p>This is the test that separates the families whose tails behave alike from
 those whose do not. Gaussian, Student-t and Frank are radially symmetric;
 Clayton, Gumbel and Joe are not. For risk work the asymmetry <em>is</em> the
 modelling question -- a copula symmetric in the tails cannot represent
 "crashes cluster but rallies do not".</p>
 
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, 2)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bivariate observations on any scale; they are converted to ranks first.
+Exactly two columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rep</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of random replicates used to build the null distribution, a
+positive integer.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed or generator, for reproducible p-values.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;average&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TestResult (rcopula.htest.api.TestResult)" href="#rcopula.htest.api.TestResult">TestResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>With <code>null="radial symmetry"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>data</code> does not have exactly two columns.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>:math:<code>H_0</code>: :math:<code>(U,V)</code> and :math:<code>(1-U,1-V)</code> have the same distribution,
+equivalently :math:<code>C</code> equals its own survival copula. The null is
+generated by reflecting a random half of the observations.</p>
+</details>
 
 <p><span class="doc-section-title">Examples:</span></p>
     <p>Frank is radially symmetric:</p>
@@ -2400,7 +3166,11 @@ modelling question -- a copula symmetric in the tails cannot represent
 
     <div class="doc doc-contents ">
 
-        <p>Test for independence (R's <code>indepTest</code>).</p>
+        <p>Check whether the variables are related to each other at all.</p>
+<p>This is a rank-based test of <em>independence</em> (R's <code>indepTest</code>). It
+detects any kind of relationship, not only linear correlation. A small
+p-value (say below 0.05) means there is dependence worth modelling; a large
+one means the data give no evidence of it.</p>
 <p>:math:<code>H_0: C = \Pi</code>, tested with a Cramer-von Mises distance between the
 empirical copula and the independence copula.</p>
 <p>The null is generated by <strong>permuting each column independently</strong>, which
@@ -2409,7 +3179,112 @@ randomisation test rather than an asymptotic approximation. R's
 <code>indepTestSim</code> instead simulates the limiting distribution, which costs
 :math:<code>O(N n^2 p)</code> time and :math:<code>O(n^2 p)</code> memory and becomes infeasible
 for large <code>n</code>; permutation has neither problem.</p>
-<p>Works in any dimension, unlike the other tests in this module.</p>
+<p>Works in any dimension, unlike the other tests in this module. To find out
+<em>which</em> variables are dependent, use :func:<code>dependogram</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, d)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations on any scale, <code>d &gt;= 2</code> columns; they are converted to
+ranks first.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rep</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of random permutations used to build the null distribution, a
+positive integer.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed or generator, for reproducible p-values.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;average&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TestResult (rcopula.htest.api.TestResult)" href="#rcopula.htest.api.TestResult">TestResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>With <code>null="independence"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2452,13 +3327,146 @@ claims:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Test whether the copula is an extreme-value copula (R's <code>evTestC</code>).</p>
+        <p>Check whether the dependence has the shape typical of maxima, such as yearly peak floods.</p>
+<p>This tests whether the copula is an <em>extreme-value</em> copula (R's
+<code>evTestC</code>). Use it before fitting an extreme-value family (Gumbel,
+Galambos, Husler-Reiss, ...) to block maxima or other componentwise
+extremes. A small p-value (say below 0.05) means an extreme-value copula
+is not a good description.</p>
 <p>:math:<code>H_0</code>: :math:<code>C</code> is max-stable, :math:<code>C(u^{1/m}, v^{1/m})^m = C(u,v)</code>.</p>
 <p>The null distribution comes from a <strong>parametric bootstrap through the
 Gumbel family</strong>: Gumbel is extreme-value, so resampling from a Gumbel fitted
 to the data's Kendall tau gives draws satisfying the null with comparable
 dependence strength. This is cruder than R's multiplier construction and is
 best read as indicative.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code>array_like of float, shape (n, 2)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bivariate observations on any scale; they are converted to ranks first.
+Exactly two columns. Extreme-value copulas cannot be negatively
+dependent; a negative sample Kendall's tau is clipped to a tiny positive
+value when building the null.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rep</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of bootstrap replicates, a positive integer.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed or generator, for reproducible p-values.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ties_method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;average&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TestResult (rcopula.htest.api.TestResult)" href="#rcopula.htest.api.TestResult">TestResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>With <code>null="extreme-value dependence"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>data</code> does not have exactly two columns.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 <p><span class="doc-section-title">Examples:</span></p>
@@ -2490,7 +3498,9 @@ best read as indicative.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Test independence on every subset of the coordinates (R's <code>dependogram</code>).</p>
+        <p>Find out which groups of variables are related, by testing every pair, triple and so on.</p>
+<p>This runs an independence test on each subset of two or more columns
+(R's <code>dependogram</code>) and also reports one overall p-value.</p>
 <p>:func:<code>indep_test</code> answers "are these independent?" with one number. This
 answers "and <em>which</em> of them are not?", by decomposing the empirical copula
 process into one component per subset (Genest and Remillard 2004). The
@@ -2517,11 +3527,12 @@ three-element subset shows it.</p>
                 <code>data</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>, <span title="d">d</span>))</code>
+                  <code>array_like of float, shape (n, d)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Observations on any scale, <code>d &gt;= 2</code> columns; they are converted to
+ranks first.</p>
               </div>
             </td>
             <td>
@@ -2537,8 +3548,9 @@ three-element subset shows it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Permutations. The null is generated by permuting each column
-independently, which is exact rather than asymptotic.</p>
+                <p>Number of permutations, a positive integer. The null is generated by
+permuting each column independently, which is exact rather than
+asymptotic.</p>
               </div>
             </td>
             <td>
@@ -2550,11 +3562,11 @@ independently, which is exact rather than asymptotic.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Seed or generator, for reproducible p-values.</p>
               </div>
             </td>
             <td>
@@ -2570,11 +3582,11 @@ independently, which is exact rather than asymptotic.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;average&#39;</code>
+                  <code>&#34;average&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -2601,7 +3613,30 @@ independently, which is exact rather than asymptotic.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>One statistic and p-value per subset, plus <code>global_pvalue</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>data</code> has fewer than 2 columns.</p>
               </div>
             </td>
           </tr>
@@ -2660,7 +3695,11 @@ exactly independent, while the triple is deterministic:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Test a series for serial independence (R's <code>serialIndepTest</code>).</p>
+        <p>Check whether a time series' past values tell you anything about its next value.</p>
+<p>This is a rank-based test of <em>serial independence</em> (R's
+<code>serialIndepTest</code>). A small <code>global_pvalue</code> (say below 0.05) means the
+observations are not independent over time -- for example, model residuals
+that still contain structure.</p>
 <p>Embeds the series into its own lags and runs :func:<code>dependogram</code> on the
 result, so the answer names <em>which lag structure</em> carries the dependence
 rather than only whether some does.</p>
@@ -2689,11 +3728,12 @@ autocorrelation function is not even well defined.</p>
                 <code>x</code>
             </td>
             <td>
-                  <code>(<span title="array_like">array_like</span>, <span title="shape">shape</span>(<span title="n">n</span>))</code>
+                  <code>array_like of float, shape (n,)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A univariate series, in time order.</p>
+                <p>A univariate series, in time order, oldest first. Any array is
+flattened. Needs more than <code>lags</code> values.</p>
               </div>
             </td>
             <td>
@@ -2709,7 +3749,9 @@ autocorrelation function is not even well defined.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Embedding dimension. <code>3</code> looks at lags 1 and 2.</p>
+                <p>Embedding dimension: how many consecutive values are looked at
+together, at least 2. <code>3</code> looks at lags 1 and 2. Cost grows as
+:math:<code>2^{lags}</code>.</p>
               </div>
             </td>
             <td>
@@ -2725,7 +3767,7 @@ autocorrelation function is not even well defined.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Permutations for the null.</p>
+                <p>Number of permutations for the null, a positive integer.</p>
               </div>
             </td>
             <td>
@@ -2737,11 +3779,11 @@ autocorrelation function is not even well defined.</p>
                 <code>random_state</code>
             </td>
             <td>
-                  <code>(None, <span title="int">int</span> or <span title="Generator">Generator</span>)</code>
+                  <code>(<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span> or None)</code>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>Seed or generator, for reproducible p-values.</p>
               </div>
             </td>
             <td>
@@ -2757,11 +3799,11 @@ autocorrelation function is not even well defined.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                
+                <p>How tied values are ranked; passed to :func:<code>~rcopula.pseudo_obs</code>.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;average&#39;</code>
+                  <code>&#34;average&#34;</code>
             </td>
           </tr>
       </tbody>
@@ -2790,6 +3832,29 @@ autocorrelation function is not even well defined.</p>
               <div class="doc-md-description">
                 <p>Subsets are indices into the embedded vector, so <code>0</code> is the current
 observation and <code>k</code> the one <code>k</code> steps back.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>lags &lt; 2</code>, or if the series has <code>lags</code> or fewer values.</p>
               </div>
             </td>
           </tr>
