@@ -58,6 +58,46 @@ def test_p2P_and_P2p_round_trip() -> None:
     assert np.allclose(rc.P2p(rc.p2P(params, 4)), params)
 
 
+def test_p2P_fills_column_by_column_as_R_does() -> None:
+    """R's lower.tri order. It agrees with row-by-row order up to dim=3, so the
+    golden fixtures (all dim <= 3) could not catch the difference."""
+    sigma = rc.p2P([12, 13, 14, 23, 24, 34], 4)
+    assert [sigma[i, j] for i, j in [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]] == [
+        12,
+        13,
+        14,
+        23,
+        24,
+        34,
+    ]
+    names = rc.GaussianCopula(dim=4, dispstr="un").param_names
+    assert names == ("rho.12", "rho.13", "rho.14", "rho.23", "rho.24", "rho.34")
+
+
+@pytest.mark.parametrize("method", ["itau", "irho", "mpl"])
+def test_unstructured_fit_recovers_the_matrix_in_five_dimensions(method: str) -> None:
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=(5, 8))
+    cov = a @ a.T
+    scale = np.sqrt(np.diag(cov))
+    truth = cov / np.outer(scale, scale)
+    u = rc.pseudo_obs(
+        rc.GaussianCopula(rc.P2p(truth), dim=5, dispstr="un").rvs(4000, random_state=1)
+    )
+    fitted = rc.fit(rc.GaussianCopula(dim=5, dispstr="un"), u, method=method).copula
+    assert np.max(np.abs(fitted.sigma() - truth)) < 0.06
+
+
+def test_itau_mpl_recovers_student_in_five_dimensions() -> None:
+    truth = rc.StudentCopula(
+        [0.6, 0.5, 0.4, 0.3, 0.5, 0.4, 0.3, 0.4, 0.3, 0.2], dim=5, dispstr="un", df=5.0
+    )
+    u = rc.pseudo_obs(truth.rvs(3000, random_state=2))
+    fitted = rc.fit(rc.StudentCopula(dim=5, dispstr="un"), u, method="itau.mpl").copula
+    assert np.max(np.abs(fitted.sigma() - truth.sigma())) < 0.06
+    assert 3.0 < fitted.df < 9.0
+
+
 def test_exchangeable_lower_bound_is_enforced() -> None:
     """rho >= -1/(d-1) is required for positive definiteness."""
     rc.GaussianCopula(-0.24, dim=5)  # just inside

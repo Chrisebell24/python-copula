@@ -402,3 +402,16 @@ def _fails_often(x: np.ndarray) -> float:
     if np.unique(x[:, 0]).size < x.shape[0]:
         raise RuntimeError("refused")
     return float(np.mean(x[:, 0]))
+
+
+def test_schema_1_documents_with_four_or_more_dimensions_still_load() -> None:
+    """0.1.0 wrote unstructured correlations row by row; 0.2.0 reads them back
+    into R's column-by-column order rather than silently permuting them."""
+    sigma = rc.p2P([0.6, 0.5, 0.4, 0.3, 0.2, 0.1], 4)
+    rows, cols = np.tril_indices(4, -1)
+    document = to_dict(rc.StudentCopula(rc.P2p(sigma), dim=4, dispstr="un", df=6.0))
+    document["schema"] = 1
+    document["copula"]["params"] = [*sigma[rows, cols].tolist(), 6.0]
+    loaded = from_dict(json.loads(json.dumps(document)))
+    assert np.allclose(loaded.sigma(), sigma)
+    assert loaded.df == 6.0

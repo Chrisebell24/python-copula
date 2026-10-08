@@ -54,11 +54,22 @@ __all__ = ["EllipticalCopula", "GaussianCopula", "P2p", "StudentCopula", "p2P"]
 DISPSTRS = ("ex", "ar1", "toep", "un")
 
 
+def _lower_indices(dim: int) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    """Lower-triangle indices in R's ``lower.tri`` order: column by column.
+
+    ``np.tril_indices`` runs row by row instead. The two orders agree up to
+    ``dim=3`` and differ from ``dim=4``, which is why the difference can hide.
+    """
+    cols, rows = np.triu_indices(dim, 1)
+    return rows, cols
+
+
 def p2P(param: ArrayLike, dim: int) -> NDArray[np.float64]:
     """Build a correlation matrix from its lower triangle (R's ``p2P``).
 
-    Entries fill the lower triangle column by column, so for ``dim=3`` the
-    parameter vector is ``(rho_12, rho_13, rho_23)``.
+    Entries fill the lower triangle column by column, as R does, so for
+    ``dim=4`` the parameter vector is
+    ``(rho_12, rho_13, rho_14, rho_23, rho_24, rho_34)``.
 
     Examples
     --------
@@ -67,13 +78,15 @@ def p2P(param: ArrayLike, dim: int) -> NDArray[np.float64]:
     array([[1. , 0.6, 0.3],
            [0.6, 1. , 0.2],
            [0.3, 0.2, 1. ]])
+    >>> p2P([12, 13, 14, 23, 24, 34], 4)[[0, 0, 0, 1, 1, 2], [1, 2, 3, 2, 3, 3]]
+    array([12., 13., 14., 23., 24., 34.])
     """
     param = np.asarray(param, dtype=np.float64).ravel()
     expected = dim * (dim - 1) // 2
     if param.size != expected:
         raise ValueError(f"need {expected} parameters for dim={dim}, got {param.size}")
     out = np.eye(dim)
-    idx = np.tril_indices(dim, -1)
+    idx = _lower_indices(dim)
     out[idx] = param
     out.T[idx] = param
     return out
@@ -90,7 +103,7 @@ def P2p(matrix: ArrayLike) -> NDArray[np.float64]:
     array([0.6, 0.3, 0.2])
     """
     m = np.asarray(matrix, dtype=np.float64)
-    return m[np.tril_indices(m.shape[0], -1)]
+    return m[_lower_indices(m.shape[0])]
 
 
 def _n_corr_params(dispstr: str, dim: int) -> int:
@@ -150,7 +163,7 @@ class EllipticalCopula(Copula):
         elif dispstr == "toep":
             names = tuple(f"rho.{i + 1}" for i in range(n))
         else:
-            i, j = np.tril_indices(dim, -1)
+            i, j = _lower_indices(dim)
             names = tuple(f"rho.{b + 1}{a + 1}" for a, b in zip(i, j, strict=True))
         return names
 

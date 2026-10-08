@@ -250,6 +250,33 @@ class GarchResult:
         )
 
 
+def _fit_reparameterised(
+    y: NDArray[np.float64],
+    dist: str,
+    theta: NDArray[np.float64],
+    bounds: list[tuple[float, float]],
+) -> NDArray[np.float64]:
+    """Maximise over (mu, omega, persistence, alpha share[, df]) by L-BFGS-B."""
+    persistence = min(float(theta[2] + theta[3]), _MAX_PERSISTENCE)
+    share = float(theta[2] / (theta[2] + theta[3])) if theta[2] + theta[3] > 0 else 0.1
+
+    def unpack(z: NDArray[np.float64]) -> NDArray[np.float64]:
+        out = np.array(z, dtype=float)
+        out[2], out[3] = z[2] * z[3], z[2] * (1.0 - z[3])
+        return out
+
+    start = np.array(theta, dtype=float)
+    start[2], start[3] = persistence, share
+    box = [bounds[0], bounds[1], (0.0, _MAX_PERSISTENCE), (0.0, 1.0), *bounds[4:]]
+    opt = optimize.minimize(
+        lambda z: _neg_loglik(unpack(z), y, dist, 1.0),
+        start,
+        method="L-BFGS-B",
+        bounds=box,
+    )
+    return unpack(opt.x)
+
+
 def fit_garch(
     x: ArrayLike,
     dist: Literal["normal", "t"] = "normal",
@@ -357,6 +384,13 @@ def fit_garch(
             options={"maxiter": 500, "ftol": 1e-10},
         )
     theta = opt.x
+    if theta[2] + theta[3] > _MAX_PERSISTENCE + 1e-9:
+        # SLSQP only enforces alpha + beta < 1 at convergence; when it stops
+        # early -- typical when the truth sits on the boundary -- the point it
+        # returns can break it, giving a non-stationary model with no
+        # unconditional variance. Refit with persistence and alpha's share of
+        # it as box-bounded parameters, so the constraint cannot be broken.
+        theta = _fit_reparameterised(y, dist, theta, bounds)
     mu, omega, alpha, beta = (float(v) for v in theta[:4])
     df = float(theta[4]) if dist == "t" else None
 
@@ -372,7 +406,7 @@ def fit_garch(
         resid=(y - mu) / sigma,
         # The scaling shifts the log-likelihood by a constant Jacobian term,
         # n*log(scale); undo it so loglik/AIC/BIC refer to the original data.
-        loglik=-float(opt.fun) - arr.size * float(np.log(scale)),
+        loglik=-_neg_loglik(theta, y, dist, 1.0) - arr.size * float(np.log(scale)),
         dist=dist,
         name=name,
     )

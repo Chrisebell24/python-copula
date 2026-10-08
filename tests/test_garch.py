@@ -436,3 +436,30 @@ class TestForecastRisk:
         text = repr(CopulaGarch(_two_margins(), rc.GaussianCopula(0.3)))
         assert "CopulaGarch" in text
         assert "empirical" in text
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_persistence_never_exceeds_one_on_near_integrated_data(seed: int) -> None:
+    """Stochastic volatility with persistence 0.98 in log-variance pushes GARCH
+    to its boundary. SLSQP can stop there with alpha + beta > 1 (seen on Linux
+    CI at 1.0071); the reparameterised refit must keep the model stationary."""
+    rng = np.random.default_rng(seed)
+    log_vol = np.zeros(4000)
+    shocks = rng.standard_normal(4000)
+    for t in range(1, 4000):
+        log_vol[t] = 0.98 * log_vol[t - 1] + 0.25 * shocks[t]
+    x = rng.standard_normal(4000) * 0.01 * np.exp(log_vol)
+    for dist in ("normal", "t"):
+        assert fit_garch(x, dist=dist).persistence < 1.0
+
+
+def test_the_reparameterised_refit_cannot_break_stationarity() -> None:
+    from rcopula.garch import _MAX_PERSISTENCE, _fit_reparameterised
+
+    rng = np.random.default_rng(0)
+    y = rng.standard_t(5, size=2000)
+    y /= y.std()
+    bounds = [(-10.0, 10.0), (1e-8, 10.0), (0.0, _MAX_PERSISTENCE), (0.0, _MAX_PERSISTENCE)]
+    theta = _fit_reparameterised(y, "normal", np.array([0.0, 0.05, 0.3, 0.8]), bounds)
+    assert theta[2] >= 0.0 and theta[3] >= 0.0
+    assert theta[2] + theta[3] <= _MAX_PERSISTENCE + 1e-12
