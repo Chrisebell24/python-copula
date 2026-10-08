@@ -3,6 +3,33 @@
 Dates are ISO. Pre-1.0 the API may change; breaking changes are listed first in
 each release.
 
+## 0.4.0 — 2026-10-08
+
+### Added
+
+- **Factor copulas** (`rcopula.factor`): `FactorCopula` and `fit_factor`, a
+  Gaussian or Student-t copula driven by one market factor plus optional group
+  (e.g. sector) factors. Densities use the Woodbury identity, so 800 stocks
+  need an 11 × 11 solve rather than an 800 × 800 one; fitting 800 stocks takes
+  seconds. Works with `CopulaDistribution`, `CopulaGarch`, `fit` and
+  serialization. Example 32 now uses it instead of hand-rolled numpy.
+- **GJR-GARCH and ARMA means**: `fit_garch(..., vol="gjr", mean="ar1" |
+  "arma11" | "zero")`, carried through `CopulaGarch` fitting, simulation and
+  forecasting. Defaults are unchanged and give identical results. Checked
+  against R's `rugarch` (`tools/rgolden/10_garch.R`).
+
+### Packaging
+
+- **matplotlib is optional**: `pip install "rcopula[plots]"`. `import rcopula`
+  no longer needs it; plot functions raise an ImportError explaining how to
+  install it.
+- Ships a `py.typed` marker, so type checkers use rcopula's annotations.
+- Python 3.14 supported and tested in CI.
+- The unused `garch` extra (`arch`) is removed; `rcopula.garch` is pure NumPy.
+- ruff and mypy are pinned in the `dev` extra so local and CI linting agree.
+- Tagged releases also publish a GitHub Release with that version's changelog
+  section; releases for 0.1.0–0.3.0 were backfilled.
+
 ## 0.3.0 — 2026-10-08
 
 ### Breaking

@@ -22,9 +22,10 @@ import time
 import numpy as np
 import pandas as pd
 from _common import check, heading, show
-from scipy import special, stats
+from scipy import special
 
 import rcopula as rc
+from rcopula.core.elliptical import P2p
 from rcopula.dynamic import fit_dynamic
 from rcopula.garch import fit_garch
 from rcopula.risk import expected_shortfall, value_at_risk
@@ -50,24 +51,13 @@ heading("Step 0. Why the obvious copulas fail at 800 stocks")
 # Here the hidden truth is a Student-t *factor* market: every stock loads on
 # one market factor and on its own sector's factor, and a shared "panic"
 # variable makes them all crash together now and then (the Student-t part).
+# rc.FactorCopula is exactly that model.
 
 rng = np.random.default_rng(32)
 true_market = rng.uniform(0.45, 0.65, N_STOCKS)
 true_sector = rng.uniform(0.30, 0.50, N_STOCKS)
-true_corr = np.outer(true_market, true_market) + SAME_SECTOR * np.outer(true_sector, true_sector)
-np.fill_diagonal(true_corr, 1.0)
-
-
-def simulate_factor_t(n, market, sector, df, rng):
-    """Uniforms from a Student-t factor copula. df=inf gives the Gaussian one."""
-    idio = np.sqrt(1.0 - market**2 - sector**2)
-    m = rng.standard_normal((n, 1))
-    s = rng.standard_normal((n, N_SECTORS))[:, SECTOR]
-    z = market * m + sector * s + idio * rng.standard_normal((n, N_STOCKS))
-    if np.isinf(df):
-        return special.ndtr(z)
-    w = rng.chisquare(df, (n, 1)) / df  # one panic draw per day, shared by all
-    return special.stdtr(df, z / np.sqrt(w))
+truth = rc.FactorCopula(true_market, true_sector, groups=SECTOR, df=TRUE_DF)
+true_corr = truth.sigma()  # market x market, plus sector x sector within a sector
 
 
 # Each stock gets its own GARCH volatility and fat-tailed shocks.
@@ -75,7 +65,7 @@ vol = rng.uniform(0.010, 0.030, N_STOCKS)
 g_alpha = rng.uniform(0.04, 0.10, N_STOCKS)
 g_beta = rng.uniform(0.84, 0.89, N_STOCKS)  # alpha + beta < 1: stationary
 g_omega = vol**2 * (1.0 - g_alpha - g_beta)
-true_u = simulate_factor_t(N_TRAIN + N_TEST, true_market, true_sector, TRUE_DF, rng)
+true_u = truth.rvs(N_TRAIN + N_TEST, random_state=rng)
 shocks = special.stdtrit(5.0, true_u)
 shocks /= np.sqrt(5.0 / 3.0)
 returns = np.empty_like(shocks)
@@ -162,58 +152,16 @@ heading("Step 2A. A factor copula: a few factors drive everything")
 # Assume each stock = market loading x market factor + sector loading x
 # sector factor + its own noise. Given the factors, stocks are independent,
 # so 800 stocks need 800 market loadings + 800 sector loadings + 1 tail
-# number, not 319,600 correlations. Estimate the loadings by matching the
-# sample correlations, which averages away most of their noise.
+# number, not 319,600 correlations. rc.fit_factor estimates the loadings by
+# matching the correlations implied by Kendall's tau, sin(pi * tau / 2) --
+# each loading is fitted to 799 correlations, which averages away most of
+# their noise -- and then profiles the Student-t likelihood over the degrees
+# of freedom.
 
-
-def fit_loadings(corr, n_iter=200):
-    market = np.full(N_STOCKS, 0.5)
-    sector = np.full(N_STOCKS, 0.3)
-    off = ~np.eye(N_STOCKS, dtype=bool)
-    within = SAME_SECTOR & off
-    for _ in range(n_iter):
-        target = np.where(off, corr - SAME_SECTOR * np.outer(sector, sector), 0.0)
-        market = target @ market / (market @ market - market**2)
-        target = np.where(within, corr - np.outer(market, market), 0.0)
-        sector = np.clip(target @ sector / ((within * sector**2).sum(axis=1)), 0.0, None)
-        scale = np.sqrt(np.maximum(market**2 + sector**2, 1e-12))
-        shrink = np.minimum(1.0, 0.99 / scale)  # keep each stock's own noise positive
-        market, sector = market * shrink, sector * shrink
-    return market, sector
-
-
-def factor_corr(market, sector):
-    out = np.outer(market, market) + SAME_SECTOR * np.outer(sector, sector)
-    np.fill_diagonal(out, 1.0)
-    return out
-
-
-def gaussian_loglik(z, corr):
-    """Gaussian copula log-likelihood: the multivariate normal minus its margins."""
-    _, logdet = np.linalg.slogdet(corr)
-    q = np.einsum("ij,ij->i", z @ (np.linalg.inv(corr) - np.eye(len(corr))), z)
-    return float(np.sum(-0.5 * logdet - 0.5 * q))
-
-
-def student_loglik(u, corr, df):
-    """Student-t copula log-likelihood: the multivariate t minus its margins."""
-    x = special.stdtrit(df, u)
-    d = corr.shape[0]
-    _, logdet = np.linalg.slogdet(corr)
-    q = np.einsum("ij,ij->i", x @ np.linalg.inv(corr), x)
-    joint = (
-        special.gammaln((df + d) / 2)
-        - special.gammaln(df / 2)
-        - d / 2 * np.log(df * np.pi)
-        - 0.5 * logdet
-        - (df + d) / 2 * np.log1p(q / df)
-    )
-    margins_ll = stats.t.logpdf(x, df).sum(axis=1)
-    return float(np.sum(joint - margins_ll))
-
-
-fit_market, fit_sector = fit_loadings(np.corrcoef(z_train, rowvar=False))
-corr_factor = factor_corr(fit_market, fit_sector)
+t0 = time.time()
+factor_t = rc.fit_factor(u_train, groups=SECTOR, family="student")
+show("seconds to fit the 800-stock factor copula", time.time() - t0)
+fit_market, fit_sector, fit_df = factor_t.market, factor_t.group_loadings, factor_t.df
 show("average loading error, market factor", float(np.mean(np.abs(fit_market - true_market))))
 show("average loading error, sector factor", float(np.mean(np.abs(fit_sector - true_sector))))
 check(
@@ -221,20 +169,23 @@ check(
     np.mean(np.abs(fit_market - true_market)) < 0.05
     and np.mean(np.abs(fit_sector - true_sector)) < 0.05,
 )
-
-# The tail number: profile the Student-t likelihood over degrees of freedom.
-grid = [3.0, 4.0, 5.0, 6.0, 8.0, 12.0, 20.0]
-profile = [student_loglik(u_train, corr_factor, v) for v in grid]
-fit_df = grid[int(np.argmax(profile))]
 show("Student-t degrees of freedom (true: 4)", fit_df)
-show("parameters: factor copula", f"{2 * N_STOCKS + 1:,}")
+show("parameters: factor copula", f"{factor_t.n_params:,}")
 check("the data ask for fat joint tails", fit_df <= 6)
+check("1,601 parameters", factor_t.n_params == 2 * N_STOCKS + 1)
 
-# Grade on the two years the models never saw: log-likelihood per day.
+# The Gaussian factor copula with the same loadings: Kendall's tau does not
+# depend on the family, so the loadings would come out identical.
+factor_g = rc.FactorCopula(fit_market, fit_sector, groups=SECTOR, family="gaussian")
+
+# Grade on the two years the models never saw: log-likelihood per day. The
+# factor copulas' densities never invert an 800 x 800 matrix (Woodbury does it
+# with an 11 x 11 one); the full sample matrix is the dense GaussianCopula.
+full_matrix = rc.GaussianCopula(P2p(np.corrcoef(z_train, rowvar=False)), dim=N_STOCKS, dispstr="un")
 oos = {
-    "full sample matrix (Gaussian)": gaussian_loglik(z_test, np.corrcoef(z_train, rowvar=False)),
-    "factor, Gaussian": gaussian_loglik(z_test, corr_factor),
-    "factor, Student-t": student_loglik(u_test, corr_factor, fit_df),
+    "full sample matrix (Gaussian)": float(np.sum(full_matrix.logpdf(u_test))),
+    "factor, Gaussian": factor_g.loglik(u_test),
+    "factor, Student-t": factor_t.loglik(u_test),
 }
 for name, value in oos.items():
     show(f"held-out log-likelihood per day: {name}", value / N_TEST)
@@ -243,6 +194,10 @@ check(
     oos["factor, Gaussian"] > oos["full sample matrix (Gaussian)"],
 )
 check("and fat tails beat thin ones", oos["factor, Student-t"] > oos["factor, Gaussian"])
+tau_train = rc.cor_kendall(u_train)
+tau_gap = float(np.mean(np.abs(factor_t.tau_matrix() - tau_train)[OFF_DIAGONAL]))
+show("average gap, model vs sample Kendall's tau", tau_gap)
+check("the factor copula's 319,600 pairwise taus track the sample's", tau_gap < 0.03)
 
 # Dynamic loadings. Real loadings drift -- a stock's beta rises in a crisis --
 # and rcopula's GAS recursion lets a parameter move day by day. It is
@@ -269,7 +224,6 @@ heading("Step 2B. A nested copula: one copula per sector, one linking them")
 # tau matches the average sample tau of the pairs it governs -- the estimator
 # rcopula's fit_nested uses -- read off the full tau matrix.
 
-tau_train = rc.cor_kendall(u_train)
 theta_root = rc.ClaytonCopula.from_tau(mean_tau(tau_train, ~SAME_SECTOR)).theta
 children = []
 for s in range(N_SECTORS):
@@ -333,13 +287,9 @@ show("seconds to draw 20,000 days from the 801-variable vine", time.time() - t0)
 
 graded = pd.DataFrame(
     {
-        "truth": mass_moves(simulate_factor_t(n_sim, true_market, true_sector, TRUE_DF, rng)),
-        "factor, Student-t": mass_moves(
-            simulate_factor_t(n_sim, fit_market, fit_sector, fit_df, rng)
-        ),
-        "factor, Gaussian": mass_moves(
-            simulate_factor_t(n_sim, fit_market, fit_sector, np.inf, rng)
-        ),
+        "truth": mass_moves(truth.rvs(n_sim, random_state=rng)),
+        "factor, Student-t": mass_moves(factor_t.rvs(n_sim, random_state=rng)),
+        "factor, Gaussian": mass_moves(factor_g.rvs(n_sim, random_state=rng)),
         "nested Clayton": mass_moves(nested.rvs(n_sim, random_state=1)),
         "vine (index root)": mass_moves(vine_draws),
     },
@@ -391,10 +341,10 @@ def to_returns(v):
     return mu + next_vol * innov
 
 
-def simulate_book(market, sector, df, n=50_000, chunk=10_000, truth=False):
+def simulate_book(copula, n=50_000, chunk=10_000, truth=False):
     pnl, stock_pnl = [], []
     for _ in range(n // chunk):
-        v = simulate_factor_t(chunk, market, sector, df, rng)
+        v = copula.rvs(chunk, random_state=rng)  # O(n x 800): no 800 x 800 matrix
         if truth:  # the true margins: t(5) shocks at the true next-day volatility
             r = TRUE_NEXT_VOL * special.stdtrit(5.0, v) / np.sqrt(5.0 / 3.0)
         else:
@@ -406,9 +356,9 @@ def simulate_book(market, sector, df, n=50_000, chunk=10_000, truth=False):
 
 t0 = time.time()
 book = {
-    "truth": simulate_book(true_market, true_sector, TRUE_DF, truth=True),
-    "factor, Student-t": simulate_book(fit_market, fit_sector, fit_df),
-    "factor, Gaussian": simulate_book(fit_market, fit_sector, np.inf),
+    "truth": simulate_book(truth, truth=True),
+    "factor, Student-t": simulate_book(factor_t),
+    "factor, Gaussian": simulate_book(factor_g),
 }
 show("seconds to simulate 3 x 50,000 days x 800 stocks", time.time() - t0)
 

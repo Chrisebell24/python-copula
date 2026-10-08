@@ -562,15 +562,27 @@ graded on two more:
 - **Factor copula.** Each stock is a market loading times a market factor, plus a
   sector loading times its sector factor, plus noise of its own; given the
   factors, stocks are independent. 800 + 800 loadings + 1 tail number = **1,601
-  parameters** instead of 319,600. The example fits the loadings by matching
-  sample correlations (rcopula has no factor-copula class) and profiles the
-  Student-t degrees of freedom.
+  parameters** instead of 319,600. `rc.fit_factor` matches the loadings to the
+  correlations implied by Kendall's tau and profiles the Student-t degrees of
+  freedom, in about 4 seconds for 800 stocks. Its density uses an 11 × 11
+  matrix (Woodbury) instead of inverting an 800 × 800 one.
+
+  ```python
+  sector = np.repeat(np.arange(10), 80)  # each stock's sector
+  factor_t = rc.fit_factor(u_train, groups=sector, family="student")
+  factor_t.n_params  # 1601
+  factor_t.df  # 4.06; the truth is 4
+  factor_g = rc.FactorCopula(
+      factor_t.market, factor_t.group_loadings, groups=sector, family="gaussian"
+  )
+  # loading errors: market 0.019, sector 0.022
+  ```
 
   ```
   held-out log-likelihood per day
   full 319,600-entry matrix   -1,763
-  factor, Gaussian               233
-  factor, Student-t              325     df = 4, as in the truth
+  factor, Gaussian               234
+  factor, Student-t              325     df = 4.06, the truth is 4
   ```
 
 - **Nested copula by sector.** A Clayton copula inside each sector, a weaker one
@@ -605,8 +617,8 @@ Grade them on days when 80 or more of the 800 stocks have their own worst-1% day
 ```
                    mass crash   mass rally
 truth                 3.02%        2.94%
-factor, Student-t     2.82%        2.87%    <- closest overall
-factor, Gaussian      1.41%        1.24%
+factor, Student-t     2.76%        2.78%    <- closest overall
+factor, Gaussian      1.34%        1.33%
 nested Clayton        2.82%        0.00%    <- right on crashes, blind to rallies
 vine (index root)     1.82%        1.70%    <- cannot see sectors after one tree
 ```
@@ -624,7 +636,7 @@ in chunks of 10,000 and keep only the P&L.
 
 ```python
 for _ in range(5):
-    v = simulate_factor_t(10_000, market_loadings, sector_loadings, df=4.0)
+    v = factor_t.rvs(10_000, random_state=rng)
     pnl.append(to_returns(v) @ positions)  # $125,000 in each of 800 stocks
 ```
 
@@ -632,13 +644,13 @@ for _ in range(5):
 
 ```
                      VaR 99%   ES 99%   diversification
-truth                $2.52m    $3.50m       41.7%
-factor, Student-t    $2.46m    $3.13m       42.9%
-factor, Gaussian     $2.22m    $2.63m       51.8%   <- 25% too little ES
+truth                $2.52m    $3.32m       43.8%
+factor, Student-t    $2.47m    $3.22m       41.2%
+factor, Gaussian     $2.26m    $2.67m       51.1%   <- 20% too little ES
 ```
 
 Diversification is how far the book's ES sits below the sum of 800 standalone
-ESs. On the book's worst 1% of days, 495 of the 800 stocks are having their own
+ESs. On the book's worst 1% of days, 486 of the 800 stocks are having their own
 worst-5% day; independent failures would give 40. The Student-t factor copula
-says 483, the Gaussian 341. That gap is the diversification a correlation matrix
+says 494, the Gaussian 348. That gap is the diversification a correlation matrix
 promises and a panic takes away.

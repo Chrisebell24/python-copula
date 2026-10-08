@@ -3,6 +3,8 @@
 **Copula modelling in Python — a full-featured replication of R's [`copula`](https://cran.r-project.org/package=copula) package, verified against it numerically.**
 
 [![CI](https://github.com/Chrisebell24/python-copula/actions/workflows/ci.yml/badge.svg)](https://github.com/Chrisebell24/python-copula/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/rcopula.svg)](https://pypi.org/project/rcopula/)
+[![Python versions](https://img.shields.io/pypi/pyversions/rcopula.svg)](https://pypi.org/project/rcopula/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Chrisebell24/python-copula/blob/main/LICENSE)
 
 > **Status: pre-1.0, under active development.** The API may change before 1.0.
@@ -71,6 +73,13 @@ copula** that carries all the dependence. That separation is the whole point:
 
 ```bash
 pip install rcopula
+```
+
+The core needs only NumPy, SciPy and pandas. The diagnostic plots in `rcopula.plots`
+need matplotlib, which is an optional extra:
+
+```bash
+pip install "rcopula[plots]"
 ```
 
 ## Quick start
@@ -325,6 +334,8 @@ can paste them across.
 | *(no equivalent)* | `rc.discrete.fit_discrete(x, cop, margins)` — exact likelihood for counts |
 | *(no equivalent)* | `rc.bootstrap.bootstrap_measure(u, "tau")` — BCa intervals, `n_jobs=` |
 | *(no equivalent)* | `rc.serialize.to_json(cop)` — a model file you can read and diff |
+| *(no equivalent)* | `rc.fit_factor(u, groups=sector)` — factor copula for hundreds of assets |
+| *(rugarch `gjrGARCH`)* | `fit_garch(x, vol="gjr", mean="ar1")` — leverage and AR mean |
 | *(no equivalent)* | `rc.statarb.select_pairs(returns)` — rank every pair, six criteria |
 | *(no equivalent)* | `rc.statarb.select_partners(returns, "AAPL")` — vine quadruples |
 | `rtrafo` / inverse `cCopula` | `rc.inverse_rosenblatt(cop, z)` |
