@@ -18303,7 +18303,9 @@ product of normal probabilities averaged over the factors.</p>
 independent given the market, so the cost is <code>O(48^2 d)</code> per point,
 not exponential in the number of groups). The Student-t family adds a
 40-node generalised Gauss-Laguerre rule over the chi-square scale,
-multiplying the cost by 40. Everything is summed in logs, so tiny
+multiplying the cost by 40 (below 8 degrees of freedom, a 256-node
+Gauss-Legendre rule on the chi variable's probability scale, which
+handles the heavy tails). Everything is summed in logs, so tiny
 joint probabilities do not underflow. Agreement with the dense
 :class:<code>~rcopula.GaussianCopula</code> / :class:<code>~rcopula.StudentCopula</code>
 distribution functions is typically better than <code>1e-4</code>.</p>

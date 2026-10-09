@@ -6686,10 +6686,12 @@ Rank-transformed internally, so raw data is fine.</p>
             <td>
               <div class="doc-md-description">
                 <p>Which candidates to try: a group name (<code>"all"</code>, <code>"elliptical"</code>,
-<code>"archimedean"</code>, <code>"extreme"</code>, <code>"other"</code>, <code>"baseline"</code>), a list
-of family names from :data:<code>FAMILIES</code>, or a list of unfitted
-:class:<code>~rcopula.core.base.Copula</code> instances when you want full control
-(a fixed <code>df</code>, a particular <code>dispstr</code>, a rotated family, ...).
+<code>"archimedean"</code>, <code>"extreme"</code>, <code>"other"</code>, <code>"baseline"</code>, or
+<code>"rotated"</code>, <code>"bb"</code> and <code>"vine"</code> for the rotations and BB1/BB7,
+which <code>"all"</code> leaves out), a list of family names from
+:data:<code>FAMILIES</code> (e.g. <code>["clayton", "clayton270", "bb1"]</code>), or a
+list of unfitted :class:<code>~rcopula.core.base.Copula</code> instances when you
+want full control (a fixed <code>df</code>, a particular <code>dispstr</code>, ...).
 Families limited to two dimensions are skipped automatically for a
 group name.</p>
               </div>

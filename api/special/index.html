@@ -940,6 +940,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#rcopula.special.debye.even_bernoulli_over_factorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        even_bernoulli_over_factorial
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#rcopula.special.debye.debye_n" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1307,6 +1318,17 @@
   
     <nav class="md-nav" aria-label="debye">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rcopula.special.debye.even_bernoulli_over_factorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        even_bernoulli_over_factorial
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#rcopula.special.debye.debye_n" class="md-nav__link">
@@ -3248,6 +3270,32 @@ dependence measures are made of:</p>
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="rcopula.special.debye.even_bernoulli_over_factorial" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">even_bernoulli_over_factorial</span>
+
+
+<a href="#rcopula.special.debye.even_bernoulli_over_factorial" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">even_bernoulli_over_factorial</span><span class="p">(</span><span class="n">count</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>B_{2k} / (2k)!</code> for <code>k = 1..count</code>, from exact rational arithmetic.</p>
+<p><code>scipy.special.bernoulli</code> is not accurate enough for a series meant to
+reach machine precision: its <code>B_4</code> is off by 1.7e-12 relative, which
+capped the Debye functions (and so Frank's tau and rho) at ~4e-14. The
+numbers are computed here as exact fractions by the standard recurrence
+:math:<code>\sum_{j=0}^{m} \binom{m+1}{j} B_j = 0</code> and divided by the factorial
+<em>before</em> rounding, so each value is correctly rounded.</p>
+
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 

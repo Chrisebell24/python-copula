@@ -10435,13 +10435,21 @@ callers short-circuit there rather than evaluate.</p>
             <td>
               <div class="doc-md-description">
                 <p><code>True</code> if <code>theta</code> gives the independence copula. The default
-rule is <code>theta == 0</code>; Gumbel and Joe use <code>theta == 1</code>.</p>
+rule is <code>|theta| &lt; 1e-300</code>; Gumbel and Joe use <code>theta == 1</code>.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
 
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Not just <code>theta == 0</code>: below about <code>5.6e-309</code> the <code>1 / theta</code> in
+Clayton and Frank overflows to <code>inf</code>, and a subnormal <code>theta</code> gave
+<code>nan</code> densities and CDF margins of 0. Such a copula differs from
+independence by <code>O(theta)</code>, far below anything a double can show.</p>
+</details>
 
     </div>
 
