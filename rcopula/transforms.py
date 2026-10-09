@@ -329,6 +329,11 @@ def rosenblatt(copula: Copula, u: ArrayLike) -> NDArray[np.float64]:
         # C(u_k | u_1..u_{k-1}) = psi^(k-1)(S_k) / psi^(k-1)(S_{k-1}), with
         # S_k the running sum of inverse-generator values.
         gen, theta = copula.generator, copula.theta
+        if gen.is_independent(theta):
+            # The generators divide by theta - theta_indep (Clayton raised
+            # ZeroDivisionError at theta = 0, Frank took log(0)); under
+            # independence every conditional distribution is the margin itself.
+            return arr.copy()
         t = gen.ipsi(arr, theta)
         running = np.cumsum(t, axis=1)
         for k in range(1, d):

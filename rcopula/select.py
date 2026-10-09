@@ -69,6 +69,7 @@ from rcopula.core.archimedean import (
     JoeCopula,
 )
 from rcopula.core.base import Copula
+from rcopula.core.bb import BB1Copula, BB7Copula
 from rcopula.core.elliptical import GaussianCopula, StudentCopula
 from rcopula.core.extreme_value import (
     GalambosCopula,
@@ -81,6 +82,7 @@ from rcopula.dependence import pseudo_obs
 from rcopula.fit import fit
 from rcopula.fit.results import CopulaFitResult
 from rcopula.gof import gof_test
+from rcopula.structural.rotated import RotatedCopula
 
 __all__ = [
     "FAMILIES",
@@ -161,8 +163,56 @@ def _spec(
     factory: Callable[[int], Copula],
     *groups: str,
     max_dim: int | None = None,
+    in_all: bool = True,
 ) -> FamilySpec:
-    return FamilySpec(name, factory, max_dim, frozenset(groups) | {"all"})
+    return FamilySpec(name, factory, max_dim, frozenset(groups) | ({"all"} if in_all else set()))
+
+
+def _rotated(base: Callable[[int], Copula], degrees: int) -> Callable[[int], Copula]:
+    """Factory for a rotation of a bivariate family (or the survival copula at 180)."""
+
+    def build(dim: int) -> Copula:
+        if degrees == 180:
+            return RotatedCopula(base(dim), True)
+        return RotatedCopula(base(dim), degrees)
+
+    return build
+
+
+def _rotations() -> list[FamilySpec]:
+    """The 90/180/270-degree rotations of the one-sided families, and BB1/BB7.
+
+    Kept out of the ``"all"`` group: they are mainly pair-copulas for vines,
+    and adding 20 candidates to every ``select_copula(u)`` call would slow it
+    down and change what it has always returned. Ask for them by name, or by
+    the ``"rotated"``, ``"bb"`` or ``"vine"`` groups.
+    """
+    specs = [
+        _spec("bb1", lambda d: BB1Copula(dim=d), "bb", "vine", max_dim=2, in_all=False),
+        _spec("bb7", lambda d: BB7Copula(dim=d), "bb", "vine", max_dim=2, in_all=False),
+    ]
+    bases: dict[str, Callable[[int], Copula]] = {
+        "clayton": lambda d: ClaytonCopula(dim=d),
+        "gumbel": lambda d: GumbelCopula(dim=d),
+        "joe": lambda d: JoeCopula(dim=d),
+        "bb1": lambda d: BB1Copula(dim=d),
+        "bb7": lambda d: BB7Copula(dim=d),
+    }
+    for base, factory in bases.items():
+        sep = "_" if base.startswith("bb") else ""
+        groups = ("rotated", "vine") + (("bb",) if base.startswith("bb") else ())
+        for degrees in (90, 180, 270):
+            survival_any_dim = degrees == 180 and not base.startswith("bb")
+            specs.append(
+                _spec(
+                    f"{base}{sep}{degrees}",
+                    _rotated(factory, degrees),
+                    *groups,
+                    max_dim=None if survival_any_dim else 2,
+                    in_all=False,
+                )
+            )
+    return specs
 
 
 #: The candidate registry. Keys are the names used in ``families=[...]`` and in
@@ -172,16 +222,26 @@ def _spec(
 #: Families excluded on purpose: Marshall-Olkin (its density is undefined on a
 #: curve, so the likelihood is not comparable), the Frechet bounds (no density),
 #: and FGM beyond ``d = 2`` (``2^d - d - 1`` parameters, 1013 at ``d = 10``).
+#:
+#: The rotations (``"clayton90"``, ``"clayton180"``, ``"clayton270"``, the same
+#: for ``gumbel`` and ``joe``, and ``"bb1_90"`` ... ``"bb7_270"``) and the
+#: two-parameter ``"bb1"`` and ``"bb7"`` are registered too, but outside the
+#: ``"all"`` group: they are chiefly vine pair-copulas, chosen through the
+#: ``"rotated"``, ``"bb"`` and ``"vine"`` groups or by name. Degrees follow
+#: :class:`~rcopula.RotatedCopula`: 90 reflects the second argument, 270 the
+#: first, 180 both (the survival copula). R ``VineCopula``'s family codes
+#: 2x/3x are the other way round -- its 90 (e.g. 23) reflects the first
+#: argument, so it is rcopula's 270.
 FAMILIES: dict[str, FamilySpec] = {
     spec.name: spec
     for spec in (
-        _spec("independence", lambda d: IndependenceCopula(d), "baseline"),
-        _spec("gaussian", lambda d: GaussianCopula(dim=d), "elliptical"),
-        _spec("student", lambda d: StudentCopula(dim=d), "elliptical"),
-        _spec("clayton", lambda d: ClaytonCopula(dim=d), "archimedean"),
-        _spec("gumbel", lambda d: GumbelCopula(dim=d), "archimedean", "extreme"),
-        _spec("frank", lambda d: FrankCopula(dim=d), "archimedean"),
-        _spec("joe", lambda d: JoeCopula(dim=d), "archimedean"),
+        _spec("independence", lambda d: IndependenceCopula(d), "baseline", "vine"),
+        _spec("gaussian", lambda d: GaussianCopula(dim=d), "elliptical", "vine"),
+        _spec("student", lambda d: StudentCopula(dim=d), "elliptical", "vine"),
+        _spec("clayton", lambda d: ClaytonCopula(dim=d), "archimedean", "vine"),
+        _spec("gumbel", lambda d: GumbelCopula(dim=d), "archimedean", "extreme", "vine"),
+        _spec("frank", lambda d: FrankCopula(dim=d), "archimedean", "vine"),
+        _spec("joe", lambda d: JoeCopula(dim=d), "archimedean", "vine"),
         _spec("amh", lambda d: AMHCopula(dim=d), "archimedean"),
         _spec("galambos", lambda d: GalambosCopula(1.0), "extreme", max_dim=2),
         _spec("husler_reiss", lambda d: HuslerReissCopula(1.0), "extreme", max_dim=2),
@@ -189,6 +249,7 @@ FAMILIES: dict[str, FamilySpec] = {
         _spec("tev", lambda d: TEVCopula(0.5), "extreme", max_dim=2),
         _spec("plackett", lambda d: PlackettCopula(2.0), "other", max_dim=2),
         _spec("fgm", lambda d: FGMCopula(0.3), "other", max_dim=2),
+        *_rotations(),
     )
 }
 
@@ -464,10 +525,12 @@ def select_copula(
         Rank-transformed internally, so raw data is fine.
     families : str, sequence of str or sequence of Copula, default "all"
         Which candidates to try: a group name (``"all"``, ``"elliptical"``,
-        ``"archimedean"``, ``"extreme"``, ``"other"``, ``"baseline"``), a list
-        of family names from :data:`FAMILIES`, or a list of unfitted
-        :class:`~rcopula.core.base.Copula` instances when you want full control
-        (a fixed ``df``, a particular ``dispstr``, a rotated family, ...).
+        ``"archimedean"``, ``"extreme"``, ``"other"``, ``"baseline"``, or
+        ``"rotated"``, ``"bb"`` and ``"vine"`` for the rotations and BB1/BB7,
+        which ``"all"`` leaves out), a list of family names from
+        :data:`FAMILIES` (e.g. ``["clayton", "clayton270", "bb1"]``), or a
+        list of unfitted :class:`~rcopula.core.base.Copula` instances when you
+        want full control (a fixed ``df``, a particular ``dispstr``, ...).
         Families limited to two dimensions are skipped automatically for a
         group name.
     criterion : {"aic", "bic", "loglik", "xv"}, default "aic"

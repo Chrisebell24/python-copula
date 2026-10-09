@@ -36,7 +36,9 @@ It also goes past R where the gap was worth closing:
   Engle's DCC for a correlation matrix that moves;
 - **discrete and mixed margins** — the exact inclusion-exclusion likelihood, with the
   identifiability caveat stated rather than buried;
-- **vines** — R/C/D, in pure NumPy;
+- **vines** — C-, D- and regular (R-) vines with automatic structure and family
+  selection (Dissmann), rotated, BB1 and BB7 pair-copulas, checked against R's
+  VineCopula;
 - **automatic family selection**, **JSON serialization**, and **bootstrap confidence
   intervals** with measured coverage.
 
@@ -320,7 +322,7 @@ can paste them across.
 | `fitLambda(x)` | `rc.fit_lambda(x)` — tail dependence without a family |
 | `onacopula("G", C(1.5, , list(C(4, 1:3))))` | `rc.NestedArchimedean(rc.GumbelCopula(1.5), ...)` |
 | `enacopula(u, cop, method = "etau")` | `rc.fit_nested(structure, u)` |
-| *(VineCopula::RVineStructureSelect)* | `rc.fit_vine(u, structure="D")` |
+| *(VineCopula::RVineStructureSelect)* | `rc.fit_vine(u, structure="R")` — or `"C"`/`"D"` |
 | `retstable(n, V0, h, alpha)` | `rcopula.special.stable.retstable(...)` |
 | `pK(t, cop, d)` / `qK` / `dK` / `rK` | `rc.kendall_cdf/ppf/pdf/rvs(cop, ...)` |
 | `Kn(u, x)` | `rc.kendall_empirical(x, u)` |
@@ -374,6 +376,4 @@ observed deviation.
 `rcopula` is MIT. R's `copula` is GPL-3. **No R source code was translated into this
 project** — every algorithm is implemented from its originating published paper, and the R
 package is used solely as a black-box test oracle. See [`NOTICE`](https://github.com/Chrisebell24/python-copula/blob/main/NOTICE) and
-[`CONTRIBUTING.md`](https://github.com/Chrisebell24/python-copula/blob/main/CONTRIBUTING.md).
-
-`rcopula` is not affiliated with or endorsed by the authors of the R `copula` package.
+[`CONTRIBUTING.md`](https:

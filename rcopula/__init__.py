@@ -35,6 +35,7 @@ from rcopula.core.archimedean import (
     JoeCopula,
 )
 from rcopula.core.base import Copula, TailDependence
+from rcopula.core.bb import BB1Copula, BB7Copula
 from rcopula.core.elliptical import (
     EllipticalCopula,
     GaussianCopula,
@@ -112,13 +113,16 @@ from rcopula.transforms import (
     radial_simplex,
     rosenblatt,
 )
-from rcopula.vine import VineCopula, fit_vine
+from rcopula.vine import EXTENDED_FAMILIES, VineCopula, fit_vine
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
+    "EXTENDED_FAMILIES",
     "AMHCopula",
     "ArchimedeanCopula",
+    "BB1Copula",
+    "BB7Copula",
     "ClaytonCopula",
     "Copula",
     "CopulaDistribution",

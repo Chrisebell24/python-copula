@@ -163,6 +163,10 @@ def _encode(copula: Copula) -> dict[str, Any]:
             "kind": kind,
             "copulas": [_encode(component) for component in copula.copulas],
             "weights": _floats(copula.weights),
+            # The weights are for reading; the exact parameter vector (component
+            # parameters, then weight log-odds) is what makes reloading exact --
+            # rebuilding from weights can land one ulp away.
+            "params": _floats(copula.params),
         }
     if isinstance(copula, NestedArchimedean):
         return {
@@ -177,6 +181,12 @@ def _encode(copula: Copula) -> dict[str, Any]:
             "pair_copulas": [[_encode(pair) for pair in tree] for tree in copula.pair_copulas],
             "structure": str(copula.structure),
             "order": [int(i) for i in copula.order],
+            # An R-vine is defined by its matrix; a C- or D-vine by its order.
+            **(
+                {"matrix": [[int(v) for v in row] for row in copula.matrix]}
+                if copula.structure == "R"
+                else {}
+            ),
         }
 
     if isinstance(copula, FactorCopula):
@@ -388,6 +398,8 @@ def _families() -> dict[str, type[Copula]]:
 
     names = [
         "AMHCopula",
+        "BB1Copula",
+        "BB7Copula",
         "ClaytonCopula",
         "FGMCopula",
         "FrankCopula",
@@ -454,9 +466,12 @@ def _decode(node: dict[str, Any]) -> Copula:
             _decode(node["copula1"]), _decode(node["copula2"]), shapes=node["shapes"]
         )
     if kind == "MixtureCopula":
-        return rc.MixtureCopula(
+        mixture: Copula = rc.MixtureCopula(
             [_decode(component) for component in node["copulas"]], weights=node["weights"]
         )
+        if "params" in node:  # absent from documents written before 0.5.0
+            mixture = mixture.with_params(np.asarray(node["params"], dtype=float))
+        return mixture
     if kind == "NestedArchimedean":
         children = [_decode(child) for child in node["children"]]
         return rc.NestedArchimedean(
@@ -478,11 +493,10 @@ def _decode(node: dict[str, Any]) -> Copula:
             return factor.fix_params(free)
         return factor
     if kind == "VineCopula":
-        return rc.VineCopula(
-            [[_decode(pair) for pair in tree] for tree in node["pair_copulas"]],
-            structure=node["structure"],
-            order=node["order"],
-        )
+        pair_copulas = [[_decode(pair) for pair in tree] for tree in node["pair_copulas"]]
+        if node["structure"] == "R":
+            return rc.VineCopula(pair_copulas, structure="R", matrix=node["matrix"])
+        return rc.VineCopula(pair_copulas, structure=node["structure"], order=node["order"])
 
     families = _families()
     if kind not in families:

@@ -14,3 +14,10 @@ tests all work on them unchanged.
 ## Vines
 
 ::: rcopula.vine
+
+## Two-parameter pair-copulas
+
+BB1 and BB7 set the lower and upper tails separately. They are mainly vine
+pair-copulas, but they work anywhere a bivariate copula does.
+
+::: rcopula.core.bb

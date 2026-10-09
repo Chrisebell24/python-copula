@@ -147,3 +147,49 @@ print("  tree 1 families:", [c.name for c in selected.pair_copulas[0]])
 print("  tree 4 family:  ", [c.name for c in selected.pair_copulas[3]])
 check("the fitted vine has 10 pair-copulas", selected.n_pairs == 10)
 check("it beats independence by a wide margin", selected.loglik(sample) > 500)
+
+heading("A regular vine: trees that are neither stars nor paths")
+
+# Column i of the R-vine matrix lists, bottom-up, the partners of its diagonal
+# variable in trees 1, 2, ... (R VineCopula's convention, 0-based labels).
+# Here variable 0 is a hub joined to 1, 2 and 3, and 4 hangs off 3.
+matrix = np.array(
+    [[4, 0, 0, 0, 0], [1, 1, 0, 0, 0], [2, 2, 2, 0, 0], [0, 3, 3, 3, 0], [3, 0, 0, 0, 0]]
+)
+regular = rc.VineCopula(
+    [
+        [
+            rc.ClaytonCopula(2.0),
+            rc.RotatedCopula(rc.GumbelCopula(1.8), 270),  # negative dependence
+            rc.BB1Copula(0.6, 1.5),  # both tails, set separately
+            rc.StudentCopula(0.7, df=5.0),
+        ],
+        [rc.GaussianCopula(0.3), rc.FrankCopula(-3.0), rc.FrankCopula(2.0)],
+        [rc.IndependenceCopula(2)] * 2,
+        [rc.IndependenceCopula(2)],
+    ],
+    structure="R",
+    matrix=matrix,
+)
+print(regular.describe())
+show("truncation level", regular.truncation_level)
+r_sample = regular.rvs(3000, random_state=0)
+z = regular.rosenblatt(r_sample)
+check(
+    "its Rosenblatt transform gives independent columns",
+    np.abs(np.corrcoef(z, rowvar=False) - np.eye(5)).max() < 0.06,
+)
+
+# Dissmann's algorithm picks the trees as well as the families.
+r_fit = rc.fit_vine(r_sample, structure="R", families=rc.EXTENDED_FAMILIES, truncate=2)
+print(r_fit.describe())
+pseudo = rc.pseudo_obs(r_sample)
+show("log-likelihood, true R-vine", regular.loglik(pseudo))
+show("log-likelihood, fitted R-vine", r_fit.loglik(pseudo))
+c_fit = rc.fit_vine(r_sample, structure="C", families=rc.EXTENDED_FAMILIES, truncate=2)
+show("log-likelihood, fitted C-vine", c_fit.loglik(pseudo))
+check("the R-vine fit beats the fitted C-vine", r_fit.loglik(pseudo) > c_fit.loglik(pseudo))
+check(
+    "a C-vine rewritten as an R-vine matrix is the same density",
+    np.allclose(c_fit.to_rvine().logpdf(pseudo), c_fit.logpdf(pseudo), atol=1e-12),
+)

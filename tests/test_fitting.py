@@ -611,3 +611,74 @@ class TestItauMplHonoursItsArguments:
             rc.StudentCopula(dim=3, dispstr="un"), u, method="itau.mpl", estimate_variance=False
         )
         assert quiet.cov_params is None
+
+
+class TestStructuredInversion:
+    """Regression: ``itau``/``irho`` for ``"toep"`` and ``"ar1"`` in d > 2.
+
+    Found by the 4-/5-d R fixtures (``tests/golden/highdim.json``). Both
+    structures used to fall through to the one-parameter path, which averages
+    the statistic over *all* pairs: a Toeplitz fit came back with every lag
+    equal, and an AR(1) fit with an all-lags average (0.40 for a true lag-1
+    correlation of 0.6 in five dimensions). R fits the structure to the pairwise
+    correlations by least squares; so does this package now, to 1e-6 of R.
+    """
+
+    def test_toeplitz_lags_are_estimated_separately(self) -> None:
+        truth = [0.6, 0.35, 0.15, -0.05]
+        u = rc.GaussianCopula(truth, dim=5, dispstr="toep").rvs(3000, random_state=1)
+        for method in ("itau", "irho"):
+            res = rc.fit(rc.GaussianCopula(dim=5, dispstr="toep"), u, method=method)
+            assert np.allclose(res.params, truth, atol=0.04), method
+            assert res.bse is not None and res.bse.shape == (4,)
+
+    def test_toeplitz_lag_is_the_mean_of_its_pairwise_correlations(self) -> None:
+        from scipy import stats
+
+        u = rc.GaussianCopula([0.5, 0.25, -0.1], dim=4, dispstr="toep").rvs(500, random_state=2)
+        res = rc.fit(rc.GaussianCopula(dim=4, dispstr="toep"), u, method="itau")
+        lag1 = [stats.kendalltau(u[:, i], u[:, i + 1]).statistic for i in range(3)]
+        assert res.params[0] == pytest.approx(np.mean(np.sin(np.pi * np.array(lag1) / 2)))
+
+    def test_fixed_toeplitz_lags_are_kept(self) -> None:
+        truth = [0.6, 0.35, 0.15, -0.05]
+        u = rc.GaussianCopula(truth, dim=5, dispstr="toep").rvs(1000, random_state=1)
+        start = rc.GaussianCopula([0.0, 0.3, 0.0, 0.0], dim=5, dispstr="toep")
+        res = rc.fit(start.fix_params([True, False, True, True]), u, method="itau")
+        assert res.copula.params[1] == 0.3
+        assert res.params.shape == (3,)
+        full = rc.fit(rc.GaussianCopula(dim=5, dispstr="toep"), u, method="itau")
+        assert np.allclose(res.params, full.params[[0, 2, 3]], rtol=1e-12)
+
+    @pytest.mark.parametrize("rho", [0.6, -0.5])
+    def test_ar1_is_consistent(self, rho: float) -> None:
+        # Negative rho makes odd-lag correlations negative, where R's log-linear
+        # fit is undefined; the least-squares fallback covers it.
+        u = rc.GaussianCopula(rho, dim=5, dispstr="ar1").rvs(3000, random_state=2)
+        for method in ("itau", "irho"):
+            res = rc.fit(rc.GaussianCopula(dim=5, dispstr="ar1"), u, method=method)
+            assert res.params[0] == pytest.approx(rho, abs=0.03), method
+            assert res.bse is not None and 0.0 < res.bse[0] < 0.05
+
+
+class TestStudentIrhoUnstructured:
+    """Regression: ``irho`` for an unstructured t copula used the Gaussian rho map.
+
+    ``2 sin(pi rho_S / 6)`` holds only for the Gaussian copula. In d > 2 the
+    unstructured branch applied it to t copulas too, so with ``df = 2.5`` and a
+    true correlation of 0.7 the estimate converged to 0.677, while the same
+    data's bivariate fit (via ``StudentCopula.from_rho``) gave 0.702.
+    """
+
+    def test_each_pair_is_inverted_with_the_t_relation(self) -> None:
+        from scipy import stats
+
+        truth = rc.StudentCopula([0.7, 0.5, 0.3], dim=3, dispstr="un", df=2.5)
+        u = truth.rvs(400, random_state=1)
+        family = rc.StudentCopula(dim=3, dispstr="un", df=2.5, df_fixed=True)
+        res = rc.fit(family, u, method="irho")
+        for k, (i, j) in enumerate([(1, 0), (2, 0), (2, 1)]):
+            rho_s = stats.spearmanr(u[:, i], u[:, j]).statistic
+            pair = rc.StudentCopula.from_rho(rho_s, df=2.5).params[0]
+            assert res.params[k] == pytest.approx(pair, rel=1e-10)
+        assert res.bse is not None and np.all(res.bse > 0)
