@@ -61,7 +61,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from scipy.special import bernoulli, factorial, zeta
+from scipy.special import factorial, zeta
 
 __all__ = ["debye1", "debye2", "debye_n"]
 
@@ -76,11 +76,31 @@ _N_BERNOULLI = 40
 #: 60 terms give e^{-120}, again far below epsilon.
 _N_EXP = 60
 
-# B_0, B_2, B_4, ... — only even-index Bernoulli numbers are needed (the odd
-# ones vanish beyond B_1). scipy.special.bernoulli returns B_0..B_m.
-_B_EVEN = bernoulli(2 * _N_BERNOULLI)[2::2].copy()
+
+def even_bernoulli_over_factorial(count: int) -> NDArray[np.float64]:
+    r"""``B_{2k} / (2k)!`` for ``k = 1..count``, from exact rational arithmetic.
+
+    ``scipy.special.bernoulli`` is not accurate enough for a series meant to
+    reach machine precision: its ``B_4`` is off by 1.7e-12 relative, which
+    capped the Debye functions (and so Frank's tau and rho) at ~4e-14. The
+    numbers are computed here as exact fractions by the standard recurrence
+    :math:`\sum_{j=0}^{m} \binom{m+1}{j} B_j = 0` and divided by the factorial
+    *before* rounding, so each value is correctly rounded.
+    """
+    from fractions import Fraction
+    from math import comb
+    from math import factorial as int_factorial
+
+    m_max = 2 * count
+    b = [Fraction(1)]
+    for m in range(1, m_max + 1):
+        b.append(-sum((comb(m + 1, j) * b[j] for j in range(m)), Fraction(0)) / (m + 1))
+    return np.array([float(b[2 * k] / int_factorial(2 * k)) for k in range(1, count + 1)])
+
+
+# Only even-index Bernoulli numbers are needed (the odd ones vanish beyond B_1).
 _TWO_K = np.arange(1, _N_BERNOULLI + 1) * 2.0
-_B_OVER_FACT = _B_EVEN / factorial(_TWO_K)
+_B_OVER_FACT = even_bernoulli_over_factorial(_N_BERNOULLI)
 
 
 def _debye_series(x: NDArray[np.float64], n: int) -> NDArray[np.float64]:

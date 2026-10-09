@@ -91,6 +91,10 @@ _RVS_BLOCK_ELEMENTS = 1 << 24
 # Quadrature sizes for the distribution function (see FactorCopula.cdf).
 _N_HERMITE = 48
 _N_LAGUERRE = 40
+# Below this df the Laguerre rule is replaced by a probability-scale rule with
+# _N_PROBABILITY nodes (see FactorCopula._cdf); at df = 8 Laguerre is at 7e-8.
+_LAGUERRE_MIN_DF = 8.0
+_N_PROBABILITY = 256
 
 # Distinct correlations above which a Student-t rho_matrix interpolates.
 _N_RHO_NODES = 15
@@ -579,6 +583,18 @@ class FactorCopula(Copula):
         if np.isinf(nu):
             x = special.ndtri(u)
             scales, log_sw = np.ones(1), np.zeros(1)
+        elif nu < _LAGUERRE_MIN_DF:
+            x = _stdtrit(nu, u)
+            # Heavy tails: Gauss-Legendre on the probability scale of the chi
+            # variable, s(q) = sqrt(chi2.ppf(q, nu) / nu). The integrand depends
+            # on sqrt(W), which is not smooth at W = 0, and a Laguerre rule in W
+            # converges slowly there: with 40 nodes C(u, 1, 1) missed u by 2e-2
+            # at df = 1, 9e-4 at df = 2 and 4e-4 at df = 3. On the probability
+            # scale no density survives and the total mass is exactly one; 256
+            # nodes give ~1e-7 for df in [0.5, 8).
+            q_nodes, q_weights = np.polynomial.legendre.leggauss(_N_PROBABILITY)
+            scales = np.sqrt(special.chdtri(nu, 1.0 - 0.5 * (q_nodes + 1.0)) / nu)
+            log_sw = np.log(0.5 * q_weights)
         else:
             x = _stdtrit(nu, u)
             # W/2 ~ Gamma(nu/2): generalised Gauss-Laguerre in t = W/2.
@@ -629,7 +645,9 @@ class FactorCopula(Copula):
         independent given the market, so the cost is ``O(48^2 d)`` per point,
         not exponential in the number of groups). The Student-t family adds a
         40-node generalised Gauss-Laguerre rule over the chi-square scale,
-        multiplying the cost by 40. Everything is summed in logs, so tiny
+        multiplying the cost by 40 (below 8 degrees of freedom, a 256-node
+        Gauss-Legendre rule on the chi variable's probability scale, which
+        handles the heavy tails). Everything is summed in logs, so tiny
         joint probabilities do not underflow. Agreement with the dense
         :class:`~rcopula.GaussianCopula` / :class:`~rcopula.StudentCopula`
         distribution functions is typically better than ``1e-4``.

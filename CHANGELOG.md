@@ -3,6 +3,56 @@
 Dates are ISO. Pre-1.0 the API may change; breaking changes are listed first in
 each release.
 
+## 0.5.0 — 2026-10-09
+
+### Added
+
+- **Regular vines**: `VineCopula(..., structure="R", matrix=...)` (R
+  `VineCopula` matrix convention, 0-based) with density, sampling, Rosenblatt
+  transform, `describe`, truncation and serialization; `.matrix` and
+  `.to_rvine()` on every vine. `fit_vine(structure="R")` selects the trees with
+  Dissmann's algorithm and supports `truncate=`. On R's own test data it picks
+  the same matrix and all ten families as `RVineStructureSelect`.
+- **More pair-copula families**: `BB1Copula`, `BB7Copula`, and Joe plus the
+  90/180/270 rotations for vines (`EXTENDED_FAMILIES`; `select_copula` groups
+  `"rotated"`, `"bb"`, `"vine"`). Checked against R's VineCopula.
+- `VineCopula.rosenblatt` now works for C-vines.
+
+### Changed
+
+- Full vines sample with closed-form inverse h-functions: 15–40× faster at
+  d = 10. Seeded draws agree with 0.4.0 to about 1e-13.
+- Multi-parameter `mpl` fits converge to a tighter tolerance; the
+  log-likelihood now matches or beats R's.
+
+### Fixed
+
+- `fit(..., "itau"/"irho")` for `dispstr="toep"`/`"ar1"` above two dimensions
+  fits the structure as R does (Toeplitz used to come back with every lag
+  equal; AR(1) estimated 0.40 for a true 0.6).
+- `"irho"` for unstructured t copulas uses the t copula's Spearman relation,
+  not the Gaussian one (0.677 for a true 0.7 at df = 2.5).
+- C-vines with pair-copulas whose arguments cannot be swapped (90/270
+  rotations) used inconsistent argument order between density, sampling and
+  fitting.
+- Near independence: Frank tau/rho/CDF/generators, Plackett CDF, and Clayton's
+  generators lost precision or broke; `from_tau`/`from_rho` failed for tiny
+  targets (Frank, Gumbel, Joe); `rosenblatt` failed at theta = 0; subnormal
+  theta is treated as independence.
+- Debye functions accurate to ~1e-16 (exact Bernoulli numbers); Student-t
+  factor copula CDF accurate at low df.
+- Saving and reloading a `MixtureCopula` is exact (the document now carries
+  its parameter vector; older documents still load).
+
+### Tests
+
+- R fixtures in 4 and 5 dimensions (`tools/rgolden/11_highdim.R`): elliptical
+  with un/toep/ar1 structures, fits and standard errors, Archimedean, nested,
+  marginal and Rosenblatt.
+- R parity for regular vines (density, Rosenblatt, structure selection) and
+  BB/rotated pair-copulas.
+- Property-based tests with hypothesis (`hypothesis` added to the dev extra).
+
 ## 0.4.0 — 2026-10-08
 
 ### Added

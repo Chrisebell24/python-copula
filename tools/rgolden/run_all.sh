@@ -7,7 +7,8 @@
 # regenerated files together with the change that motivated them.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-for script in tools/rgolden/0[1-9]_*.R; do
+# 10_garch.R needs rugarch and is run separately; 11+ are copula-only.
+for script in tools/rgolden/0[1-9]_*.R tools/rgolden/11_highdim.R; do
     echo "=== $script ==="
     Rscript "$script"
 done

@@ -191,9 +191,12 @@ class TestRosenblatt:
         worst = min(stats.kstest(z[:, j], "uniform").pvalue for j in range(3))
         assert worst < 1e-6
 
-    def test_it_is_refused_for_a_c_vine(self) -> None:
-        with pytest.raises(NotImplementedError, match="D-vines"):
-            MIXED["C"].rosenblatt(np.full((1, 3), 0.5))
+    def test_a_c_vine_inverts_its_own_sampler(self) -> None:
+        """rcopula 0.4.0 refused a C-vine; it now goes through the R-vine form."""
+        vine = MIXED["C"]
+        u = vine.rvs(300, random_state=5)
+        w = np.random.default_rng(5).uniform(size=(300, 3))
+        np.testing.assert_allclose(vine.rosenblatt(u), w, atol=1e-7)
 
 
 class TestStructure:
@@ -207,7 +210,11 @@ class TestStructure:
 
     def test_it_validates_the_structure_and_order(self) -> None:
         with pytest.raises(ValueError, match="structure must be"):
+            VineCopula([[rc.ClaytonCopula(2.0)]], structure="X")
+        with pytest.raises(ValueError, match="needs the R-vine matrix"):
             VineCopula([[rc.ClaytonCopula(2.0)]], structure="R")
+        with pytest.raises(ValueError, match="describes an R-vine"):
+            VineCopula([[rc.ClaytonCopula(2.0)]], structure="D", matrix=[[1, 0], [0, 0]])
         with pytest.raises(ValueError, match="permutation"):
             VineCopula([[rc.ClaytonCopula(2.0)]], order=[0, 0])
 
@@ -420,11 +427,31 @@ class TestTruncation:
     def test_untruncated_seeded_draws_are_unchanged(
         self, structure: str, expected: list[list[float]]
     ) -> None:
-        """A full vine keeps its exact algorithm: same seed, same draws. Values
-        pinned from rcopula 0.2.0 (bit-identical on the machine that pinned them;
-        the tolerance only allows for another platform's libm)."""
+        """Same seed, same draws, up to the last few bits. Values pinned from
+        rcopula 0.2.0, which inverted every h-function by 60-step bisection. A
+        full vine now uses the closed-form inverses (Clayton and Frank here;
+        Gumbel still bisects), which agree with bisection to about 4e-14, so
+        the pins hold at 1e-11 rather than bit for bit."""
         u = MIXED[structure].rvs(2, random_state=11)
-        np.testing.assert_allclose(u, np.array(expected), rtol=1e-13, atol=0)
+        np.testing.assert_allclose(u, np.array(expected), rtol=1e-11, atol=0)
+
+    @pytest.mark.parametrize("structure", ["C", "D"])
+    def test_closed_form_inverses_agree_with_bisection(self, structure: str) -> None:
+        """The fast path and the 0.4.0 bisection path describe the same draws."""
+        trees = [
+            [rc.ClaytonCopula(2.0), rc.StudentCopula(0.5, df=4.0), rc.FrankCopula(-3.0)],
+            [rc.RotatedCopula(rc.ClaytonCopula(1.5), 90), rc.GaussianCopula(0.4)],
+            [rc.RotatedCopula(rc.ClaytonCopula(0.8), True)],
+        ]
+        vine = VineCopula(trees, structure=structure)
+        w = np.random.default_rng(0).uniform(size=(2000, 4))
+        simulate = vine._simulate_c_vine if structure == "C" else vine._simulate_d_vine
+        fast, slow = simulate(w, 3, closed_form=True), simulate(w, 3, closed_form=False)
+        # The bisection path inverts the generic conditional_cdf, which for a
+        # rotated copula is a numerical derivative good to ~1e-7; by tree 3
+        # that is the larger error of the two.
+        np.testing.assert_allclose(fast, slow, atol=1e-5)
+        np.testing.assert_allclose(fast[:, :3], slow[:, :3], atol=1e-9)
 
     @pytest.mark.parametrize("structure", ["C", "D"])
     def test_truncated_fit_has_the_right_shape(self, structure: str) -> None:
@@ -445,3 +472,374 @@ class TestDefaultOrder:
         assert list(fitted.order) == _default_order(u, "D")
         tau = np.abs(rc.cor_kendall(u)).sum(axis=1)
         assert list(fitted.order) == [int(j) for j in np.argsort(-tau)]
+
+
+# ---------------------------------------------------------------------------
+# Regular vines
+# ---------------------------------------------------------------------------
+
+#: The example matrix of R VineCopula's RVineMatrix help page, minus 1: tree 1
+#: joins 0 to 1, 2 and 3, and 3 to 4 -- neither a star nor a path.
+RVM = np.array(
+    [[4, 0, 0, 0, 0], [1, 1, 0, 0, 0], [2, 2, 2, 0, 0], [0, 3, 3, 3, 0], [3, 0, 0, 0, 0]]
+)
+
+
+def mixed_rvine() -> VineCopula:
+    return VineCopula(
+        [
+            [
+                rc.ClaytonCopula(2.0),
+                rc.RotatedCopula(rc.GumbelCopula(1.8), 270),
+                rc.BB1Copula(0.6, 1.5),
+                rc.StudentCopula(0.5, df=5.0),
+            ],
+            [
+                rc.BB7Copula(1.4, 1.2),
+                rc.FrankCopula(-3.0),
+                rc.RotatedCopula(rc.ClaytonCopula(1.5), 90),
+            ],
+            [rc.GaussianCopula(0.3), rc.RotatedCopula(rc.JoeCopula(1.6), True)],
+            [rc.JoeCopula(1.3)],
+        ],
+        structure="R",
+        matrix=RVM,
+    )
+
+
+def gaussian_rvine(sigma: np.ndarray, matrix: np.ndarray) -> VineCopula:
+    """The R-vine on ``matrix`` whose pair parameters are ``sigma``'s partial correlations."""
+    d = sigma.shape[0]
+    trees = []
+    for t in range(d - 1):
+        row = d - 1 - t
+        trees.append(
+            [
+                rc.GaussianCopula(
+                    _partial(
+                        sigma, int(matrix[row, i]), int(matrix[i, i]), list(matrix[row + 1 :, i])
+                    )
+                )
+                for i in range(d - 1 - t)
+            ]
+        )
+    return VineCopula(trees, structure="R", matrix=matrix)
+
+
+def random_rvine_matrix(d: int, seed: int) -> np.ndarray:
+    """A random valid R-vine matrix, from Dissmann selection on random Gaussian data."""
+    sigma = random_correlation(d, seed)
+    u = rc.GaussianCopula(rc.P2p(sigma), dim=d, dispstr="un").rvs(300, random_state=seed)
+    return np.array(fit_vine(u, structure="R", families=["gaussian"]).matrix)
+
+
+class TestRegularVineIdentities:
+    @pytest.mark.parametrize("d", [3, 4, 5, 6, 7])
+    @pytest.mark.parametrize("seed", [0, 1])
+    def test_an_all_gaussian_r_vine_is_the_gaussian_copula(self, d: int, seed: int) -> None:
+        matrix = random_rvine_matrix(d, seed)
+        # Shrunk towards the identity: a near-singular matrix puts some test
+        # points so deep in the tails that the 1e-12 clipping of h-values
+        # shows (in every vine structure, not just this one).
+        sigma = 0.8 * random_correlation(d, seed + 100) + 0.2 * np.eye(d)
+        vine = gaussian_rvine(sigma, matrix)
+        np.testing.assert_allclose(vine.to_gaussian().sigma(), sigma, atol=1e-12)
+        points = np.random.default_rng(seed).uniform(0.05, 0.95, size=(300, d))
+        np.testing.assert_allclose(
+            vine.logpdf(points),
+            rc.GaussianCopula(rc.P2p(sigma), dim=d, dispstr="un").logpdf(points),
+            atol=1e-9,
+        )
+
+    def test_the_r_vine_help_page_matrix_is_the_gaussian_copula_too(self) -> None:
+        sigma = random_correlation(5, 7)
+        vine = gaussian_rvine(sigma, RVM)
+        points = np.random.default_rng(2).uniform(0.05, 0.95, size=(200, 5))
+        np.testing.assert_allclose(
+            vine.logpdf(points), vine.to_gaussian().logpdf(points), atol=1e-9
+        )
+        np.testing.assert_allclose(vine.to_gaussian().sigma(), sigma, atol=1e-12)
+
+    @pytest.mark.parametrize("structure", ["C", "D"])
+    @pytest.mark.parametrize("order", [None, [2, 0, 3, 1]])
+    def test_c_and_d_vines_as_r_vine_matrices_are_the_same_copula(
+        self, structure: str, order: list[int] | None
+    ) -> None:
+        trees = [
+            [
+                rc.ClaytonCopula(2.0),
+                rc.RotatedCopula(rc.GumbelCopula(1.5), 90),
+                rc.FrankCopula(3.0),
+            ],
+            [rc.RotatedCopula(rc.ClaytonCopula(1.2), 270), rc.StudentCopula(0.3, df=6.0)],
+            [rc.BB7Copula(1.3, 0.8)],
+        ]
+        vine = VineCopula(trees, structure=structure, order=order)
+        as_r = VineCopula(
+            [list(reversed(level)) for level in trees], structure="R", matrix=vine.matrix
+        )
+        assert as_r == vine.to_rvine()
+        u = vine.rvs(500, random_state=1)
+        np.testing.assert_allclose(as_r.logpdf(u), vine.logpdf(u), rtol=0, atol=1e-12)
+        np.testing.assert_allclose(as_r.rosenblatt(u), vine.rosenblatt(u), atol=1e-10)
+        np.testing.assert_allclose(as_r.rvs(500, random_state=1), u, atol=1e-9)
+        assert as_r.order == vine.order
+
+    def test_a_d_vine_matrix_written_by_hand(self) -> None:
+        """Path 0-1-2-3 in the VineCopula convention (diagonal 3, 2, 1, 0)."""
+        hand = np.array([[3, 0, 0, 0], [0, 2, 0, 0], [1, 0, 1, 0], [2, 1, 0, 0]])
+        trees = [
+            [rc.ClaytonCopula(2.0), rc.GumbelCopula(1.5), rc.FrankCopula(3.0)],
+            [rc.FrankCopula(2.0), rc.GaussianCopula(0.3)],
+            [rc.ClaytonCopula(0.5)],
+        ]
+        dvine = VineCopula(trees, structure="D")
+        np.testing.assert_array_equal(dvine.matrix, hand)
+        rvine = VineCopula([list(reversed(t)) for t in trees], structure="R", matrix=hand)
+        u = dvine.rvs(300, random_state=0)
+        np.testing.assert_allclose(rvine.logpdf(u), dvine.logpdf(u), atol=1e-12)
+
+    def test_a_c_vine_matrix_written_by_hand(self) -> None:
+        """Root 0, then 1: every column lists 0 at the bottom (tree 1) and 1 above it."""
+        hand = np.array([[3, 0, 0, 0], [2, 2, 0, 0], [1, 1, 1, 0], [0, 0, 0, 0]])
+        np.testing.assert_array_equal(
+            VineCopula(
+                [
+                    [rc.GaussianCopula(0.1)] * 3,
+                    [rc.GaussianCopula(0.1)] * 2,
+                    [rc.GaussianCopula(0.1)],
+                ],
+                structure="C",
+            ).matrix,
+            hand,
+        )
+
+
+class TestRegularVine:
+    def test_density_integrates_to_one(self) -> None:
+        points = np.random.default_rng(0).uniform(size=(400_000, 5))
+        assert np.exp(mixed_rvine().logpdf(points)).mean() == pytest.approx(1.0, abs=0.03)
+
+    def test_the_sampler_and_rosenblatt_are_inverse(self) -> None:
+        vine = mixed_rvine()
+        u = vine.rvs(3000, random_state=4)
+        w = np.random.default_rng(4).uniform(size=(3000, 5))
+        z = vine.rosenblatt(u)
+        # rvs drives variable order[i] by uniform column i; rosenblatt undoes it.
+        np.testing.assert_allclose(z[:, list(vine.order)], w, atol=1e-7)
+        # The first variable in the order is passed through, in its own column.
+        np.testing.assert_array_equal(z[:, vine.order[0]], u[:, vine.order[0]])
+
+    def test_tree_one_governs_the_pairs_it_joins(self) -> None:
+        vine = mixed_rvine()
+        u = vine.rvs(20_000, random_state=2)
+        for t, a, b, _, cop in vine.edges:
+            if t == 0:
+                tau = stats.kendalltau(u[:, a], u[:, b]).statistic
+                assert tau == pytest.approx(cop.tau(), abs=0.02), (a, b)
+
+    def test_margins_are_uniform(self) -> None:
+        u = mixed_rvine().rvs(10_000, random_state=3)
+        for j in range(5):
+            assert stats.kstest(u[:, j], "uniform").pvalue > 1e-3
+
+    def test_describe_and_truncation_level(self) -> None:
+        vine = mixed_rvine()
+        lines = vine.describe().splitlines()
+        assert lines[0] == "R-vine copula, dim 5, order [0, 3, 2, 1, 4]"
+        assert lines[1].split()[:3] == ["tree", "1", "3,4"]
+        assert lines[-1].split()[:3] == ["tree", "4", "1,4|2,0,3"]
+        assert vine.truncation_level == 4
+        assert vine.to_rvine() is vine
+
+    def test_a_truncated_r_vine_matches_explicit_zero_gaussians(self) -> None:
+        first = mixed_rvine().pair_copulas[0]
+        truncated = VineCopula(
+            [first] + [[rc.IndependenceCopula(2)] * (4 - k) for k in range(1, 4)],
+            structure="R",
+            matrix=RVM,
+        )
+        explicit = VineCopula(
+            [first] + [[rc.GaussianCopula(0.0)] * (4 - k) for k in range(1, 4)],
+            structure="R",
+            matrix=RVM,
+        )
+        assert truncated.truncation_level == 1
+        u = explicit.rvs(400, random_state=4)
+        np.testing.assert_allclose(truncated.logpdf(u), explicit.logpdf(u), atol=1e-10)
+        np.testing.assert_allclose(truncated.rosenblatt(u), explicit.rosenblatt(u), atol=1e-10)
+        np.testing.assert_allclose(
+            truncated.rvs(400, random_state=4), explicit.rvs(400, random_state=4), atol=1e-10
+        )
+
+    def test_serialisation_round_trip(self) -> None:
+        from rcopula.serialize import from_json, to_json
+
+        vine = mixed_rvine()
+        back = from_json(to_json(vine))
+        assert back == vine
+        np.testing.assert_array_equal(back.matrix, vine.matrix)
+        u = vine.rvs(50, random_state=0)
+        np.testing.assert_allclose(back.logpdf(u), vine.logpdf(u))
+
+    def test_order_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="read from its matrix"):
+            VineCopula(mixed_rvine().pair_copulas, structure="R", matrix=RVM, order=[0, 1, 2, 3, 4])
+
+    @pytest.mark.parametrize(
+        ("matrix", "message"),
+        [
+            ([[0, 0, 0], [1, 0, 0], [2, 1, 0]], "permutation"),
+            ([[2, 0], [1, 2]], "must be square|permutation"),
+            ([[2, 0, 0], [0, 1, 0], [2, 0, 0]], "column 0"),
+            (np.ones((3, 2)), "square"),
+            ([[2.5, 0], [0, 0]], "integer"),
+        ],
+    )
+    def test_invalid_matrices_are_refused(self, matrix: object, message: str) -> None:
+        d = np.asarray(matrix).shape[0]
+        trees = [[rc.GaussianCopula(0.2)] * (d - 1 - k) for k in range(max(d - 1, 1))]
+        with pytest.raises(ValueError, match=message):
+            VineCopula(trees, structure="R", matrix=matrix)
+
+    def test_the_proximity_condition_is_enforced(self) -> None:
+        # Tree 1 is 0-3, 1-2, 0-1 (a spanning tree) and every column holds the
+        # right variables, but the tree-2 edge 2,3|0 would join tree-1 edges
+        # {0,2} and {0,3}, and {0,2} is not in tree 1.
+        bad = np.array([[3, 0, 0, 0], [1, 2, 0, 0], [2, 0, 1, 0], [0, 1, 0, 0]])
+        trees = [[rc.GaussianCopula(0.2)] * (3 - k) for k in range(3)]
+        with pytest.raises(ValueError, match="proximity condition"):
+            VineCopula(trees, structure="R", matrix=bad)
+
+    def test_a_mismatched_dimension_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="describe a 3-dimensional"):
+            VineCopula(
+                [[rc.GaussianCopula(0.2)] * 2, [rc.GaussianCopula(0.2)]], structure="R", matrix=RVM
+            )
+
+
+class TestRegularVineFitting:
+    def test_the_first_tree_is_the_maximum_spanning_tree_on_abs_tau(self) -> None:
+        """Checked against scipy's minimum spanning tree on -|tau|."""
+        from scipy.sparse.csgraph import minimum_spanning_tree
+
+        u = mixed_rvine().rvs(2000, random_state=0)
+        fitted = fit_vine(u, structure="R", families=["gaussian", "clayton", "frank"])
+        tree1 = {frozenset((a, b)) for t, a, b, _, _ in fitted.edges if t == 0}
+        weights = -np.abs(rc.cor_kendall(u))
+        np.fill_diagonal(weights, 0.0)
+        mst = minimum_spanning_tree(np.triu(weights)).tocoo()
+        assert tree1 == {frozenset((int(a), int(b))) for a, b in zip(mst.row, mst.col, strict=True)}
+
+    def test_rotations_pick_up_negative_dependence(self) -> None:
+        truth = mixed_rvine()
+        u = truth.rvs(3000, random_state=1)
+        fitted = fit_vine(u, structure="R", families=rc.EXTENDED_FAMILIES)
+        pair = {frozenset((a, b)): cop for t, a, b, _, cop in fitted.edges if t == 0}
+        assert pair[frozenset((0, 1))].tau() < -0.3
+        # Dissmann's trees are a heuristic (here tree 1 prefers 0-4 to the
+        # truth's 0-3), so the fit falls a little short of the truth -- but the
+        # extended families beat the Gaussian-only fit on the same data.
+        p = rc.pseudo_obs(u)
+        assert fitted.loglik(p) > 0.85 * truth.loglik(p)
+        gaussian = fit_vine(u, structure="R", families=["gaussian"])
+        assert fitted.loglik(p) > gaussian.loglik(p) + 100
+
+    @pytest.mark.parametrize("d", [3, 4, 6])
+    @pytest.mark.parametrize("truncate", [None, 1, 2])
+    def test_the_fitted_likelihood_is_the_sum_of_the_edge_fits(
+        self, d: int, truncate: int | None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Each edge is selected on the data it sees; if the matrix put an edge
+        in the wrong place or mis-oriented its copula, the vine's likelihood
+        would not be the sum of the per-edge likelihoods."""
+        import rcopula.vine as vine_module
+
+        original = vine_module._select_pair
+        recorded: list[float] = []
+
+        def spy(first, second, names, criterion):
+            best = original(first, second, names, criterion)
+            recorded.append(float(np.sum(best.logpdf(np.column_stack([first, second])))))
+            return best
+
+        monkeypatch.setattr(vine_module, "_select_pair", spy)
+        sigma = random_correlation(d, d)
+        base = rc.GaussianCopula(rc.P2p(sigma), dim=d, dispstr="un").rvs(500, random_state=d)
+        # Some negative dependence; pseudo-observations, as fit_vine sees them.
+        u = rc.pseudo_obs(np.column_stack([base[:, :-1], 1.0 - base[:, -1]]))
+        fitted = fit_vine(
+            u,
+            structure="R",
+            families=["gaussian", "clayton", "clayton90", "clayton270", "gumbel90"],
+            truncate=truncate,
+        )
+        expected_edges = sum(
+            d - 1 - k for k in range(d - 1 if truncate is None else min(truncate, d - 1))
+        )
+        assert len(recorded) == expected_edges
+        assert fitted.loglik(u) == pytest.approx(sum(recorded), rel=1e-10, abs=1e-8)
+        if truncate is not None:
+            assert fitted.truncation_level <= truncate
+
+    def test_a_truncated_fit_scales_to_many_variables(self) -> None:
+        d = 25
+        loadings = np.random.default_rng(0).uniform(0.4, 0.8, d)
+        sigma = np.outer(loadings, loadings)
+        np.fill_diagonal(sigma, 1.0)
+        u = rc.GaussianCopula(rc.P2p(sigma), dim=d, dispstr="un").rvs(400, random_state=0)
+        fitted = fit_vine(u, structure="R", families=["gaussian"], truncate=1)
+        assert fitted.truncation_level == 1
+        assert [len(level) for level in fitted.pair_copulas] == [d - 1 - k for k in range(d - 1)]
+        assert fitted.rvs(10, random_state=0).shape == (10, d)
+
+    def test_order_is_refused(self) -> None:
+        u = MIXED["D"].rvs(100, random_state=0)
+        with pytest.raises(ValueError, match="selected from the data"):
+            fit_vine(u, structure="R", order=[0, 1, 2])
+
+    def test_a_family_group_name_is_accepted(self) -> None:
+        u = MIXED["D"].rvs(300, random_state=0)
+        fitted = fit_vine(u, structure="R", families="vine", truncate=1)
+        assert fitted.structure == "R"
+
+
+@pytest.mark.parametrize("structure", ["C", "D"])
+def test_c_and_d_fits_with_rotations_are_the_sum_of_their_edge_fits(
+    structure: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With non-exchangeable pair-copulas the argument order matters. rcopula
+    0.4.0's C-vine evaluated each density at (root, other) but built the next
+    tree's data from (other, root); this pins the two together."""
+    import rcopula.vine as vine_module
+
+    original = vine_module._select_pair
+    recorded: list[float] = []
+
+    def spy(first, second, names, criterion):
+        best = original(first, second, names, criterion)
+        recorded.append(float(np.sum(best.logpdf(np.column_stack([first, second])))))
+        return best
+
+    monkeypatch.setattr(vine_module, "_select_pair", spy)
+    truth = VineCopula(
+        [
+            [
+                rc.RotatedCopula(rc.GumbelCopula(2.0), 90),
+                rc.ClaytonCopula(2.0),
+                rc.FrankCopula(4.0),
+            ],
+            [rc.RotatedCopula(rc.ClaytonCopula(1.5), 270), rc.GumbelCopula(1.4)],
+            [rc.RotatedCopula(rc.JoeCopula(1.8), 90)],
+        ],
+        structure=structure,
+    )
+    u = rc.pseudo_obs(truth.rvs(1500, random_state=0))
+    fitted = fit_vine(
+        u,
+        structure=structure,
+        order=[0, 1, 2, 3],
+        families=["gaussian", "clayton", "clayton90", "clayton270", "gumbel90", "joe90"],
+    )
+    assert len(recorded) == 6
+    assert fitted.loglik(u) == pytest.approx(sum(recorded), rel=1e-10)

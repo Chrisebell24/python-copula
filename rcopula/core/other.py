@@ -480,8 +480,13 @@ class PlackettCopula(Copula):
         theta = float(params[0])
         if theta == 1.0:
             return u[:, 0] * u[:, 1]
-        eta, s, d = self._eta_s_d(u[:, 0], u[:, 1], theta)
-        return (s - d) / (2.0 * eta)
+        x, y = u[:, 0], u[:, 1]
+        _, s, d = self._eta_s_d(x, y, theta)
+        # (s - d) / (2 eta), rationalised: s^2 - d^2 = 4 x y theta eta, so this
+        # equals 2 theta x y / (s + d). The textbook form subtracts two numbers
+        # that both tend to 1 and divides by eta -> 0; at theta = 1 + 1e-12 it
+        # was off by 6e-5. Here s, d > 0 and nothing cancels.
+        return 2.0 * theta * x * y / (s + d)
 
     def _logpdf(self, u, params):
         theta = float(params[0])

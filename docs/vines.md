@@ -162,6 +162,95 @@ sits — the family chosen on each edge is — and an exhaustive search costs $d
 fits to recover almost nothing. That is a better argument for the greedy
 algorithm than "it finds the optimum", which it does not.
 
+## Regular vines: any tree shape
+
+A C-vine forces every tree to be a star and a D-vine forces a path. Real
+dependence is rarely either. In a **regular vine** (R-vine) the first tree can
+be any tree on the variables, and each later tree any tree on the edges of the
+one before, with one rule — the *proximity condition*: two edges may be joined
+only if they share a variable. C- and D-vines are the two extreme cases.
+
+An R-vine is written down as a small lower-triangular matrix, in the same
+convention as R's `VineCopula` package, except that the labels start at 0.
+Read column `i` from the bottom up: it lists the variables that the diagonal
+entry is paired with in tree 1, tree 2, and so on. The pair-copula for column
+`i` in tree `k` is `pair_copulas[k][i]`.
+
+```python
+import numpy as np
+import rcopula as rc
+
+# Variable 0 is a hub joined to 1, 2 and 3; variable 4 hangs off 3.
+matrix = np.array(
+    [[4, 0, 0, 0, 0], [1, 1, 0, 0, 0], [2, 2, 2, 0, 0], [0, 3, 3, 3, 0], [3, 0, 0, 0, 0]]
+)
+truth = rc.VineCopula(
+    [
+        [
+            rc.ClaytonCopula(2.0),  # 3,4
+            rc.RotatedCopula(rc.GumbelCopula(1.8), 270),  # 0,1: negative
+            rc.BB1Copula(0.6, 1.5),  # 0,2: both tails
+            rc.StudentCopula(0.7, df=5.0),  # 0,3
+        ],
+        [rc.GaussianCopula(0.3), rc.FrankCopula(-3.0), rc.FrankCopula(2.0)],
+        [rc.IndependenceCopula(2)] * 2,
+        [rc.IndependenceCopula(2)],
+    ],
+    structure="R",
+    matrix=matrix,
+)
+truth.truncation_level  # 2: trees 3 and 4 carry no dependence
+u = truth.rvs(3000, random_state=0)
+
+fitted = rc.fit_vine(u, structure="R", families=rc.EXTENDED_FAMILIES, truncate=2)
+print(fitted.describe())
+```
+
+```
+R-vine copula, dim 5, order [3, 0, 4, 2, 1]
+  tree 1  3,1            270-degree rotated BB1 copula, dim 2, theta=0.185676, delta=1.66304
+  tree 1  0,2            BB7 copula, dim 2, theta=1.67767, delta=1.11867
+  tree 1  3,4            Clayton copula, dim 2, theta=1.93415
+  tree 1  3,0            Student copula, dim 2, rho=0.684017, df=4.30972
+  tree 2  0,1|3          270-degree rotated Gumbel copula, dim 2, theta=1.26609
+  tree 2  3,2|0          Frank copula, dim 2, theta=1.9456
+  tree 2  0,4|3          Gaussian copula, dim 2, rho=0.296769
+  tree 3  2,1|0,3        Independence copula, dim 2
+  ...
+```
+
+`fit_vine(..., structure="R")` chooses the trees with Dissmann's algorithm: tree
+1 is the tree that links all the variables with the largest total |Kendall's
+τ|, and each later tree does the same on the transformed data, among the pairs
+the proximity condition allows. Every edge then gets its own family.
+`EXTENDED_FAMILIES` adds Joe, the 90/180/270-degree rotations and the
+two-parameter BB1 and BB7 to the defaults. The rotations are how a family that
+only does positive dependence (Gumbel, BB1) can fit a negative pair.
+
+Three of the four true tree-1 edges come back. The fourth shows the greedy
+step at work: in this sample |τ| is 0.464 for the pair 1–3 and 0.433 for the
+true edge 0–1, so the algorithm links 1 to 3 and picks up 0–1 in tree 2. The
+fitted log-likelihood is 4666.3 against the truth's 4750.8. A C-vine fitted to
+the same data gets 4605.1 and a D-vine 3700.8, because neither can draw the
+true shape.
+
+Two checks pin the R-vine code down. An all-Gaussian R-vine is exactly the
+Gaussian copula with the implied correlation matrix (`to_gaussian()` works for
+any structure). A C- or D-vine rewritten as its R-vine matrix (`to_rvine()`,
+or `structure="R", matrix=vine.matrix`) gives the same log-density to 1e-12.
+Against R `VineCopula` 2.6.1, the density, log-likelihood and Rosenblatt
+transform of a five-variable mixed R-vine agree to 1e-8. Dissmann selection on
+600 R-simulated rows picks the same matrix and the same 10 families as R's
+`RVineStructureSelect`, with log-likelihood 1183.5 against R's 1184.8 (the two
+use different optimisers).
+
+Sampling uses the exact inverse h-function wherever one exists: Gaussian,
+Student t, Clayton, Frank, all their rotations, and BB1/BB7 through a Newton
+solve. Only Gumbel and Joe still fall back to bisection. A ten-variable full
+vine draws 20,000 rows 15 to 40 times faster than rcopula 0.4.0. Seeded draws
+agree with 0.4.0 to about 1e-13, except where 0.4.0's h-function was a
+numerical derivative, which is about 1e-7.
+
 ## Using it
 
 ```python

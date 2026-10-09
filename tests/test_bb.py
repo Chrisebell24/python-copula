@@ -44,7 +44,9 @@ class TestDefinitions:
         hi[:, 0] += e
         lo[:, 0] -= e
         numeric = (cop.hfunc(hi, 1) - cop.hfunc(lo, 1)) / (2 * e)
-        np.testing.assert_allclose(cop.pdf(POINTS), numeric, rtol=1e-6)
+        # Central differences of h carry ~1e-11 absolute error, which is all
+        # that is left where the density itself is tiny (~1e-5 in a far corner).
+        np.testing.assert_allclose(cop.pdf(POINTS), numeric, rtol=1e-6, atol=1e-9)
 
     def test_hinv_inverts_h(self, cop) -> None:
         h = cop.hfunc(POINTS, given=1)

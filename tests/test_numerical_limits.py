@@ -419,3 +419,167 @@ class TestSingularComponents:
         """Purely singular, so raising is the honest answer."""
         with pytest.raises(NotImplementedError, match="singular"):
             cop.pdf([[0.3, 0.4]])
+
+
+class TestNearIndependence:
+    """Regressions found by the property tests (``tests/test_properties.py``).
+
+    Each family's independence point is a removable singularity -- the textbook
+    formulas divide by ``theta`` (or ``theta - 1``) -- and every one of these
+    returned wrong numbers, not merely imprecise ones, within ``1e-8`` of it.
+    """
+
+    U = np.array([[0.3, 0.6], [0.9, 0.2], [0.05, 0.95]])
+
+    @pytest.mark.parametrize("theta", [1e-300, 1e-20, 1e-12, 1e-9, 1e-5, -1e-9, 0.5])
+    def test_frank_tau_and_rho_follow_their_series(self, theta: float) -> None:
+        # Was: tau = 1.0 at theta = 1e-20, the wrong sign at 1e-9, and a 35%
+        # error at 1e-7; the closed forms cancel catastrophically near zero.
+        cop = rc.FrankCopula(theta)
+        tau = theta / 9 - theta**3 / 900 + theta**5 / 52920
+        rho = theta / 6 - theta**3 / 450 + theta**5 / 23520
+        rel = 1e-14 if abs(theta) < 1e-3 else 1e-6  # the reference stops at theta^5
+        assert cop.tau() == pytest.approx(tau, rel=rel, abs=1e-300)
+        assert cop.rho() == pytest.approx(rho, rel=rel, abs=1e-300)
+
+    def test_frank_series_meets_the_closed_form_at_the_cutoff(self) -> None:
+        below, above = rc.FrankCopula(np.nextafter(2.0, 0.0)), rc.FrankCopula(2.0)
+        assert below.tau() == pytest.approx(above.tau(), rel=1e-14)
+        assert below.rho() == pytest.approx(above.rho(), rel=1e-14)
+
+    @pytest.mark.parametrize("theta", [1e-300, 1e-30, 1e-12, -1e-12, 1e-8])
+    def test_frank_cdf_is_continuous_at_independence(self, theta: float) -> None:
+        # Was: 0 or 1 below theta ~ 1e-17 and off by 5e-5 at 1e-12.
+        u = self.U
+        # C = uv + (theta / 2) uv(1-u)(1-v) + O(theta^2)
+        first_order = u.prod(axis=1) * (1 + theta / 2 * (1 - u[:, 0]) * (1 - u[:, 1]))
+        np.testing.assert_allclose(rc.FrankCopula(theta).cdf(u), first_order, rtol=1e-14)
+
+    @pytest.mark.parametrize("target", [6e-183, -1e-300, 1e-10])
+    def test_frank_inverts_tiny_tau_and_rho(self, target: float) -> None:
+        # Was: brentq "f(a) and f(b) must have different signs" below 1e-12 / 9.
+        assert rc.FrankCopula.from_tau(target).tau() == pytest.approx(target, rel=1e-12)
+        assert rc.FrankCopula.from_rho(target).rho() == pytest.approx(target, rel=1e-12)
+
+    @pytest.mark.parametrize("eta", [1e-12, 1e-9, -1e-9, 1e-6])
+    def test_plackett_cdf_and_tau_near_theta_one(self, eta: float) -> None:
+        # Was: CDF off by 6e-5 and tau = -1.0 at theta = 1 + 1e-12 -- the CDF
+        # formula (s - d) / (2 (theta - 1)) cancels; it is now rationalised.
+        cop = rc.PlackettCopula(1.0 + eta)
+        u = self.U
+        first_order = u.prod(axis=1) * (1 + eta * (1 - u[:, 0]) * (1 - u[:, 1]))
+        np.testing.assert_allclose(cop.cdf(u), first_order, rtol=1e-12)
+        # Near independence Plackett is FGM with alpha = theta - 1: tau = 2 eta / 9.
+        # tau is a quadrature of numerical partial derivatives (~1e-12 absolute
+        # here); the bug was tau = -1.0 and 4.6e-5 for 2.2e-10.
+        assert cop.tau() == pytest.approx(2 * eta / 9, rel=1e-3, abs=2e-12)
+
+    @pytest.mark.parametrize(
+        "cop",
+        [
+            rc.ClaytonCopula(0.0),
+            rc.ClaytonCopula(0.0, dim=3),
+            rc.FrankCopula(0.0),
+            rc.FrankCopula(0.0, dim=3),
+            rc.GumbelCopula(1.0, dim=3),
+            rc.AMHCopula(0.0),
+        ],
+        ids=repr,
+    )
+    def test_rosenblatt_at_independence_is_the_identity(self, cop: rc.Copula) -> None:
+        # Was: ZeroDivisionError for Clayton, log(0) for Frank.
+        z = np.random.default_rng(1).uniform(0.01, 0.99, size=(5, cop.dim))
+        np.testing.assert_allclose(rc.rosenblatt(cop, z), z, atol=1e-15)
+        np.testing.assert_allclose(rc.inverse_rosenblatt(cop, z), z, atol=1e-15)
+
+    @pytest.mark.parametrize("theta", [1e-12, -1e-12, 1e-300])
+    def test_clayton_rosenblatt_near_independence_round_trips(self, theta: float) -> None:
+        # Was: round trip off by 1.7e-4 at theta = 1e-12 -- psi^{-1}(u) = u^-theta - 1
+        # lost its digits; it is now expm1(-theta log u).
+        cop = rc.ClaytonCopula(theta, dim=2)
+        z = np.random.default_rng(2).uniform(0.001, 0.999, size=(8, 2))
+        u = rc.inverse_rosenblatt(cop, z)
+        np.testing.assert_allclose(rc.rosenblatt(cop, u), z, atol=1e-12)
+        np.testing.assert_allclose(u, z, atol=1e-9)  # and it is ~ independence
+
+
+class TestClaytonNegativeNearIndependence:
+    """``psi(t) = (1 + t)^(-1/theta)`` rounded ``1 + t`` before raising it to a
+    huge power: at ``theta = -1e-12`` the CDF was off by 3e-5, at ``-1e-20`` by
+    up to 1.0 (outside the Frechet bounds). Now ``exp(-log1p(t) / theta)``."""
+
+    @pytest.mark.parametrize("theta", [-1.17549e-38, -1e-20, -1e-12, -1e-8])
+    def test_cdf_is_independence_to_first_order(self, theta: float) -> None:
+        u = np.random.default_rng(0).uniform(size=(20, 2))
+        first_order = u.prod(axis=1) * np.exp(theta * np.log(u[:, 0]) * np.log(u[:, 1]))
+        np.testing.assert_allclose(rc.ClaytonCopula(theta).cdf(u), first_order, rtol=1e-12)
+
+
+class TestFactorStudentHeavyTails:
+    """The Student factor copula's CDF integrated the chi scale with a 40-node
+    Laguerre rule, which converges slowly through the sqrt(W) kink: the margin
+    identity C(u, 1, 1) = u failed by 2e-2 at df = 1 and 9e-4 at df = 2. Below
+    df = 8 a probability-scale Gauss-Legendre rule is used instead."""
+
+    @pytest.mark.parametrize("df", [0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 30.0])
+    def test_margins_and_dense_agreement(self, df: float) -> None:
+        cop = rc.FactorCopula([0.5, 0.4, 0.3], df=df)
+        x = np.array([0.3, 0.7, 0.9, 0.02, 0.999])
+        margins = cop.cdf(np.column_stack([x, np.ones(5), np.ones(5)]))
+        np.testing.assert_allclose(margins, x, atol=1e-6)
+        pts = np.random.default_rng(0).uniform(0.01, 0.99, size=(10, 3))
+        np.testing.assert_allclose(cop.cdf(pts), cop.to_elliptical().cdf(pts), atol=1e-6)
+
+
+class TestNegligibleTheta:
+    """A subnormal ``theta`` made ``1 / theta`` overflow: ``nan`` densities and
+    CDF margins of 0 for Clayton and Frank. Below ``1e-300`` the copula is
+    independence to every representable digit, and is now treated as such."""
+
+    @pytest.mark.parametrize("theta", [5e-324, 2.2e-309, -1e-305])
+    @pytest.mark.parametrize("family", [rc.ClaytonCopula, rc.FrankCopula])
+    def test_is_independence(self, family: type, theta: float) -> None:
+        cop = family(theta)
+        u = np.array([[0.3, 1.0], [0.3, 0.6]])
+        np.testing.assert_array_equal(cop.cdf(u), [0.3, 0.18])
+        np.testing.assert_array_equal(cop.logpdf(u[1:]), [0.0])
+
+
+class TestInversionJustAboveTheBound:
+    """Gumbel and Joe have their independence point *on* the lower bound
+    ``theta = 1``; a tau or rho below ``tau(1 + 1e-9)`` sat under the first rung
+    of the bracketing ladder and was reported "not attainable"."""
+
+    @pytest.mark.parametrize("family", [rc.GumbelCopula, rc.JoeCopula])
+    # Not much smaller: below 1e-12 `_attained_at_bound` deliberately snaps to
+    # theta = 1, and theta = 1 + O(target) is resolved only in steps of 2.2e-16.
+    @pytest.mark.parametrize("target", [3e-10, 1e-11])
+    def test_tiny_positive_targets_invert(self, family: type, target: float) -> None:
+        assert family.from_tau(target).tau() == pytest.approx(target, rel=1e-3)
+        assert family.from_rho(target).rho() == pytest.approx(target, rel=1e-3)
+
+
+class TestDebyeAccuracy:
+    """``scipy.special.bernoulli`` is accurate only to ~1e-12 (its B_4), which
+    capped the Debye series -- and Frank's tau and rho -- at ~4e-14. The
+    Bernoulli numbers are now exact rationals."""
+
+    def test_bernoulli_ratios_are_correctly_rounded(self) -> None:
+        from fractions import Fraction
+
+        from rcopula.special.debye import even_bernoulli_over_factorial
+
+        exact = [Fraction(1, 6) / 2, Fraction(-1, 30) / 24, Fraction(1, 42) / 720]
+        assert even_bernoulli_over_factorial(3).tolist() == [float(v) for v in exact]
+
+    @pytest.mark.parametrize("x", [0.1, 1.0, 1.99, 2.0, 2.5])
+    def test_debye_matches_high_precision(self, x: float) -> None:
+        mpmath = pytest.importorskip("mpmath")
+        from rcopula.special import debye_n
+
+        mpmath.mp.dps = 40
+        for n in (1, 2):
+            ref = (n / mpmath.mpf(x) ** n) * mpmath.quad(
+                lambda t, n=n: t**n / mpmath.expm1(t), [0, x]
+            )
+            assert float(debye_n(x, n)) == pytest.approx(float(ref), rel=1e-15)

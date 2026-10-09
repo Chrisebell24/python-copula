@@ -267,6 +267,58 @@ def _carried_value(copula: Copula, fitted: Copula, index: int) -> float:
     return value if np.isfinite(value) else float(fitted.params[index])
 
 
+def _pairwise_correlations(
+    copula: EllipticalCopula, stat: NDArray[np.float64], measure: str
+) -> NDArray[np.float64]:
+    r"""Invert pairwise tau or rho into correlations, pair by pair.
+
+    Kendall's tau gives :math:`\sin(\pi\tau/2)` for every elliptical copula.
+    Spearman's rho gives :math:`2\sin(\pi\rho_S/6)` only for the *Gaussian*;
+    a t copula's rho is inverted numerically at its ``df``, exactly as
+    :meth:`StudentCopula.from_rho` does in two dimensions. (The unstructured
+    branch used the Gaussian relation for t copulas too, so ``"irho"`` on a 3-d
+    t copula with ``df=2.5`` converged to 0.677 for a true correlation of 0.7.)
+    """
+    if measure == "tau":
+        return np.sin(np.pi * stat / 2.0)
+    if isinstance(copula, StudentCopula):
+        df = float(copula.df)
+        return np.array([float(StudentCopula.from_rho(float(s), df=df).params[0]) for s in stat])
+    return 2.0 * np.sin(np.pi * stat / 6.0)
+
+
+def _dcorrelation_dstat(
+    copula: EllipticalCopula, correlation: NDArray[np.float64], measure: str
+) -> NDArray[np.float64]:
+    """Derivative of the inverse map (correlation as a function of tau/rho).
+
+    Evaluated *at a correlation*, so it serves both the pairwise inversion
+    (evaluated at each pair's own inverse) and R's convention for structured
+    matrices (evaluated at the fitted correlation of each pair).
+    """
+    r = np.asarray(correlation, dtype=np.float64)
+    if measure == "tau":
+        # tau = (2 / pi) arcsin(r)  =>  dr / dtau = (pi / 2) sqrt(1 - r^2)
+        return (np.pi / 2.0) * np.sqrt(np.clip(1.0 - r**2, 0.0, None))
+    if isinstance(copula, StudentCopula):
+        from rcopula.core.elliptical import _student_rho
+
+        df, h = float(copula.df), 1e-5
+        slope = np.array(
+            [
+                (
+                    _student_rho(min(x + h, 1.0 - 1e-12), df)
+                    - _student_rho(max(x - h, -1.0 + 1e-12), df)
+                )
+                / (min(x + h, 1.0 - 1e-12) - max(x - h, -1.0 + 1e-12))
+                for x in r
+            ]
+        )
+        return 1.0 / slope
+    # rho_S = (6 / pi) arcsin(r / 2)  =>  dr / drho_S = (pi / 3) sqrt(1 - r^2 / 4)
+    return (np.pi / 3.0) * np.sqrt(1.0 - r**2 / 4.0)
+
+
 def _inverted_correlations(
     copula: EllipticalCopula, u: NDArray[np.float64], measure: str
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -282,7 +334,7 @@ def _inverted_correlations(
     """
     d = copula.dim
     stat = _pairwise_measure(u, measure)
-    rho = np.sin(np.pi * stat / 2.0) if measure == "tau" else 2.0 * np.sin(np.pi * stat / 6.0)
+    rho = _pairwise_correlations(copula, stat, measure)
     n_corr = rho.size
     corr_free = np.asarray(copula.free[:n_corr], dtype=bool)
     if corr_free.all():
@@ -303,18 +355,83 @@ def _inverted_correlations(
 
 
 def _correlation_cov(
-    u: NDArray[np.float64], stat: NDArray[np.float64], measure: str
+    copula: EllipticalCopula, u: NDArray[np.float64], stat: NDArray[np.float64], measure: str
 ) -> NDArray[np.float64] | None:
     """Delta-method covariance of pairwise-inverted correlations (all pairs)."""
     # Each correlation depends only on its own pairwise statistic, so the
-    # Jacobian is diagonal: d(sin(pi t / 2))/dt for tau, and d(2 sin(pi r / 6))/dr
-    # for rho.
+    # Jacobian is diagonal, evaluated at each pair's own inverse.
     jac = np.diag(
-        (np.pi / 2.0) * np.cos(np.pi * stat / 2.0)
-        if measure == "tau"
-        else (np.pi / 3.0) * np.cos(np.pi * stat / 6.0)
+        _dcorrelation_dstat(copula, _pairwise_correlations(copula, stat, measure), measure)
     )
     return var_inversion_multi(u, jac, measure=measure)
+
+
+def _structured_correlations(
+    copula: EllipticalCopula, u: NDArray[np.float64], measure: str, estimate_variance: bool
+) -> tuple[NDArray[np.float64], NDArray[np.float64] | None]:
+    """Inversion estimate of a Toeplitz or AR(1) correlation structure, as R does it.
+
+    Each pair's tau/rho is inverted to a correlation, the matrix is repaired to
+    the nearest correlation matrix (R's ``nearPD``), and the structure is then
+    fitted to those pairwise correlations by least squares (R's ``getXmat``
+    regression):
+
+    * ``"toep"`` -- the lag-``k`` parameter is the mean of the pairwise
+      correlations ``|i - j| = k``;
+    * ``"ar1"`` -- ``log r_ij = |i - j| log rho`` through the origin, i.e.
+      ``rho = exp(sum(lag * log r) / sum(lag^2))``. When some pairwise
+      correlation is not positive the logarithm does not exist (R fails there);
+      ``rho`` is then the least-squares solution of ``r_ij = rho^|i - j|``.
+
+    Before this existed the structured cases fell through to the
+    one-parameter path, which averages *all* pairwise statistics: ``"toep"``
+    came back with every lag equal, and ``"ar1"`` with the average over all
+    lags -- 0.40 for a true lag-1 correlation of 0.6 in five dimensions.
+
+    Returns the parameters for the free correlation entries' positions (fixed
+    ones keep their values) and their delta-method covariance over *all*
+    correlation parameters, with R's convention of evaluating the derivative
+    at the fitted correlations.
+    """
+    d = copula.dim
+    stat = _pairwise_measure(u, measure)
+    icor = P2p(nearest_correlation(p2P(_pairwise_correlations(copula, stat, measure), d)))
+    lags = P2p(np.abs(np.subtract.outer(np.arange(d), np.arange(d)))).astype(int)
+    n_corr = 1 if copula.dispstr == "ar1" else d - 1
+    corr_free = np.asarray(copula.free[:n_corr], dtype=bool)
+    params = np.array(copula.params[:n_corr], dtype=np.float64)
+
+    if copula.dispstr == "toep":
+        # (n_corr, n_pairs) averaging matrix: row k averages the lag-(k+1) pairs.
+        weights = np.array([(lags == k + 1) / np.sum(lags == k + 1) for k in range(n_corr)])
+        params = np.where(corr_free, weights @ icor, params)
+        fitted_pairs = params[lags - 1]
+        jac = weights * _dcorrelation_dstat(copula, fitted_pairs, measure)[None, :]
+    else:
+        lag = lags.astype(np.float64)
+        if np.all(icor > 0.0):
+            rho = float(np.exp(np.sum(lag * np.log(icor)) / np.sum(lag**2)))
+            fitted_pairs = rho**lag
+            # d rho / d r_ij = rho * lag_ij / (r_ij * sum(lag^2)), at the fitted r_ij.
+            dparam = rho * lag / (fitted_pairs * np.sum(lag**2))
+        else:
+            fit_ls = optimize.minimize_scalar(
+                lambda r: float(np.sum((icor - r**lag) ** 2)),
+                bounds=(-1.0 + 1e-10, 1.0 - 1e-10),
+                method="bounded",
+                options={"xatol": 1e-13},
+            )
+            rho = float(fit_ls.x)
+            fitted_pairs = rho**lag
+            # Implicit-function derivative of the least-squares root.
+            grad = lag * rho ** (lag - 1.0)
+            curv = np.sum(grad**2 - (icor - fitted_pairs) * lag * (lag - 1.0) * rho ** (lag - 2.0))
+            dparam = grad / curv
+        params = np.array([rho])
+        jac = (dparam * _dcorrelation_dstat(copula, fitted_pairs, measure))[None, :]
+
+    cov = var_inversion_multi(u, jac, measure=measure) if estimate_variance else None
+    return params, cov
 
 
 def _fit_by_inversion(
@@ -349,8 +466,25 @@ def _fit_by_inversion(
         corr, stat = _inverted_correlations(copula, u, measure)
         full[:n_corr] = corr
         if estimate_variance:
-            cov_all = _correlation_cov(u, stat, measure)
+            cov_all = _correlation_cov(copula, u, stat, measure)
         reference: Copula = copula
+    elif isinstance(copula, EllipticalCopula) and copula.dispstr in ("toep", "ar1") and d > 2:
+        n_corr = int(determined.sum())
+        if not free[:n_corr].any():
+            raise ValueError(
+                f"cannot fit {_names(copula, free & ~determined)} by {measure} inversion: "
+                "it estimates only the correlations, and they are all fixed; use "
+                "method='mpl'"
+            )
+        full[:n_corr], cov_all = _structured_correlations(copula, u, measure, estimate_variance)
+        try:
+            copula.with_params(full)
+        except ValueError as exc:
+            raise ValueError(
+                f"inverting {measure} pair by pair gives a {copula.dispstr!r} correlation "
+                f"structure that is not positive definite ({exc}); use method='mpl'"
+            ) from exc
+        reference = copula
     else:
         # One dependence parameter: average the pairwise statistics, invert once.
         if not free[determined].any():
@@ -480,9 +614,15 @@ def _optimise(
                 bounds=span,
                 options={"xatol": 1e-10, "fatol": 1e-10, "maxiter": 5000},
             )
-        return optimize.minimize(
-            negative_loglik, guess, method=which, bounds=span, options={"maxiter": 5000}
-        )
+        # L-BFGS-B's default stopping rule (relative change in f below 2.2e-9)
+        # stops a log-likelihood of a few hundred ~1e-6 short of its maximum,
+        # i.e. 1e-4 relative error in the estimates of a 6-10 parameter
+        # unstructured fit; R's BFGS gets further. Tightened to the precision
+        # the finite-difference gradient supports.
+        options: dict[str, float | int] = {"maxiter": 5000}
+        if which == "L-BFGS-B":
+            options.update(ftol=1e-13, gtol=1e-9)
+        return optimize.minimize(negative_loglik, guess, method=which, bounds=span, options=options)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -869,7 +1009,7 @@ def _fit_itau_mpl(
 
     cov = None
     if estimate_variance:
-        corr_cov = _correlation_cov(u, stat, "tau")
+        corr_cov = _correlation_cov(copula, u, stat, "tau")
         cov_full = np.full((free.size, free.size), np.nan)
         if corr_cov is not None:
             cov_full[:n_corr, :n_corr] = corr_cov

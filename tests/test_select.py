@@ -100,7 +100,18 @@ class TestDimensionHandling:
 
     def test_all_registered_families_appear_in_two_dimensions(self) -> None:
         u = rc.FrankCopula(4.0).rvs(400, random_state=0)
-        assert set(select_copula(u).table.index) == set(FAMILIES)
+        everyday = {name for name, spec in FAMILIES.items() if "all" in spec.groups}
+        assert set(select_copula(u).table.index) == everyday
+
+    def test_rotations_and_bb_families_are_opt_in(self) -> None:
+        """Kept out of ``"all"`` so the default ranking is unchanged; the
+        ``"vine"`` group (and naming them) brings them in."""
+        u = rc.RotatedCopula(rc.ClaytonCopula(2.0), 90).rvs(400, random_state=0)
+        names = set(select_copula(u).table.index)
+        assert not (names & {"clayton90", "bb1", "bb7_270"})
+        vine = set(select_copula(u, families="vine").table.index)
+        assert {"clayton90", "gumbel270", "joe180", "bb1", "bb7_90"} <= vine
+        assert select_copula(u, families="vine").best_name in {"clayton90", "bb1_90", "bb7_90"}
 
     def test_asking_for_a_bivariate_family_in_higher_dimensions_is_an_error(self) -> None:
         u = rc.GaussianCopula(0.5, dim=3).rvs(200, random_state=0)

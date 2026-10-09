@@ -163,6 +163,10 @@ def _encode(copula: Copula) -> dict[str, Any]:
             "kind": kind,
             "copulas": [_encode(component) for component in copula.copulas],
             "weights": _floats(copula.weights),
+            # The weights are for reading; the exact parameter vector (component
+            # parameters, then weight log-odds) is what makes reloading exact --
+            # rebuilding from weights can land one ulp away.
+            "params": _floats(copula.params),
         }
     if isinstance(copula, NestedArchimedean):
         return {
@@ -462,9 +466,12 @@ def _decode(node: dict[str, Any]) -> Copula:
             _decode(node["copula1"]), _decode(node["copula2"]), shapes=node["shapes"]
         )
     if kind == "MixtureCopula":
-        return rc.MixtureCopula(
+        mixture = rc.MixtureCopula(
             [_decode(component) for component in node["copulas"]], weights=node["weights"]
         )
+        if "params" in node:  # absent from documents written before 0.5.0
+            mixture = mixture.with_params(np.asarray(node["params"], dtype=float))
+        return mixture
     if kind == "NestedArchimedean":
         children = [_decode(child) for child in node["children"]]
         return rc.NestedArchimedean(

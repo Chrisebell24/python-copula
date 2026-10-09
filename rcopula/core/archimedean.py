@@ -43,11 +43,11 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import brentq
-from scipy.special import digamma, zeta
+from scipy.special import digamma, exprel, zeta
 
 from rcopula.core.base import Copula, TailDependence
 from rcopula.special.combinatorics import eulerian_all, stirling1_all, stirling2_all
-from rcopula.special.debye import debye1, debye2
+from rcopula.special.debye import debye1, debye2, even_bernoulli_over_factorial
 from rcopula.special.logexp import log1mexp, log1pexp, signed_logsumexp
 from rcopula.special.stable import rlog_series, rsibuya, rstable_positive
 
@@ -295,9 +295,16 @@ class ArchimedeanGenerator(ABC):
         -------
         bool
             ``True`` if ``theta`` gives the independence copula. The default
-            rule is ``theta == 0``; Gumbel and Joe use ``theta == 1``.
+            rule is ``|theta| < 1e-300``; Gumbel and Joe use ``theta == 1``.
+
+        Notes
+        -----
+        Not just ``theta == 0``: below about ``5.6e-309`` the ``1 / theta`` in
+        Clayton and Frank overflows to ``inf``, and a subnormal ``theta`` gave
+        ``nan`` densities and CDF margins of 0. Such a copula differs from
+        independence by ``O(theta)``, far below anything a double can show.
         """
-        return theta == 0.0
+        return abs(theta) < 1e-300
 
     # -- optional log-space paths, for strong dependence ----------------
     #
@@ -500,8 +507,13 @@ class ArchimedeanGenerator(ABC):
         if np.isfinite(hi):
             rungs.append(hi - np.geomspace(1e-9, _THETA_MAX, _LADDER_RUNGS))
 
+        # A finite bound is a rung too: a target just above the value there
+        # (tau = 3e-10 for Joe, i.e. theta = 1 + 5e-10) lies below the first
+        # interior rung, and without the bound no sign change was ever seen.
+        rungs.append(np.array([b for b in (lo, hi) if np.isfinite(b)]))
+
         ladder = np.unique(np.concatenate(rungs))
-        ladder = ladder[(ladder > lo) & (ladder < hi)]
+        ladder = ladder[(ladder >= lo) & (ladder <= hi)]
 
         def safe(t: float) -> float:
             """Overflow at extreme theta is expected; treat it as "no value here"
@@ -591,6 +603,49 @@ class ArchimedeanGenerator(ABC):
         return float(brentq(lambda th: self.rho(th) - rho, a, b, xtol=1e-12, rtol=8.9e-16))
 
 
+#: Below this ``|theta|`` Frank's tau and rho come from their Taylor series.
+#: The closed forms ``1 - 4 (1 - D_1) / theta`` and ``1 - 12 (D_1 - D_2) / theta``
+#: subtract two numbers that both tend to 1 and divide by theta: the relative
+#: error grows like ``eps / theta^2`` -- 6e-6 at theta = 1e-5, the wrong sign at
+#: 1e-9, and tau = 1.0 (perfect dependence) at theta = 1e-20.
+_FRANK_SERIES_CUTOFF = 2.0
+_FRANK_SERIES_TERMS = 24
+
+
+def _frank_coefficients(kind: str) -> NDArray[np.float64]:
+    r"""Odd-power Taylor coefficients of Frank's tau or rho in theta.
+
+    From :math:`D_n(x) = 1 - \frac{n x}{2(n+1)} + n\sum_{k\ge1}
+    \frac{B_{2k} x^{2k}}{(2k+n)(2k)!}` (Abramowitz & Stegun 27.1.1):
+
+    .. math::
+        \tau = 4\sum_{k\ge1} \frac{B_{2k}\,\theta^{2k-1}}{(2k+1)(2k)!},\qquad
+        \rho = 12\sum_{k\ge1} \frac{2k\,B_{2k}\,\theta^{2k-1}}{(2k)!(2k+1)(2k+2)},
+
+    i.e. ``tau = theta/9 - theta^3/900 + ...`` and ``rho = theta/6 - theta^3/450
+    + ...``. The radius of convergence is 2 pi, so at ``|theta| < 2`` the
+    twenty-four terms used leave a truncation error below ``(1 / pi)^48``.
+    """
+    k = np.arange(1, _FRANK_SERIES_TERMS + 1)
+    b_over_fact = even_bernoulli_over_factorial(_FRANK_SERIES_TERMS)
+    if kind == "tau":
+        return 4.0 * b_over_fact / (2 * k + 1)
+    return 12.0 * 2 * k * b_over_fact / ((2 * k + 1) * (2 * k + 2))
+
+
+_FRANK_TAU_COEF = _frank_coefficients("tau")
+_FRANK_RHO_COEF = _frank_coefficients("rho")
+
+
+def _frank_series(theta: float, coef: NDArray[np.float64]) -> float:
+    """Evaluate ``sum_k coef[k] theta^(2k+1)`` by Horner's rule in ``theta^2``."""
+    t2 = theta * theta
+    acc = 0.0
+    for c in coef[::-1]:
+        acc = acc * t2 + float(c)
+    return float(theta * acc)
+
+
 class _ClaytonGenerator(ArchimedeanGenerator):
     r"""Clayton: :math:`\psi(t) = (1 + t)^{-1/\theta}`.
 
@@ -610,10 +665,24 @@ class _ClaytonGenerator(ArchimedeanGenerator):
         # 1 + t <= 0. That region is where C hits the Frechet lower bound, and
         # it is reached for perfectly ordinary (u, v), so it has to be handled
         # rather than left to produce nan from a fractional power of a negative.
-        return np.maximum(1.0 + t, 0.0) ** (-1.0 / theta)
+        #
+        # Written as exp(-log1p(t) / theta) rather than (1 + t)^(-1/theta):
+        # near independence t = O(theta), and forming 1 + t first rounded away
+        # the digits the huge exponent then amplified (the CDF was off by 3e-5
+        # at theta = -1e-12, and by up to 1.0 at theta = -1e-20).
+        t = np.asarray(t, dtype=np.float64)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            value = np.exp(-np.log1p(np.maximum(t, -1.0)) / theta)
+        return np.where(1.0 + t > 0.0, value, 0.0)
 
     def ipsi(self, u, theta):
-        return u ** (-theta) - 1.0
+        # u^(-theta) - 1 written as expm1(-theta log u): near independence the
+        # value is ~ -theta log u, and the subtraction kept only its leading
+        # digits -- at theta = 1e-12 the Rosenblatt transform, which divides
+        # differences of these by theta, was off by 1.7e-4.
+        with np.errstate(divide="ignore"):
+            # "+ 0.0" turns the -0.0 that expm1(-theta * log 1) gives into 0.0.
+            return np.expm1(-theta * np.log(u)) + 0.0
 
     def log_abs_dpsi(self, t, theta):
         # log|theta|, not log(theta): theta is negative on the whole
@@ -838,6 +907,13 @@ class _FrankGenerator(ArchimedeanGenerator):
         ``theta < -709``; taking the logarithm first avoids both.
         """
         t = np.asarray(t, dtype=np.float64)
+        if abs(theta) < 1.0:
+            # Near independence 1 - h e^{-t} is 1 - O(theta): the two-term sum
+            # keeps it only to absolute precision, and dividing its logarithm by
+            # theta turned that into an error of eps / theta -- the CDF was off
+            # by 5e-5 at theta = 1e-12 and returned 0 or 1 below about 1e-17.
+            # Here h e^{-t} is small, so log1p of it is exact to rounding.
+            return -np.log1p(np.expm1(-theta) * np.exp(-t)) / theta
         with np.errstate(divide="ignore"):
             log_omz = np.logaddexp(np.log(-np.expm1(-t)), -theta - t)
         return -log_omz / theta
@@ -868,6 +944,20 @@ class _FrankGenerator(ArchimedeanGenerator):
         copula short-circuits there before reaching this method.
         """
         u = np.asarray(u, dtype=np.float64)
+        if abs(theta) < 1.0:
+            # Nothing can overflow here, so form s as a ratio. Its logarithm as
+            # a difference of logs subtracts two numbers of size |log theta|
+            # (~690 at theta = 1e-300) and kept only ~1e-13 of the result.
+            # expm1(a) / expm1(b) = (a / b) exprel(a) / exprel(b), which also
+            # survives theta * u underflowing to zero.
+            with np.errstate(divide="ignore", invalid="ignore"):
+                s = (
+                    np.exp(-theta * u)
+                    * ((1.0 - u) / u)
+                    * exprel(-theta * (1.0 - u))
+                    / exprel(-theta * u)
+                )
+            return np.asarray(np.log1p(s))
         with np.errstate(divide="ignore", invalid="ignore"):
             log_s = (
                 -theta * u
@@ -924,13 +1014,13 @@ class _FrankGenerator(ArchimedeanGenerator):
         return _log_polylog_neg_int(z, d - 1, omz) - np.log(abs(theta))
 
     def tau(self, theta):
-        if theta == 0.0:
-            return 0.0
+        if abs(theta) < _FRANK_SERIES_CUTOFF:
+            return _frank_series(theta, _FRANK_TAU_COEF)
         return 1.0 - 4.0 * (1.0 - float(debye1(theta))) / theta
 
     def rho(self, theta):
-        if theta == 0.0:
-            return 0.0
+        if abs(theta) < _FRANK_SERIES_CUTOFF:
+            return _frank_series(theta, _FRANK_RHO_COEF)
         return 1.0 - 12.0 * (float(debye1(theta)) - float(debye2(theta))) / theta
 
     def lambda_(self, theta):
@@ -955,6 +1045,11 @@ class _FrankGenerator(ArchimedeanGenerator):
             )
         if target == 0.0:
             return 0.0
+        if abs(target) < 1e-9:
+            # tau = theta/9 - theta^3/900 + ..., rho = theta/6 - theta^3/450 + ...:
+            # the linear inverse is exact to rounding here, and the bracket below
+            # starts at |theta| = 1e-12, which a smaller target lies beneath.
+            return float(target * (9.0 if label == "tau" else 6.0))
         edge = self._INVERSION_THETA_MAX
         lo, hi = (1e-12, edge) if target > 0 else (-edge, -1e-12)
         extreme = measure(hi if target > 0 else lo)

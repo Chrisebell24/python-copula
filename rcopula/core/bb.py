@@ -509,7 +509,7 @@ class BB7Copula(_BBCopula):
     >>> round(lam.lower, 4), round(lam.upper, 4)
     (0.7071, 0.4126)
     >>> round(cop.tau(), 4)
-    0.5359
+    0.5429
 
     With ``theta = 1`` it reduces to Clayton:
 

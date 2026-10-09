@@ -177,7 +177,7 @@ def _h_inverse(
     every rotation of those, and BB1/BB7 through their own Newton solver -- and
     otherwise (Gumbel, Joe, the extreme-value families, ...) the generic
     60-step bisection on :func:`_h` is the fallback. ``closed_form=False``
-    forces the bisection everywhere, which is how rcopula 0.3.0 and earlier
+    forces the bisection everywhere, which is how rcopula 0.4.0 and earlier
     sampled a full vine. ``cache`` remembers a conditioning variable's
     quantiles between elliptical calls that share it, as every tree-1 edge of
     a C-vine does.
@@ -602,9 +602,11 @@ class VineCopula(Copula):
     The sampler inverts each pair-copula's h-function in closed form where an
     exact inverse exists (Gaussian, Student t, Clayton, Frank and their
     rotations; BB1 and BB7 by a safeguarded Newton solve) and by bisection
-    otherwise (Gumbel, Joe, ...). rcopula 0.3.0 used bisection everywhere on a
-    full vine, so seeded draws from such a vine differ from 0.3.0 in about the
-    eighth decimal place while being several times faster.
+    otherwise (Gumbel, Joe, ...). rcopula 0.4.0 and earlier used bisection
+    everywhere on a full vine. Seeded draws agree with those to about
+    ``1e-13`` where the old h-function was exact and to about ``1e-7`` where
+    it was a numerical derivative (rotated families), and a ten-variable full
+    vine now samples 15 to 40 times faster.
 
     An R-vine matrix is checked for the proximity condition in every tree that
     carries dependence; trees past :attr:`truncation_level` hold only
@@ -686,11 +688,11 @@ class VineCopula(Copula):
       tree 1  3,4            Clayton copula, dim 2, theta=2
       tree 1  0,1            Gumbel copula, dim 2, theta=1.5
       tree 1  0,2            Frank copula, dim 2, theta=4
-      tree 1  0,3            Gaussian copula, dim 2, rho.1=0.5
-      tree 2  0,4|3          Gaussian copula, dim 2, rho.1=0.3
+      tree 1  0,3            Gaussian copula, dim 2, rho=0.5
+      tree 2  0,4|3          Gaussian copula, dim 2, rho=0.3
       tree 2  3,1|0          90-degree rotated Clayton copula, dim 2, theta=1
       tree 2  3,2|0          Frank copula, dim 2, theta=-2
-      tree 3  2,4|0,3        t copula, dim 2, rho.1=0.2, df=6
+      tree 3  2,4|0,3        Student copula, dim 2, rho=0.2, df=6
       tree 3  2,1|3,0        Gumbel copula, dim 2, theta=1.2
       tree 4  1,4|2,0,3      Independence copula, dim 2
     >>> rvine.truncation_level
@@ -1052,7 +1054,7 @@ class VineCopula(Copula):
                     yield copula, root, level[i + 1]
                 if k < depth - 1:
                     level = [
-                        _h(copula, level[i + 1], root, given=1) for i, copula in enumerate(copulas)
+                        _h(copula, root, level[i + 1], given=0) for i, copula in enumerate(copulas)
                     ]
             return
 
@@ -1156,7 +1158,7 @@ class VineCopula(Copula):
                     self.pair_copulas[k][i - k - 1],
                     value,
                     v[k][k],
-                    side=1,
+                    side=0,
                     closed_form=closed_form,
                     cache=cache,
                 )
@@ -1164,7 +1166,7 @@ class VineCopula(Copula):
             if i == d - 1:
                 break
             for j in range(min(i, depth - 1)):
-                v[i][j + 1] = _h(self.pair_copulas[j][i - j - 1], v[i][j], v[j][j], given=1)
+                v[i][j + 1] = _h(self.pair_copulas[j][i - j - 1], v[j][j], v[i][j], given=0)
         return x
 
     def _simulate_d_vine(
@@ -1264,7 +1266,7 @@ class VineCopula(Copula):
         dependence that should not be there.
 
         A C-vine or R-vine is transformed through its R-vine form (see
-        :meth:`to_rvine`); a D-vine uses its own recursion. (rcopula 0.3.0 and
+        :meth:`to_rvine`); a D-vine uses its own recursion. (rcopula 0.4.0 and
         earlier raised ``NotImplementedError`` for a C-vine.)
 
         Examples
@@ -1444,7 +1446,9 @@ class VineCopula(Copula):
                     r_dd = rho[np.ix_(given, given)]
                     r_a, r_b = rho[a, given], rho[b, given]
                     sol_a, sol_b = np.linalg.solve(r_dd, r_a), np.linalg.solve(r_dd, r_b)
-                    scale = np.sqrt(max(1.0 - r_a @ sol_a, 0.0) * max(1.0 - r_b @ sol_b, 0.0))
+                    var_a = max(1.0 - float(r_a @ sol_a), 0.0)
+                    var_b = max(1.0 - float(r_b @ sol_b), 0.0)
+                    scale = np.sqrt(var_a * var_b)
                     value = value * scale + float(r_a @ sol_b)
                 rho[a, b] = rho[b, a] = value
         return GaussianCopula(P2p(rho), dim=d, dispstr="un")
@@ -1779,7 +1783,7 @@ def fit_vine(
             # whatever its data, so the next level's h-transforms are not needed.
             if k < d - 2 and k + 1 < depth:
                 level_data = [
-                    _h(chosen[i], level_data[i + 1], root, given=1) for i in range(d - 1 - k)
+                    _h(chosen[i], root, level_data[i + 1], given=0) for i in range(d - 1 - k)
                 ]
     else:
         left = [arranged[:, j] for j in range(d - 1)]
@@ -1953,25 +1957,27 @@ def _fit_rvine(u: NDArray[np.float64], names: list[str], criterion: str, depth: 
                 for k1, k2, node in candidates
             ]
             shared_of = {(k1, k2): node for k1, k2, node in candidates}
-            joined = _max_spanning_tree(len(previous), weighted)
-            joined = [(a, b, shared_of[(a, b)]) for a, b in joined]
+            links: list[tuple[int, int, int]] = [
+                (k1, k2, shared_of[(k1, k2)])
+                for k1, k2 in _max_spanning_tree(len(previous), weighted)
+            ]
         else:
             # Past the truncation level any valid tree will do: join every edge
             # at a node to the first edge there. Summed over nodes that is
             # exactly one fewer link than edges, and connected -- a spanning tree.
-            joined = [(ks[0], k, node) for node, ks in incident.items() for k in ks[1:]]
+            links = [(ks[0], k, node) for node, ks in incident.items() for k in ks[1:]]
 
         level = []
-        for k1, k2, node in joined:
+        for k1, k2, node in links:
             x, y = outer(k1, node), outer(k2, node)
             rec = _Record(x, y, (k1, k2))
             if t < depth:
-                a, b = previous[k1].values[x], previous[k2].values[y]
-                rec.copula = _select_pair(a, b, names, criterion)
+                arg_x, arg_y = previous[k1].values[x], previous[k2].values[y]
+                rec.copula = _select_pair(arg_x, arg_y, names, criterion)
                 if t + 1 < depth:
                     rec.values = {
-                        x: _h(rec.copula, a, b, given=1),
-                        y: _h(rec.copula, a, b, given=0),
+                        x: _h(rec.copula, arg_x, arg_y, given=1),
+                        y: _h(rec.copula, arg_x, arg_y, given=0),
                     }
             else:
                 rec.copula = independence
