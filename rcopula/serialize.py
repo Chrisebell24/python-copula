@@ -177,6 +177,12 @@ def _encode(copula: Copula) -> dict[str, Any]:
             "pair_copulas": [[_encode(pair) for pair in tree] for tree in copula.pair_copulas],
             "structure": str(copula.structure),
             "order": [int(i) for i in copula.order],
+            # An R-vine is defined by its matrix; a C- or D-vine by its order.
+            **(
+                {"matrix": [[int(v) for v in row] for row in copula.matrix]}
+                if copula.structure == "R"
+                else {}
+            ),
         }
 
     if isinstance(copula, FactorCopula):
@@ -388,6 +394,8 @@ def _families() -> dict[str, type[Copula]]:
 
     names = [
         "AMHCopula",
+        "BB1Copula",
+        "BB7Copula",
         "ClaytonCopula",
         "FGMCopula",
         "FrankCopula",
@@ -478,11 +486,10 @@ def _decode(node: dict[str, Any]) -> Copula:
             return factor.fix_params(free)
         return factor
     if kind == "VineCopula":
-        return rc.VineCopula(
-            [[_decode(pair) for pair in tree] for tree in node["pair_copulas"]],
-            structure=node["structure"],
-            order=node["order"],
-        )
+        pair_copulas = [[_decode(pair) for pair in tree] for tree in node["pair_copulas"]]
+        if node["structure"] == "R":
+            return rc.VineCopula(pair_copulas, structure="R", matrix=node["matrix"])
+        return rc.VineCopula(pair_copulas, structure=node["structure"], order=node["order"])
 
     families = _families()
     if kind not in families:

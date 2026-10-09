@@ -112,18 +112,22 @@ from rcopula.transforms import (
     radial_simplex,
     rosenblatt,
 )
-from rcopula.vine import VineCopula, fit_vine
+from rcopula.core.bb import BB1Copula, BB7Copula
+from rcopula.vine import EXTENDED_FAMILIES, VineCopula, fit_vine
 
 __version__ = "0.4.0"
 
 __all__ = [
     "AMHCopula",
+    "BB1Copula",
+    "BB7Copula",
     "ArchimedeanCopula",
     "ClaytonCopula",
     "Copula",
     "CopulaDistribution",
     "CopulaFitResult",
     "DependogramResult",
+    "EXTENDED_FAMILIES",
     "EllipticalCopula",
     "EmpiricalCopula",
     "ExtremeValueCopula",
