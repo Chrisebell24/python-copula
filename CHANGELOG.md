@@ -3,6 +3,13 @@
 Dates are ISO. Pre-1.0 the API may change; breaking changes are listed first in
 each release.
 
+## 0.5.1 — 2026-10-09
+
+### Fixed
+
+- The README shipped in 0.5.0 was cut off in its last paragraph, so the PyPI
+  page ended mid-link. Documentation only; no code changes.
+
 ## 0.5.0 — 2026-10-09
 
 ### Added

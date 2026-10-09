@@ -115,7 +115,7 @@ from rcopula.transforms import (
 )
 from rcopula.vine import EXTENDED_FAMILIES, VineCopula, fit_vine
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 __all__ = [
     "EXTENDED_FAMILIES",
