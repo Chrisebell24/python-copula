@@ -466,7 +466,7 @@ def _decode(node: dict[str, Any]) -> Copula:
             _decode(node["copula1"]), _decode(node["copula2"]), shapes=node["shapes"]
         )
     if kind == "MixtureCopula":
-        mixture = rc.MixtureCopula(
+        mixture: Copula = rc.MixtureCopula(
             [_decode(component) for component in node["copulas"]], weights=node["weights"]
         )
         if "params" in node:  # absent from documents written before 0.5.0
