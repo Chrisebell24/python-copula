@@ -376,4 +376,6 @@ observed deviation.
 `rcopula` is MIT. R's `copula` is GPL-3. **No R source code was translated into this
 project** — every algorithm is implemented from its originating published paper, and the R
 package is used solely as a black-box test oracle. See [`NOTICE`](https://github.com/Chrisebell24/python-copula/blob/main/NOTICE) and
-[`CONTRIBUTING.md`](https:
+[`CONTRIBUTING.md`](https://github.com/Chrisebell24/python-copula/blob/main/CONTRIBUTING.md).
+
+`rcopula` is not affiliated with or endorsed by the authors of the R `copula` package.
