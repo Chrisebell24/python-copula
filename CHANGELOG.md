@@ -22,8 +22,9 @@ each release.
 
 - Full vines sample with closed-form inverse h-functions: 15–40× faster at
   d = 10. Seeded draws agree with 0.4.0 to about 1e-13.
-- Multi-parameter `mpl` fits converge to a tighter tolerance; the
-  log-likelihood now matches or beats R's.
+- `mpl` fits with more than two parameters converge to a tighter tolerance;
+  their log-likelihood now matches or beats R's. One- and two-parameter fits
+  keep the default, which already matches R and keeps rolling refits fast.
 
 ### Fixed
 

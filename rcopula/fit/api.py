@@ -618,9 +618,12 @@ def _optimise(
         # stops a log-likelihood of a few hundred ~1e-6 short of its maximum,
         # i.e. 1e-4 relative error in the estimates of a 6-10 parameter
         # unstructured fit; R's BFGS gets further. Tightened to the precision
-        # the finite-difference gradient supports.
+        # the finite-difference gradient supports. Only above two parameters:
+        # one- and two-parameter fits already match R at the default, and the
+        # tighter rule cost rolling refits (backtest_pairs) ~30% more
+        # likelihood evaluations.
         options: dict[str, float | int] = {"maxiter": 5000}
-        if which == "L-BFGS-B":
+        if which == "L-BFGS-B" and np.size(guess) > 2:
             options.update(ftol=1e-13, gtol=1e-9)
         return optimize.minimize(negative_loglik, guess, method=which, bounds=span, options=options)
 
